@@ -1,4 +1,6 @@
 package com.api.crud.repositories;
+
+import com.api.crud.DTO.UserUpdateDTO;
 import com.api.crud.models.UserModel;
 import com.api.crud.services.EmailService;
 import jakarta.persistence.EntityManager;
@@ -10,7 +12,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
-
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -27,6 +28,107 @@ public class UserDaoImp implements UserDao {
     private EmailService emailService;
 
     private static final Logger logger = LoggerFactory.getLogger(UserDaoImp.class);
+
+
+    @Transactional
+    public void register(UserModel user) {
+        logger.debug("Executing query Registering new user: {}", user.getEmail());
+        try {
+            entityManager.merge(user);
+
+            String subject = "Registration Confirmation";
+            String body = "Hello " + user.getFirstName() + ",\n\nYour account has been created successfully.\n\nGreetings!";
+            boolean emailSent = emailService.sendEmail(user.getEmail(), subject, body);
+
+            if (!emailSent) {
+                logger.error("Failed to send confirmation email to {}, rolling back registration", user.getEmail());
+                throw new RuntimeException("Failed to send confirmation email, User not registered.");
+            }
+        } catch (Exception e) {
+            logger.error("Error occurred while registering user {}: {}", user.getEmail(), e.getMessage(), e);
+            throw new RuntimeException("Failed to send confirmation email, User not registered.");
+        }
+    }
+
+    @Override
+    public Optional<UserModel> findUserByName(String firstName, String lastName) {
+        logger.debug("Executing query Searching for user with name: {} {}", firstName, lastName);
+        UserModel user = null;
+        try {
+            user = entityManager
+                    .createQuery("SELECT u FROM UserModel u WHERE u.firstName = :firstName AND u.lastName = :lastName", UserModel.class)
+                    .setParameter("firstName", firstName)
+                    .setParameter("lastName", lastName)
+                    .getSingleResult();
+        } catch (NoResultException e) {
+            logger.warn("No user found with name: {} {}", firstName, lastName);
+        } catch (Exception e) {
+            logger.error("Unexpected error while querying searching for user with name {} {}: {}", firstName, lastName, e.getMessage());
+        }
+        return Optional.ofNullable(user);
+    }
+
+    @Override
+    public Optional<UserModel> findUserByEmail(String email) {
+        logger.debug("Executing query to find user with email: {}", email);
+        Optional<UserModel> response;
+        try {
+            UserModel user = entityManager
+                    .createQuery(
+                            "SELECT u FROM UserModel u LEFT JOIN FETCH u.roles WHERE u.email = :email",
+                            UserModel.class)
+                    .setParameter("email", email)
+                    .getSingleResult();
+            response = Optional.of(user);
+        } catch (NoResultException e) {
+            logger.warn("No user found with email: {}", email);
+            response = Optional.empty();
+        } catch (Exception e) {
+            logger.error("Unexpected error while querying user with email {}: {}", email, e.getMessage());
+            response = Optional.empty();
+        }
+        return response;
+    }
+
+    @Override
+    public UserModel updateUserByEmail(String email, UserUpdateDTO dto) {
+        Optional<UserModel> optionalUser = findUserByEmail(email);
+
+        if (optionalUser.isPresent()) {
+            UserModel user = optionalUser.get();
+
+            if (dto.getFirstName() != null) user.setFirstName(dto.getFirstName());
+            if (dto.getLastName() != null) user.setLastName(dto.getLastName());
+            if (dto.getPhone() != null) user.setPhone(dto.getPhone());
+
+            entityManager.merge(user);
+            return user;
+        } else {
+            throw new RuntimeException("User with email " + email + " not found.");
+        }
+    }
+
+    @Override
+    public boolean deleteUserByEmail(String email) {
+        logger.debug("Executing query Attempting to delete user with Email: {}", email);
+        boolean response = false;
+        try {
+            UserModel user = entityManager.createQuery(
+                            "SELECT u FROM UserModel u WHERE u.email = :email", UserModel.class)
+                    .setParameter("email", email)
+                    .getSingleResult();
+
+            if (user != null) {
+                entityManager.remove(user);
+                response = true;
+            }
+        } catch (NoResultException e) {
+            logger.warn("No user found with email: {}", email);
+        } catch (Exception e) {
+            logger.error("Error while querying delete user with Email {}: {}", email, e.getMessage(), e);
+        }
+        return response;
+    }
 
     @Override
     public List<UserModel> getUsers() {
@@ -66,64 +168,10 @@ public class UserDaoImp implements UserDao {
     }
 
     @Override
-    public boolean deleteUserById(long id) {
-        logger.debug("Executing query Attempting to delete user with ID: {}", id);
-        boolean response = false;
-        try {
-            UserModel user = entityManager.find(UserModel.class, id);
-            if (user != null) {
-                entityManager.remove(user);
-                response = true;
-            }
-        } catch (Exception e) {
-            logger.error("Error while querying delete user with ID {}: {}", id, e.getMessage(), e);
-        }
-        return response;
-    }
-
-    @Override
-    public boolean deleteUserByEmail(String email) {
-        logger.debug("Executing query Attempting to delete user with Email: {}", email);
-        boolean response = false;
-        try {
-            UserModel user = entityManager.createQuery(
-                            "SELECT u FROM UserModel u WHERE u.email = :email", UserModel.class)
-                    .setParameter("email", email)
-                    .getSingleResult();
-
-            if (user != null) {
-                entityManager.remove(user);
-                response = true;
-            }
-        } catch (NoResultException e) {
-            logger.warn("No user found with email: {}", email);
-        } catch (Exception e) {
-            logger.error("Error while querying delete user with Email {}: {}", email, e.getMessage(), e);
-        }
-        return response;
-    }
-
-
     @Transactional
-    public void register(UserModel user) {
-        logger.debug("Executing query Registering new user: {}", user.getEmail());
-        try {
-            entityManager.merge(user);
-
-            String subject = "Registration Confirmation";
-            String body = "Hello " + user.getFirstName() + ",\n\nYour account has been created successfully.\n\nGreetings!";
-            boolean emailSent = emailService.sendEmail(user.getEmail(), subject, body);
-
-            if (!emailSent) {
-                logger.error("Failed to send confirmation email to {}, rolling back registration", user.getEmail());
-                throw new RuntimeException("Failed to send confirmation email, User not registered.");
-            }
-        } catch (Exception e) {
-            logger.error("Error occurred while registering user {}: {}", user.getEmail(), e.getMessage(), e);
-            throw new RuntimeException("Failed to send confirmation email, User not registered.");
-        }
+    public void update(UserModel user) {
+        entityManager.merge(user);
     }
-
 
     @Override
     public Optional<UserModel> findUserById(Long id) {
@@ -137,44 +185,6 @@ public class UserDaoImp implements UserDao {
             response = Optional.empty();
         }
         return response;
-    }
-
-    @Override
-    public Optional<UserModel> findUserByEmail(String email) {
-        logger.debug("Executing query to find user with email: {}", email);
-        Optional<UserModel> response;
-        try {
-            UserModel user = entityManager
-                    .createQuery("SELECT u FROM UserModel u WHERE u.email = :email", UserModel.class)
-                    .setParameter("email", email)
-                    .getSingleResult();
-            response = Optional.of(user);
-        } catch (NoResultException e) {
-            logger.warn("No user found with email: {}", email);
-            response = Optional.empty();
-        } catch (Exception e) {
-            logger.error("Unexpected error while querying user with email {}: {}", email, e.getMessage());
-            response = Optional.empty();
-        }
-        return response;
-    }
-
-    @Override
-    public Optional<UserModel> findUserByName(String firstName, String lastName) {
-        logger.debug("Executing query Searching for user with name: {} {}", firstName, lastName);
-        UserModel user = null;
-        try {
-            user = entityManager
-                    .createQuery("SELECT u FROM UserModel u WHERE u.firstName = :firstName AND u.lastName = :lastName", UserModel.class)
-                    .setParameter("firstName", firstName)
-                    .setParameter("lastName", lastName)
-                    .getSingleResult();
-        } catch (NoResultException e) {
-            logger.warn("No user found with name: {} {}", firstName, lastName);
-        } catch (Exception e) {
-            logger.error("Unexpected error while querying searching for user with name {} {}: {}", firstName, lastName, e.getMessage());
-        }
-        return Optional.ofNullable(user);
     }
 
     @Override
@@ -194,6 +204,20 @@ public class UserDaoImp implements UserDao {
         return user;
     }
 
-
+    @Override
+    public boolean deleteUserById(long id) {
+        logger.debug("Executing query Attempting to delete user with ID: {}", id);
+        boolean response = false;
+        try {
+            UserModel user = entityManager.find(UserModel.class, id);
+            if (user != null) {
+                entityManager.remove(user);
+                response = true;
+            }
+        } catch (Exception e) {
+            logger.error("Error while querying delete user with ID {}: {}", id, e.getMessage(), e);
+        }
+        return response;
+    }
 
 }
