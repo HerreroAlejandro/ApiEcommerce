@@ -3,7 +3,6 @@ package com.api.crud.DTO;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Getter;
 import lombok.Setter;
-
 import java.math.BigDecimal;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -38,6 +37,9 @@ public class ProductDTO {
 
     @Getter @Setter
     private String shippingAddress;
+
+    @Getter @Setter
+    private boolean active;
 
     public ProductDTO(Long idProduct, String nameProduct, BigDecimal priceProduct, String description, String imageUrl, String category) {
         this.idProduct = idProduct;
