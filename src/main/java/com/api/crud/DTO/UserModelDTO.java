@@ -1,19 +1,16 @@
 package com.api.crud.DTO;
 
-import jakarta.persistence.Column;
 import lombok.Getter;
 import lombok.Setter;
-
+import java.util.ArrayList;
 import java.util.List;
 
 public class UserModelDTO {
 
-    @Getter
-    @Setter
+    @Getter @Setter
     private long id;
 
     @Getter @Setter
-    @Column(name = "firstName")
     private String firstName;
 
     @Getter @Setter
@@ -31,7 +28,10 @@ public class UserModelDTO {
     @Getter @Setter
     private List<String> roles;
 
-    public UserModelDTO(long id, String firstName, String lastName, String email, String phone, String password,List<String> roles) {
+    @Getter @Setter
+    private List<String> orders;
+
+    public UserModelDTO(long id, String firstName, String lastName, String email, String phone, String password,List<String> roles, List<String> orders) {
         this.id = id;
         this.firstName = firstName;
         this.lastName = lastName;
@@ -39,6 +39,7 @@ public class UserModelDTO {
         this.phone = phone;
         this.password = password;
         this.roles=roles;
+        this.orders = orders != null ? orders : new ArrayList<>();
     }
 
     public UserModelDTO(){}

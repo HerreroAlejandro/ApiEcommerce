@@ -1,4 +1,5 @@
 package com.api.crud.controllers;
+
 import com.api.crud.DTO.LoginRequestDTO;
 import com.api.crud.DTO.UserModelDTO;
 import com.api.crud.config.JWTUtil;
@@ -7,7 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,7 +28,7 @@ public class UserController {
         logger.info("Received request to register a user with email: {}", userModelDto.getEmail());
         ResponseEntity<String> response;
         try {
-            if (userService.findUserByEmail(userModelDto.getEmail()) != null) {
+            if (userService.findUserByEmail(userModelDto.getEmail()).isPresent()) {
                 logger.warn("User already registered with email: {}", userModelDto.getEmail());
                 response = ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User already registered with this email");
             } else {
@@ -66,7 +66,6 @@ public class UserController {
             message = "An unexpected error occurred during login.";
             logger.error("Unexpected error during login for user with email: {}: {}", loginRequestDTO.getEmail(), e.getMessage());
         }
-
         return ResponseEntity.status(status).body(message != null ? message : token);
     }
 

@@ -1,37 +1,54 @@
-2025-03-04 23:45:16 [main] INFO  com.api.crud.CrudApplication - Starting CrudApplication using Java 21.0.2 with PID 18480 (C:\Users\wilso\OneDrive\Documentos\Git\Repositorios\crud\target\classes started by wilso in C:\Users\wilso\OneDrive\Documentos\Git\Repositorios\crud)
-2025-03-04 23:45:16 [main] INFO  com.api.crud.CrudApplication - No active profile set, falling back to 1 default profile: "default"
-2025-03-04 23:45:17 [main] INFO  o.a.coyote.http11.Http11NioProtocol - Initializing ProtocolHandler ["http-nio-8080"]
-2025-03-04 23:45:17 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
-2025-03-04 23:45:17 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.19]
-2025-03-04 23:45:17 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
-2025-03-04 23:45:17 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
-2025-03-04 23:45:18 [main] INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@7f5614f9
-2025-03-04 23:45:18 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
-2025-03-04 23:45:19 [main] WARN  o.s.b.a.o.j.JpaBaseConfiguration$JpaWebConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
-2025-03-04 23:45:19 [main] WARN  o.s.b.a.s.s.UserDetailsServiceAutoConfiguration - 
+2025-08-14 04:06:40 [main] INFO  com.api.crud.CrudApplication - Starting CrudApplication using Java 21.0.2 with PID 13868 (C:\Users\wilso\Documents\Git\Repositorios\ApiEcommerce\target\classes started by wilso in C:\Users\wilso\Documents\Git\Repositorios\ApiEcommerce)
+2025-08-14 04:06:40 [main] INFO  com.api.crud.CrudApplication - No active profile set, falling back to 1 default profile: "default"
+2025-08-14 04:06:42 [main] INFO  o.a.coyote.http11.Http11NioProtocol - Initializing ProtocolHandler ["http-nio-8080"]
+2025-08-14 04:06:42 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2025-08-14 04:06:42 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.19]
+2025-08-14 04:06:42 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2025-08-14 04:06:42 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+2025-08-14 04:06:42 [main] INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@45e11627
+2025-08-14 04:06:42 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+2025-08-14 04:06:44 [main] WARN  o.s.b.a.o.j.JpaBaseConfiguration$JpaWebConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2025-08-14 04:06:44 [main] WARN  o.s.b.a.s.s.UserDetailsServiceAutoConfiguration - 
 
-Using generated security password: 8bd4cb6e-4f11-468b-b61c-ebeaceb2b690
+Using generated security password: 9f56b8bf-6ba1-49af-9fdf-3f3f55878992
 
 This generated password is for development use only. Your security configuration must be updated before running your application in production.
 
-2025-03-04 23:45:19 [main] INFO  o.a.coyote.http11.Http11NioProtocol - Starting ProtocolHandler ["http-nio-8080"]
-2025-03-04 23:45:19 [main] INFO  com.api.crud.CrudApplication - Started CrudApplication in 3.508 seconds (process running for 3.844)
-2025-03-04 23:45:43 [http-nio-8080-exec-1] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
-2025-03-04 23:45:43 [http-nio-8080-exec-1] INFO  c.a.crud.controllers.UserController - Received request to login user with email: alejandroherrero2009@hotmail.com
-2025-03-04 23:45:43 [http-nio-8080-exec-1] INFO  com.api.crud.services.UserService - Attempting Service login for user: alejandroherrero2009@hotmail.com
-2025-03-04 23:45:43 [http-nio-8080-exec-1] INFO  com.api.crud.services.UserService - Starting to process Search for user with email: alejandroherrero2009@hotmail.com
-2025-03-04 23:45:43 [http-nio-8080-exec-1] INFO  com.api.crud.services.UserService - User found: alejandroherrero2009@hotmail.com
-2025-03-04 23:45:43 [http-nio-8080-exec-1] INFO  com.api.crud.services.UserService - Starting to process Fetching roles for user with email: alejandroherrero2009@hotmail.com
-2025-03-04 23:45:43 [http-nio-8080-exec-1] INFO  com.api.crud.services.UserService - Roles found for user alejandroherrero2009@hotmail.com: [ADMIN, SUPPORT]
-2025-03-04 23:45:43 [http-nio-8080-exec-1] INFO  com.api.crud.services.UserService - User alejandroherrero2009@hotmail.com logged in successfully with roles [ADMIN, SUPPORT]
-2025-03-04 23:45:43 [http-nio-8080-exec-1] INFO  c.a.crud.controllers.UserController - Login successful for user with email: alejandroherrero2009@hotmail.com
-2025-03-04 23:45:50 [http-nio-8080-exec-7] INFO  c.a.crud.controllers.AuthController - Starting to fetch users.
-2025-03-04 23:45:50 [http-nio-8080-exec-7] INFO  com.api.crud.services.UserService - Starting to process getusers in service
-2025-03-04 23:45:50 [http-nio-8080-exec-7] INFO  com.api.crud.services.UserService - Successfully retrieved 7 users
-2025-03-04 23:45:50 [http-nio-8080-exec-7] INFO  c.a.crud.controllers.AuthController - Successfully found 7 users.
-2025-03-04 23:45:54 [http-nio-8080-exec-8] INFO  c.a.crud.controllers.AuthController - Starting to fetch user with id: 1
-2025-03-04 23:45:54 [http-nio-8080-exec-8] INFO  com.api.crud.services.UserService - Starting to process Search for user with ID: 1
-2025-03-04 23:45:54 [http-nio-8080-exec-8] INFO  com.api.crud.services.UserService - User with ID 1 found
-2025-03-04 23:45:54 [http-nio-8080-exec-8] INFO  c.a.crud.controllers.AuthController - User with ID: 1 found successfully.
-2025-03-04 23:47:24 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
-2025-03-04 23:47:24 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
+2025-08-14 04:06:45 [main] INFO  o.a.coyote.http11.Http11NioProtocol - Starting ProtocolHandler ["http-nio-8080"]
+2025-08-14 04:06:45 [main] WARN  o.s.b.w.s.c.AnnotationConfigServletWebServerApplicationContext - Exception encountered during context initialization - cancelling refresh attempt: org.springframework.context.ApplicationContextException: Failed to start bean 'webServerStartStop'
+2025-08-14 04:06:45 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
+2025-08-14 04:06:45 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
+2025-08-14 04:06:45 [main] ERROR o.s.b.d.LoggingFailureAnalysisReporter - 
+
+***************************
+APPLICATION FAILED TO START
+***************************
+
+Description:
+
+Web server failed to start. Port 8080 was already in use.
+
+Action:
+
+Identify and stop the process that's listening on port 8080 or configure this application to listen on another port.
+
+2025-08-14 04:07:00 [main] INFO  com.api.crud.CrudApplication - Starting CrudApplication using Java 21.0.2 with PID 14508 (C:\Users\wilso\Documents\Git\Repositorios\ApiEcommerce\target\classes started by wilso in C:\Users\wilso\Documents\Git\Repositorios\ApiEcommerce)
+2025-08-14 04:07:00 [main] INFO  com.api.crud.CrudApplication - No active profile set, falling back to 1 default profile: "default"
+2025-08-14 04:07:01 [main] INFO  o.a.coyote.http11.Http11NioProtocol - Initializing ProtocolHandler ["http-nio-8080"]
+2025-08-14 04:07:01 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2025-08-14 04:07:01 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.19]
+2025-08-14 04:07:01 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2025-08-14 04:07:02 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+2025-08-14 04:07:02 [main] INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@542c65d9
+2025-08-14 04:07:02 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+2025-08-14 04:07:03 [main] WARN  o.s.b.a.o.j.JpaBaseConfiguration$JpaWebConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2025-08-14 04:07:03 [main] WARN  o.s.b.a.s.s.UserDetailsServiceAutoConfiguration - 
+
+Using generated security password: 44886626-1df1-4d3a-be32-6f2814bf10ed
+
+This generated password is for development use only. Your security configuration must be updated before running your application in production.
+
+2025-08-14 04:07:04 [main] INFO  o.a.coyote.http11.Http11NioProtocol - Starting ProtocolHandler ["http-nio-8080"]
+2025-08-14 04:07:04 [main] INFO  com.api.crud.CrudApplication - Started CrudApplication in 4.241 seconds (process running for 4.616)
+2025-08-14 04:07:07 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
+2025-08-14 04:07:07 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
