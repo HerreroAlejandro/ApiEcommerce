@@ -1,5 +1,6 @@
 package com.api.crud.config;
 
+import com.api.crud.repositories.UserDao;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -15,9 +16,11 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JWTUtil jwtUtil;
+    private final UserDao userDao;
 
-    public SecurityConfig(JWTUtil jwtUtil) {
+    public SecurityConfig(JWTUtil jwtUtil, UserDao userDao) {
         this.jwtUtil = jwtUtil;
+        this.userDao = userDao;
     }
 
     @Bean
@@ -31,10 +34,11 @@ public class SecurityConfig {
                                 .requestMatchers("/admin/**").hasAuthority("ADMIN")
                                 .requestMatchers("/support/**").hasAuthority("SUPPORT")
                                 .requestMatchers("/products/**").hasAnyAuthority("ADMIN", "SUPPORT")
+                                .requestMatchers("/cart/**").hasAnyAuthority("ADMIN", "SUPPORT")
                                 .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .addFilterBefore(new JWTFilter(jwtUtil), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(new JWTFilter(jwtUtil, userDao ), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 }
