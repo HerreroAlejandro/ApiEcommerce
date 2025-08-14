@@ -1,10 +1,8 @@
 package com.api.crud.repositories;
 
-import com.api.crud.models.Product;
 import com.api.crud.models.Role;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-
 import java.util.List;
 import java.util.Optional;
 

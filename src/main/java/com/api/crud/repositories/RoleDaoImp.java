@@ -1,6 +1,5 @@
 package com.api.crud.repositories;
 
-import com.api.crud.models.Product;
 import com.api.crud.models.Role;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.NoResultException;
@@ -9,7 +8,6 @@ import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
-
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
