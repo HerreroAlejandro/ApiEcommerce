@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Digits;
 import lombok.Getter;
 import lombok.Setter;
-
 import java.math.BigDecimal;
 
 @Entity
@@ -14,6 +13,16 @@ public class CartItem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Getter @Setter
     private Long idCartItem;
+
+    @ManyToOne
+    @JoinColumn(name = "cart_id")
+    @Getter @Setter
+    private Cart cart;
+
+    @ManyToOne
+    @JoinColumn(name = "product_id")
+    @Getter @Setter
+    private Product productCartItem;
 
     @Column(name = "amountCartItem")
     @Getter @Setter
@@ -25,15 +34,6 @@ public class CartItem {
     @Digits(integer = 5, fraction = 2)
     private BigDecimal priceCartItem;
 
-    @ManyToOne
-    @JoinColumn(name = "product_id")
-    @Getter @Setter
-    private Product productCartItem;
-
-    @ManyToOne
-    @JoinColumn(name = "cart_id")
-    @Getter @Setter
-    private Cart cart;
 
     public CartItem(Long idCartItem, Cart cart, Product productCartItem, int amountCartItem, BigDecimal priceCartItem) {
         this.idCartItem = idCartItem;
