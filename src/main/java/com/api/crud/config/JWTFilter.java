@@ -1,7 +1,7 @@
 package com.api.crud.config;
 
-import io.jsonwebtoken.Jwts;
-import org.springframework.security.core.GrantedAuthority;
+import com.api.crud.models.UserModel;
+import com.api.crud.repositories.UserDao;
 import org.springframework.web.filter.OncePerRequestFilter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -10,21 +10,20 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-
-
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
-
-
 
 public class JWTFilter extends OncePerRequestFilter {
 
     private final JWTUtil jwtUtil;
 
-    public JWTFilter(JWTUtil jwtUtil) {
+    private UserDao userDao;
 
+    public JWTFilter(JWTUtil jwtUtil, UserDao userDao) {
         this.jwtUtil = jwtUtil;
+        this.userDao = userDao;
     }
 
     @Override
@@ -33,13 +32,21 @@ public class JWTFilter extends OncePerRequestFilter {
         String token = getTokenFromRequest(request);
         if (token != null && jwtUtil.validateToken(token)) {
             String email = jwtUtil.extractUsername(token);
-            List<String> roles = jwtUtil.extractRoles(token);
 
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(email, null, roles.stream()
-                            .map(SimpleGrantedAuthority::new)
-                            .collect(Collectors.toList()));
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+            Optional<UserModel> optionalUser = userDao.findUserByEmail(email);
+
+            if(optionalUser.isPresent() && optionalUser.get().isActive()) {
+                List<String> roles = jwtUtil.extractRoles(token);
+
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(email, null, roles.stream()
+                                .map(SimpleGrantedAuthority::new)
+                                .collect(Collectors.toList()));
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            } else {
+                // Si usuario no existe o está inactivo
+                SecurityContextHolder.clearContext();
+            }
         }
         filterChain.doFilter(request, response);
     }
@@ -53,5 +60,4 @@ public class JWTFilter extends OncePerRequestFilter {
         }
         return token;
     }
-
 }

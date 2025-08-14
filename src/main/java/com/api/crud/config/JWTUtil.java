@@ -1,14 +1,11 @@
 package com.api.crud.config;
 
-import com.api.crud.controllers.AuthController;
-import com.zaxxer.hikari.pool.HikariProxyCallableStatement;
-import io.jsonwebtoken.*;
-import lombok.Getter;
-import lombok.Setter;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-
 import java.util.Date;
 import java.util.List;
 
@@ -16,7 +13,6 @@ import java.util.List;
 public class JWTUtil {
 
     private static final Logger logger = LoggerFactory.getLogger(JWTUtil.class);
-
 
     public static final String JWT_KEY = "andintheendtheloveyoutakeisequaltotheloveyoumake";
 
@@ -31,7 +27,6 @@ public class JWTUtil {
                 .compact();
     }
 
-
     public String extractUsername(String token) {
         return Jwts.parser()
                 .setSigningKey(JWT_KEY)
@@ -39,7 +34,6 @@ public class JWTUtil {
                 .getBody()
                 .getSubject();
     }
-
 
     public boolean isTokenExpired(String token) {
 
