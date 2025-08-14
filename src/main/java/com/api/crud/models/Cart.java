@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -19,14 +21,23 @@ public class Cart {
     @Getter @Setter
     private UserModel userCart;
 
-    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL)
+    @Column(nullable = false)
     @Getter @Setter
-    private List<CartItem> itemsCart;
+    private boolean active = true;
 
-    public Cart(Long idCart, UserModel userCart, List<CartItem> itemsCart) {
+    @Column(nullable = false, updatable = false)
+    @Getter @Setter
+    private LocalDate creationDate;
+
+    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Getter @Setter
+    private List<CartItem> itemsCart = new ArrayList<>();
+
+    public Cart(Long idCart, UserModel userCart, LocalDate creationDate, List<CartItem> itemsCart) {
         this.idCart = idCart;
         this.userCart = userCart;
-        this.itemsCart = itemsCart;
+        this.creationDate = LocalDate.now();
+        this.itemsCart = new ArrayList<>();
     }
 
     public Cart(){}
