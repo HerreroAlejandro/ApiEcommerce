@@ -1,12 +1,9 @@
 package com.api.crud.repositories;
 
 import com.api.crud.models.Product;
-import com.api.crud.models.ProductDigital;
-import com.api.crud.models.ProductPhysical;
-
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
-
 
 public interface ProductDao {
 
@@ -18,7 +15,19 @@ public interface ProductDao {
 
     void saveProduct(Product product);
 
+    public boolean updateProduct(Product updatedProduct);
+
     boolean deleteProduct(Long idProduct);
+
+    boolean updateProductStock(String nameProduct, Integer newStockProduct);
+
+    boolean updateProductPrice(String nameProduct, BigDecimal newPriceProduct);
+
+    List<Product> findProductsByCategory(String category);
+
+    List<Product> findProductsByPriceRange(BigDecimal min, BigDecimal max);
+
+    List<Product> findProductsInStock();
 
 
 }

@@ -1,13 +1,16 @@
 package com.api.crud.repositories;
 
 import com.api.crud.models.Product;
+import com.api.crud.models.ProductPhysical;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.NoResultException;
 import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.TypedQuery;
 import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -107,4 +110,127 @@ public class ProductDaoImp implements ProductDao{
         return response;
         }
 
+
+    @Override
+    @Transactional
+    public boolean updateProductStock(String nameProduct, Integer newStockProduct) {
+        logger.debug("Updating stock for product {} -> {}", nameProduct, newStockProduct);
+        boolean success = false;
+        try {
+            Product product = entityManager.createQuery(
+                            "SELECT p FROM Product p WHERE p.nameProduct = :name", Product.class)
+                    .setParameter("name", nameProduct)
+                    .getSingleResult();
+
+            if (product instanceof ProductPhysical) {
+                ProductPhysical physical = (ProductPhysical) product;
+                physical.setStockProduct(newStockProduct);
+                entityManager.merge(physical);
+                success = true;
+            } else {
+                logger.warn("Product {} is not a physical product. Cannot update stock.", nameProduct);
+            }
+        } catch (NoResultException e) {
+            logger.warn("No product found with name {}", nameProduct);
+        } catch (Exception e) {
+            logger.error("Error updating stock for {}: {}", nameProduct, e.getMessage());
+        }
+        return success;
+    }
+
+    @Override
+    @Transactional
+    public boolean updateProductPrice(String nameProduct, BigDecimal newPriceProduct) {
+        logger.debug("Updating price for product {} -> {}", nameProduct, newPriceProduct);
+        boolean success = false;
+        try {
+            Product product = entityManager.createQuery(
+                            "SELECT p FROM Product p WHERE p.nameProduct = :name", Product.class)
+                    .setParameter("name", nameProduct)
+                    .getSingleResult();
+
+            product.setPriceProduct(newPriceProduct);
+            entityManager.merge(product);
+            success = true;
+        } catch (NoResultException e) {
+            logger.warn("No product found with name {}", nameProduct);
+        } catch (Exception e) {
+            logger.error("Error updating price for {}: {}", nameProduct, e.getMessage());
+        }
+        return success;
+    }
+
+    @Override
+    public List<Product> findProductsByCategory(String category) {
+        List<Product> products = Collections.emptyList();
+        if (category != null) {
+            try {
+                TypedQuery<Product> query = entityManager.createQuery(
+                                "SELECT p FROM Product p WHERE LOWER(p.category) = LOWER(:cat)", Product.class)
+                        .setParameter("cat", category.trim());
+                products = query.getResultList();
+            } catch (Exception e) {
+                logger.error("Error finding products by category {}: {}", category, e.getMessage());
+            }
+        }
+        return products;
+    }
+
+    @Override
+    public List<Product> findProductsByPriceRange(BigDecimal min, BigDecimal max) {
+        List<Product> products = Collections.emptyList();
+        if (min != null && max != null) {
+            try {
+                TypedQuery<Product> query = entityManager.createQuery(
+                                "SELECT p FROM Product p WHERE p.priceProduct BETWEEN :min AND :max", Product.class)
+                        .setParameter("min", min)
+                        .setParameter("max", max);
+                products = query.getResultList();
+            } catch (Exception e) {
+                logger.error("Error finding products by price range {} - {}: {}", min, max, e.getMessage());
+            }
+        }
+        return products;
+    }
+
+    @Override
+    public List<Product> findProductsInStock() {
+        List<Product> products = Collections.emptyList();
+        try {
+            TypedQuery<ProductPhysical> query = entityManager.createQuery(
+                    "SELECT pp FROM ProductPhysical pp WHERE pp.stockProduct > 0", ProductPhysical.class);
+            products = List.copyOf(query.getResultList());
+        } catch (Exception e) {
+            logger.error("Error finding products in stock: {}", e.getMessage());
+        }
+        return products;
+    }
+
+    @Transactional
+    public boolean updateProduct(Product updatedProduct) {
+        boolean success = false;
+        try {
+            Product existingProduct = entityManager.find(Product.class, updatedProduct.getIdProduct());
+            if (existingProduct != null) {
+                existingProduct.setNameProduct(updatedProduct.getNameProduct());
+                existingProduct.setDescription(updatedProduct.getDescription());
+                existingProduct.setCategory(updatedProduct.getCategory());
+                existingProduct.setImageUrl(updatedProduct.getImageUrl());
+                existingProduct.setPriceProduct(updatedProduct.getPriceProduct());
+                // stock y precio los podés manejar aparte si querés
+
+                entityManager.merge(existingProduct);
+                success = true;
+            }
+        } catch (Exception e) {
+            logger.error("Error updating product: {}", e.getMessage());
+        }
+        return success;
+    }
 }
+
+
+
+
+
+
