@@ -1,6 +1,6 @@
 package com.api.crud.repositories;
 
-import com.api.crud.models.CartItem;
+import com.api.crud.models.entity.CartItem;
 import java.util.List;
 import java.util.Optional;
 

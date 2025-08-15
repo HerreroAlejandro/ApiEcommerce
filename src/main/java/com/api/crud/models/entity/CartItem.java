@@ -1,4 +1,4 @@
-package com.api.crud.models;
+package com.api.crud.models.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Digits;
@@ -31,7 +31,7 @@ public class CartItem {
 
     @Column(name = "priceCartItem")
     @Getter @Setter
-    @Digits(integer = 5, fraction = 2)
+    @Digits(integer = 8, fraction = 2)
     private BigDecimal priceCartItem;
 
 

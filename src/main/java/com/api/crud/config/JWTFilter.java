@@ -1,6 +1,6 @@
 package com.api.crud.config;
 
-import com.api.crud.models.UserModel;
+import com.api.crud.models.entity.UserModel;
 import com.api.crud.repositories.UserDao;
 import org.springframework.web.filter.OncePerRequestFilter;
 import jakarta.servlet.FilterChain;

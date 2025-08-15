@@ -1,6 +1,6 @@
 package com.api.crud.repositories;
 
-import com.api.crud.models.Cart;
+import com.api.crud.models.entity.Cart;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;

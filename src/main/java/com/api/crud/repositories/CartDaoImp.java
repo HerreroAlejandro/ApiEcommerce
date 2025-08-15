@@ -1,6 +1,6 @@
 package com.api.crud.repositories;
 
-import com.api.crud.models.Cart;
+import com.api.crud.models.entity.Cart;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.NoResultException;
 import jakarta.persistence.PersistenceContext;

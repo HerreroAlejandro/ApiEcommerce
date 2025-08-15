@@ -1,8 +1,6 @@
 package com.api.crud.controllers;
 
 import com.api.crud.DTO.CartDTO;
-import com.api.crud.DTO.UserDTO;
-import com.api.crud.models.Cart;
 import com.api.crud.services.CartService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -1,7 +1,6 @@
 package com.api.crud.controllers;
 
 import com.api.crud.DTO.CartItemDTO;
-import com.api.crud.models.CartItem;
 import com.api.crud.services.CartItemService;
 import com.api.crud.services.CartService;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -1,10 +1,10 @@
 package com.api.crud.services;
 
 import com.api.crud.DTO.CartItemDTO;
-import com.api.crud.models.Cart;
-import com.api.crud.models.CartItem;
-import com.api.crud.models.Product;
-import com.api.crud.models.UserModel;
+import com.api.crud.models.entity.Cart;
+import com.api.crud.models.entity.CartItem;
+import com.api.crud.models.entity.Product;
+import com.api.crud.models.entity.UserModel;
 import com.api.crud.repositories.CartDao;
 import com.api.crud.repositories.CartItemDao;
 import com.api.crud.repositories.ProductDao;
