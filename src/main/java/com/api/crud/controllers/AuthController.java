@@ -3,7 +3,6 @@ package com.api.crud.controllers;
 import com.api.crud.DTO.UserDTO;
 import com.api.crud.DTO.UserModelDTO;
 import com.api.crud.DTO.UserUpdateDTO;
-import com.api.crud.models.UserModel;
 import com.api.crud.services.UserService;
 import org.modelmapper.ModelMapper;
 import org.slf4j.Logger;
