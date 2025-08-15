@@ -1,4 +1,4 @@
-package com.api.crud.models;
+package com.api.crud.models.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Size;

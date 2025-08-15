@@ -1,7 +1,7 @@
 package com.api.crud.repositories;
 
-import com.api.crud.models.Product;
-import com.api.crud.models.ProductPhysical;
+import com.api.crud.models.entity.Product;
+import com.api.crud.models.entity.ProductPhysical;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.NoResultException;
 import jakarta.persistence.PersistenceContext;

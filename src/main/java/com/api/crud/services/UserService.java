@@ -2,8 +2,8 @@ package com.api.crud.services;
 
 import com.api.crud.DTO.*;
 import com.api.crud.config.JWTUtil;
-import com.api.crud.models.Role;
-import com.api.crud.models.UserModel;
+import com.api.crud.models.entity.Role;
+import com.api.crud.models.entity.UserModel;
 import com.api.crud.repositories.RoleDao;
 import com.api.crud.repositories.UserDao;
 import org.modelmapper.ModelMapper;

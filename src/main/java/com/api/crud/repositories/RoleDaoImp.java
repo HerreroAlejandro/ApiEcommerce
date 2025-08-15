@@ -1,6 +1,6 @@
 package com.api.crud.repositories;
 
-import com.api.crud.models.Role;
+import com.api.crud.models.entity.Role;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.NoResultException;
 import jakarta.persistence.PersistenceContext;

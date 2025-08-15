@@ -1,9 +1,9 @@
 package com.api.crud.services;
 
 import com.api.crud.DTO.ProductDTO;
-import com.api.crud.models.Product;
-import com.api.crud.models.ProductDigital;
-import com.api.crud.models.ProductPhysical;
+import com.api.crud.models.entity.Product;
+import com.api.crud.models.entity.ProductDigital;
+import com.api.crud.models.entity.ProductPhysical;
 import com.api.crud.repositories.ProductDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -1,6 +1,6 @@
 package com.api.crud.repositories;
 
-import com.api.crud.models.Product;
+import com.api.crud.models.entity.Product;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;

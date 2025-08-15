@@ -1,7 +1,7 @@
 package com.api.crud.repositories;
 
 import com.api.crud.DTO.UserUpdateDTO;
-import com.api.crud.models.UserModel;
+import com.api.crud.models.entity.UserModel;
 import com.api.crud.services.EmailService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.NoResultException;

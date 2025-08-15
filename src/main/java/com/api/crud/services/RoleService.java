@@ -1,7 +1,7 @@
 package com.api.crud.services;
 
 import com.api.crud.DTO.RoleDTO;
-import com.api.crud.models.Role;
+import com.api.crud.models.entity.Role;
 import com.api.crud.repositories.RoleDao;
 import org.modelmapper.ModelMapper;
 import org.slf4j.Logger;

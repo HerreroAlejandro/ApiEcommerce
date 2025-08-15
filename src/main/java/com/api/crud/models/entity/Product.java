@@ -1,6 +1,7 @@
-package com.api.crud.models;
+package com.api.crud.models.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
@@ -26,6 +27,7 @@ public abstract class Product {
 
     @Column(name = "priceProduct")
     @Getter @Setter
+    @Digits(integer = 8, fraction = 2)
     private BigDecimal priceProduct;
 
     @Column(name = "description")

@@ -1,7 +1,7 @@
 package com.api.crud.repositories;
 
 import com.api.crud.DTO.UserUpdateDTO;
-import com.api.crud.models.UserModel;
+import com.api.crud.models.entity.UserModel;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
