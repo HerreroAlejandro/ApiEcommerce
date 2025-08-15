@@ -1,5 +1,7 @@
-package com.api.crud.models;
+package com.api.crud.models.entity;
 
+import com.api.crud.models.enums.OrderStatus;
+import com.api.crud.models.enums.PaymentStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
@@ -27,6 +29,16 @@ public class Order {
     @Getter @Setter
     @Column(name = "purchaseDateOrder")
     private LocalDateTime purchaseDateOrder;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "paymentStatus", nullable = false)
+    @Getter @Setter
+    private PaymentStatus paymentStatus;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "orderStatus", nullable = false)
+    @Getter @Setter
+    private OrderStatus orderStatus;
 
     @ManyToOne
     @JoinColumn(name = "user_id")
