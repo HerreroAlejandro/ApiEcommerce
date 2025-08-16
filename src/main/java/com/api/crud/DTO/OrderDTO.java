@@ -2,7 +2,6 @@ package com.api.crud.DTO;
 
 import lombok.Getter;
 import lombok.Setter;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -28,21 +27,15 @@ public class OrderDTO {
     private Long userId;
 
     @Getter @Setter
-    private String userEmail; // nuevo campo para mostrar info amigable
+    private String userEmail;
 
     @Getter @Setter
     private List<OrderItemDTO> itemsOrder;
 
     public OrderDTO() {}
 
-    public OrderDTO(Long idOrder,
-                    BigDecimal totalOrder,
-                    LocalDateTime purchaseDateOrder,
-                    String paymentStatus,
-                    String orderStatus,
-                    Long userId,
-                    String userEmail,
-                    List<OrderItemDTO> itemsOrder) {
+    public OrderDTO(Long idOrder, BigDecimal totalOrder, LocalDateTime purchaseDateOrder, String paymentStatus, String orderStatus, Long userId,
+                    String userEmail, List<OrderItemDTO> itemsOrder) {
         this.idOrder = idOrder;
         this.totalOrder = totalOrder;
         this.purchaseDateOrder = purchaseDateOrder;
