@@ -3,6 +3,7 @@ package com.api.crud.services;
 import com.api.crud.DTO.CartDTO;
 import com.api.crud.DTO.CartItemDTO;
 import com.api.crud.models.entity.Cart;
+import com.api.crud.models.entity.CartItem;
 import com.api.crud.repositories.CartDao;
 import com.api.crud.repositories.CartItemDao;
 import com.api.crud.repositories.ProductDao;
@@ -12,6 +13,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -109,5 +112,20 @@ public class CartService {
                 .map(cart -> modelMapper.map(cart, CartDTO.class))
                 .collect(Collectors.toList());
     }
+
+    public BigDecimal getCartTotal(Long cartId) {
+        List<CartItem> items = cartItemDao.findItemsByCartId(cartId);
+        return items.stream()
+                .map(item -> item.getPriceCartItem().multiply(BigDecimal.valueOf(item.getAmountCartItem())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    public void clearCart(Long cartId) {
+        List<CartItem> items = cartItemDao.findItemsByCartId(cartId);
+        for (CartItem item : items) {
+            cartItemDao.removeCartItem(item.getIdCartItem());
+        }
+    }
+
 
 }

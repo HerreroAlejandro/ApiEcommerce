@@ -19,4 +19,8 @@ public interface CartItemDao {
 
     void removeCartItem(Long cartItemId);
 
+    void increaseCartItemAmount(Long cartItemId, int increment);
+
+    void decreaseCartItemAmount(Long cartItemId, int decrement);
+
 }

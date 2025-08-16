@@ -142,5 +142,12 @@ public class CartItemService {
         );
     }
 
+    public void increaseItemAmount(Long cartItemId, int increment) {
+        cartItemDao.increaseCartItemAmount(cartItemId, increment);
+    }
+
+    public void decreaseItemAmount(Long cartItemId, int decrement) {
+        cartItemDao.decreaseCartItemAmount(cartItemId, decrement);
+    }
 
 }

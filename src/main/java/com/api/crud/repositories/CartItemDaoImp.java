@@ -76,5 +76,23 @@ public class CartItemDaoImp implements CartItemDao{
         }
     }
 
+    @Override
+    public void increaseCartItemAmount(Long cartItemId, int increment) {
+        CartItem item = entityManager.find(CartItem.class, cartItemId);
+        if (item != null) {
+            item.setAmountCartItem(item.getAmountCartItem() + increment);
+            entityManager.merge(item);
+        }
+    }
+
+    @Override
+    public void decreaseCartItemAmount(Long cartItemId, int decrement) {
+        CartItem item = entityManager.find(CartItem.class, cartItemId);
+        if (item != null) {
+            int newAmount = item.getAmountCartItem() - decrement;
+            item.setAmountCartItem(Math.max(newAmount, 0));
+            entityManager.merge(item);
+        }
+    }
 
 }

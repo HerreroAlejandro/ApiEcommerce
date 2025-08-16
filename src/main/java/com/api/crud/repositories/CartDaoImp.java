@@ -8,6 +8,8 @@ import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
+
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
@@ -134,6 +136,25 @@ public class CartDaoImp implements CartDao{
             return Collections.emptyList();
         }
     }
+
+    @Override
+    public BigDecimal calculateCartTotal(Long cartId) {
+        String jpql = "SELECT SUM(c.priceCartItem * c.amountCartItem) FROM CartItem c WHERE c.cart.idCart = :cartId";
+        BigDecimal total = entityManager.createQuery(jpql, BigDecimal.class)
+                .setParameter("cartId", cartId)
+                .getSingleResult();
+        return total != null ? total : BigDecimal.ZERO;
+    }
+
+    @Override
+    public void clearCart(Long cartId) {
+        String jpql = "DELETE FROM CartItem c WHERE c.cart.idCart = :cartId";
+        entityManager.createQuery(jpql)
+                .setParameter("cartId", cartId)
+                .executeUpdate();
+    }
+
+
 }
 
 

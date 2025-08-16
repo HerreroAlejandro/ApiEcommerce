@@ -1,6 +1,8 @@
 package com.api.crud.repositories;
 
 import com.api.crud.models.entity.Cart;
+
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -25,5 +27,9 @@ public interface CartDao {
     List<Cart> getCartsByDateRange(LocalDate start, LocalDate end);
 
     List<Cart> getCartsWithMoreThanNItems(int minItems);
+
+    BigDecimal calculateCartTotal(Long cartId);
+
+    void clearCart(Long cartId);
 
 }
