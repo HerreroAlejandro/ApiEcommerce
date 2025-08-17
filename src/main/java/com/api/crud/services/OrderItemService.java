@@ -23,7 +23,6 @@ public class OrderItemService {
         this.modelMapper = modelMapper;
     }
 
-    // Guardar un item desde DTO
     public OrderItemDTO saveOrderItem(OrderItemDTO dto, Order order, Product product) {
         OrderItem item = modelMapper.map(dto, OrderItem.class);
         item.setOrder(order);
@@ -32,14 +31,12 @@ public class OrderItemService {
         return modelMapper.map(item, OrderItemDTO.class);
     }
 
-    // Obtener un item por ID como DTO
     public OrderItemDTO getOrderItemById(Long idOrderItem) {
         OrderItem item = orderItemDao.findOrderItemById(idOrderItem)
                 .orElseThrow(() -> new RuntimeException("OrderItem no encontrado"));
         return modelMapper.map(item, OrderItemDTO.class);
     }
 
-    // Obtener items de una orden como DTO
     public List<OrderItemDTO> getItemsByOrderId(Long orderId) {
         List<OrderItem> items = orderItemDao.findItemsByOrderId(orderId);
         return items.stream()
@@ -47,22 +44,18 @@ public class OrderItemService {
                 .toList();
     }
 
-    // Incrementar cantidad de un item
     public void increaseAmount(Long orderItemId, int increment) {
         orderItemDao.increaseOrderItemAmount(orderItemId, increment);
     }
 
-    // Decrementar cantidad de un item
     public void decreaseAmount(Long orderItemId, int decrement) {
         orderItemDao.decreaseOrderItemAmount(orderItemId, decrement);
     }
 
-    // Eliminar item
     public void deleteOrderItem(Long idOrderItem) {
         orderItemDao.deleteOrderItem(idOrderItem);
     }
 
-    // Subtotal de un item
     public BigDecimal getSubtotal(OrderItem item) {
         return item.getSubtotal();
     }

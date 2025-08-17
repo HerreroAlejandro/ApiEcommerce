@@ -30,9 +30,7 @@ public class OrderService {
     private static final Logger logger = LoggerFactory.getLogger(OrderService.class);
 
     @Autowired
-    public OrderService(OrderDao orderDao,
-                        UserDao userDao,
-                        ModelMapper modelMapper) {
+    public OrderService(OrderDao orderDao, UserDao userDao, ModelMapper modelMapper) {
         this.orderDao = orderDao;
         this.userDao = userDao;
         this.modelMapper = modelMapper;
@@ -80,21 +78,18 @@ public class OrderService {
         return mapToOrderDTO(order);
     }
 
-    // Obtener orden por ID
     public OrderDTO getOrderById(Long idOrder) {
         Order order = orderDao.findOrderById(idOrder)
                 .orElseThrow(() -> new RuntimeException("Orden no encontrada"));
         return mapToOrderDTO(order);
     }
 
-    // Obtener órdenes por email de usuario
     public List<OrderDTO> getOrdersByUserEmail(String email) {
         return orderDao.getOrdersByUserEmail(email).stream()
                 .map(this::mapToOrderDTO)
                 .toList();
     }
 
-    // Actualizar estado de la orden
     public void updateOrderStatus(Long orderId, OrderStatus status) {
         Order order = orderDao.findOrderById(orderId)
                 .orElseThrow(() -> new RuntimeException("Orden no encontrada"));
@@ -102,7 +97,6 @@ public class OrderService {
         orderDao.updateOrder(order);
     }
 
-    // Actualizar estado de pago
     public void updatePaymentStatus(Long orderId, PaymentStatus status) {
         Order order = orderDao.findOrderById(orderId)
                 .orElseThrow(() -> new RuntimeException("Orden no encontrada"));
@@ -110,17 +104,14 @@ public class OrderService {
         orderDao.updateOrder(order);
     }
 
-    // Cancelar orden
     public void cancelOrder(Long orderId) {
         updateOrderStatus(orderId, OrderStatus.CANCELED);
     }
 
-    // Eliminar orden
     public void deleteOrder(Long orderId) {
         orderDao.deleteOrderById(orderId);
     }
 
-    // --- Mapeo interno usando ModelMapper ---
     private OrderDTO mapToOrderDTO(Order order) {
         OrderDTO dto = modelMapper.map(order, OrderDTO.class);
         dto.setUserId(order.getUserOrder().getId());
