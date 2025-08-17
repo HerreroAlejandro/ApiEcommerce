@@ -163,9 +163,12 @@ public class UserService {
         UserModel user = userDao.findUserByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-        // Validar que la contraseña actual coincida
         if (!passwordEncoder.matches(dto.getCurrentPassword(), user.getPassword())) {
             throw new RuntimeException("Contraseña actual incorrecta");
+        }
+
+        if (!dto.getNewPassword().equals(dto.getConfirmPassword())) {
+            throw new RuntimeException("La nueva contraseña y su confirmación no coinciden");
         }
 
         // Encriptar y guardar la nueva contraseña

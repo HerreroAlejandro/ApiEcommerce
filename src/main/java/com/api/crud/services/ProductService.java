@@ -110,15 +110,10 @@ public class ProductService {
                 .collect(Collectors.toList());
     }
 
-
-
-    // Método auxiliar privado para mapear polimórficamente
     private ProductDTO mapProductToDTO(Product product) {
         return modelMapper.map(product, ProductDTO.class);
     }
 
-
-    // Ordenar por precio ascendente
     public List<Product> findProductsSortedByPriceAsc() {
         return productDao.showProducts()
                 .stream()
@@ -126,7 +121,6 @@ public class ProductService {
                 .collect(Collectors.toList());
     }
 
-    // Ordenar por precio descendente
     public List<Product> findProductsSortedByPriceDesc() {
         return productDao.showProducts()
                 .stream()
@@ -134,7 +128,6 @@ public class ProductService {
                 .collect(Collectors.toList());
     }
 
-    // Ordenar por nombre alfabéticamente
     public List<Product> findProductsSortedByName() {
         return productDao.showProducts()
                 .stream()
