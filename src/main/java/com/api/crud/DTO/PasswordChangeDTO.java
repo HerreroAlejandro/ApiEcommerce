@@ -11,9 +11,13 @@ public class PasswordChangeDTO {
     @NotNull @Getter @Setter
     private String newPassword;
 
-    public PasswordChangeDTO(String currentPassword, String newPassword) {
+    @NotNull @Getter @Setter
+    private String confirmPassword;
+
+    public PasswordChangeDTO(String currentPassword, String newPassword,String confirmPassword) {
         this.currentPassword = currentPassword;
         this.newPassword = newPassword;
+        this.confirmPassword = confirmPassword;
     }
 
     public PasswordChangeDTO(){}
