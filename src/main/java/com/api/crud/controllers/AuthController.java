@@ -1,5 +1,6 @@
 package com.api.crud.controllers;
 
+import com.api.crud.DTO.PasswordChangeDTO;
 import com.api.crud.DTO.UserDTO;
 import com.api.crud.DTO.UserModelDTO;
 import com.api.crud.DTO.UserUpdateDTO;
@@ -101,13 +102,6 @@ public class AuthController {
         Optional<UserModelDTO> user = userService.findUserByEmail(email);
         return ResponseEntity.ok(modelMapper.map(user, UserModelDTO.class));
     }
-/*
-    @GetMapping("/users/orders")
-    public ResponseEntity<List<OrderDTO>> getUserOrders(Authentication authentication) {
-        String email = authentication.getName();
-        List<Order> orders = orderService.getOrdersByUserEmail(email);
-        return ResponseEntity.ok(orderMapper.toDTOList(orders));
-    }*/
 
     @GetMapping(path = "/ShowUser")
     public ResponseEntity<List<UserDTO>> getUsers() {
@@ -147,6 +141,36 @@ public class AuthController {
             response = ResponseEntity.ok(users);
         }
         return response;
+    }
+
+    // Cambiar contraseña
+    @PutMapping("/users/changePassword/{email}")
+    public ResponseEntity<String> changePassword(
+            @PathVariable String email,
+            @RequestBody PasswordChangeDTO dto) {
+        logger.info("Received request to change password for user with email: {}", email);
+        try {
+            userService.changePassword(email, dto);
+            logger.info("Password changed successfully for user with email: {}", email);
+            return ResponseEntity.ok("Password updated successfully");
+        } catch (RuntimeException ex) {
+            logger.error("Error changing password for user with email {}: {}", email, ex.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
+        }
+    }
+
+    // Desactivar usuario por email
+    @PutMapping("/users/deactivate/{email}")
+    public ResponseEntity<String> deactivateUserByEmail(@PathVariable String email) {
+        logger.info("Received request to deactivate user with email: {}", email);
+        try {
+            userService.deactivateUserByEmail(email);
+            logger.info("User with email {} was deactivated successfully.", email);
+            return ResponseEntity.ok("User with email " + email + " was deactivated successfully");
+        } catch (RuntimeException ex) {
+            logger.error("Error deactivating user with email {}: {}", email, ex.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
+        }
     }
 
 

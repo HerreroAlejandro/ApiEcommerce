@@ -86,6 +86,60 @@ public class CartItemController {
         return response;
     }
 
+    // 1) Actualizar cantidad de un item en el carrito
+    @PutMapping("/{cartItemId}/amount")
+    public ResponseEntity<String> updateCartItemAmount(
+            @PathVariable Long cartItemId,
+            @RequestParam int newAmount) {
+        try {
+            cartItemService.updateCartItemAmount(cartItemId, newAmount);
+            return ResponseEntity.ok("Cantidad actualizada correctamente");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error al actualizar la cantidad: " + e.getMessage());
+        }
+    }
 
+    // 2) Obtener todos los items de un carrito con info completa
+    @GetMapping("/cart/{cartId}")
+    public ResponseEntity<List<CartItemDTO>> getItemsFullByCartId(@PathVariable Long cartId) {
+        try {
+            List<CartItemDTO> items = cartItemService.getItemsFullByCartId(cartId);
+            if (items.isEmpty()) {
+                return ResponseEntity.noContent().build();
+            }
+            return ResponseEntity.ok(items);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    // 3) Aumentar cantidad de un item
+    @PatchMapping("/{cartItemId}/increase")
+    public ResponseEntity<String> increaseItemAmount(
+            @PathVariable Long cartItemId,
+            @RequestParam int increment) {
+        try {
+            cartItemService.increaseItemAmount(cartItemId, increment);
+            return ResponseEntity.ok("Cantidad aumentada correctamente");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error al aumentar la cantidad: " + e.getMessage());
+        }
+    }
+
+    // 4) Disminuir cantidad de un item
+    @PatchMapping("/{cartItemId}/decrease")
+    public ResponseEntity<String> decreaseItemAmount(
+            @PathVariable Long cartItemId,
+            @RequestParam int decrement) {
+        try {
+            cartItemService.decreaseItemAmount(cartItemId, decrement);
+            return ResponseEntity.ok("Cantidad disminuida correctamente");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error al disminuir la cantidad: " + e.getMessage());
+        }
+    }
 
 }
