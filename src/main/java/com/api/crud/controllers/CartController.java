@@ -70,14 +70,16 @@ public class CartController {
 
     @DeleteMapping("/deleteCartById/{id}")
     public ResponseEntity<String> deleteCartById(@PathVariable Long id) {
-        ResponseEntity<String> response;
-        try {
-            cartService.deleteCartById(id);
-            response = ResponseEntity.ok("Car was erased");
-        } catch (Exception e) {
-            response = ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error the cart dont be erased");
+
+        boolean deleted = cartService.deleteCartById(id);
+
+        if (deleted) {
+            return ResponseEntity.ok("Cart was erased");
         }
-        return response;
+
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body("Cart not found");
     }
 
     // 1) Buscar carrito por email de usuario
