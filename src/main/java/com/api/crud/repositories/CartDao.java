@@ -20,7 +20,7 @@ public interface CartDao {
 
     Optional<Cart> findCartByUserId(Long userId);
 
-    void deleteCartById(Long idCart);
+    boolean deleteCartById(Long idCart);
 
     Optional<Cart> findActiveCartByUserId(Long userId);
 
