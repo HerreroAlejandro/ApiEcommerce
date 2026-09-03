@@ -4,6 +4,7 @@ import com.api.crud.DTO.CartDTO;
 import com.api.crud.DTO.CartItemDTO;
 import com.api.crud.models.entity.Cart;
 import com.api.crud.models.entity.CartItem;
+import com.api.crud.models.entity.UserModel;
 import com.api.crud.repositories.CartDao;
 import com.api.crud.repositories.CartItemDao;
 import com.api.crud.repositories.ProductDao;
@@ -51,7 +52,16 @@ public class CartService {
     public void saveCart(CartDTO cartDTO) {
         try {
             Cart cart = modelMapper.map(cartDTO, Cart.class);
+
+            UserModel user = userDao.findUserById(cartDTO.getUserCart())
+                    .orElseThrow(() ->
+                            new RuntimeException("Usuario no encontrado"));
+
+            cart.setUserCart(user);
+            cart.setCreationDate(LocalDate.now());
+
             cartDao.saveCart(cart);
+
         } catch (Exception e) {
             logger.error("Error guardando el carrito: ", e);
             throw new RuntimeException("No se pudo guardar el carrito");
@@ -80,9 +90,9 @@ public class CartService {
                 .map(cart -> modelMapper.map(cart, CartDTO.class));
     }
 
-    public void deleteCartById(Long idCart) {
+    public boolean deleteCartById(Long idCart) {
         try {
-            cartDao.deleteCartById(idCart);
+            return cartDao.deleteCartById(idCart);
         } catch (Exception e) {
             logger.error("Error eliminando el carrito: ", e);
             throw new RuntimeException("No se pudo eliminar el carrito");
