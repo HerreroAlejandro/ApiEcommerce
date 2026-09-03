@@ -32,7 +32,7 @@ public class SecurityConfig {
                                 .requestMatchers("/users/**").permitAll()
                                 .requestMatchers("/users/login").permitAll()
                                 .requestMatchers("/admin/**").hasAuthority("ADMIN")
-                                .requestMatchers("/support/**").hasAuthority("SUPPORT")
+                                .requestMatchers("/support/**").hasAnyAuthority("ADMIN", "SUPPORT")
                                 .requestMatchers("/products/**").hasAnyAuthority("ADMIN", "SUPPORT")
                                 .requestMatchers("/cart/**").hasAnyAuthority("ADMIN", "SUPPORT")
                                 .anyRequest().authenticated()
