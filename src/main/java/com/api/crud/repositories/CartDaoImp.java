@@ -87,11 +87,15 @@ public class CartDaoImp implements CartDao{
     }
 
     @Override
-    public void deleteCartById(Long idCart) {
+    public boolean deleteCartById(Long idCart) {
         Cart cart = entityManager.find(Cart.class, idCart);
-        if (cart != null) {
-            entityManager.remove(cart);
+
+        if (cart == null) {
+            return false;
         }
+
+        entityManager.remove(cart);
+        return true;
     }
 
     // 🔹 Nuevo método: Carrito activo
