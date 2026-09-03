@@ -70,7 +70,7 @@ public class CartItemController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    @DeleteMapping
+    @DeleteMapping("/removeItemFromCart")
     public ResponseEntity<String> removeItemFromCart(@RequestParam Long cartId, @RequestParam Long cartItemId) {
         ResponseEntity<String> response;
 
