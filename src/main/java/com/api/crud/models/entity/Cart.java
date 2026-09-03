@@ -1,6 +1,7 @@
 package com.api.crud.models.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -19,6 +20,7 @@ public class Cart {
     @ManyToOne
     @JoinColumn(name = "user_id")
     @Getter @Setter
+    @NotNull
     private UserModel userCart;
 
     @Column(nullable = false)
