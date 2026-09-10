@@ -101,7 +101,7 @@ public class CartDaoImp implements CartDao{
     // 🔹 Nuevo método: Carrito activo
     @Override
     public Optional<Cart> findActiveCartByUserId(Long userId) {
-        String jpql = "SELECT c FROM Cart c WHERE c.u   serCart.id = :userId AND c.active = true";
+        String jpql = "SELECT c FROM Cart c WHERE c.userCart.id = :userId AND c.active = true";
         try {
             Cart cart = entityManager.createQuery(jpql, Cart.class)
                     .setParameter("userId", userId)
