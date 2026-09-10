@@ -21,19 +21,24 @@ public class CartItemController {
     @Autowired
     private CartItemService cartItemService;
 
-    @PostMapping (path = "/addItemToCart")
-    public ResponseEntity<String> addItemToCart(@RequestParam Long userId, @RequestParam Long productId, @RequestParam int amount) {
+    @PostMapping(path = "/addItemToCart")
+    public ResponseEntity<String> addItemToCart(@RequestParam Long userId,
+                                                @RequestParam Long productId,
+                                                @RequestParam int amount) {
         ResponseEntity<String> response;
 
         try {
             cartItemService.addItemToCart(userId, productId, amount);
             response = ResponseEntity.ok("Producto agregado al carrito correctamente.");
         } catch (IllegalArgumentException e) {
+            e.printStackTrace();
             response = ResponseEntity.badRequest().body("Error: " + e.getMessage());
         } catch (Exception e) {
+            e.printStackTrace();
             response = ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error inesperado al agregar el producto al carrito.");
         }
+
         return response;
     }
 
@@ -49,7 +54,7 @@ public class CartItemController {
     }
 
     @GetMapping("/findItemsByCartId/{cartId}")
-    public ResponseEntity<List<CartItemDTO>> getItemsByCartId(@RequestParam Long cartId) {
+    public ResponseEntity<List<CartItemDTO>> getItemsByCartId(@PathVariable Long cartId) {
         List<CartItemDTO> cartItems;
 
         try {
