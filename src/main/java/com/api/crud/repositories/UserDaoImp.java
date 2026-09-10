@@ -1,20 +1,24 @@
 package com.api.crud.repositories;
 
-import com.api.crud.DTO.UserUpdateDTO;
+import com.api.crud.DTO.UserUpdateRequestDTO;
 import com.api.crud.models.entity.UserModel;
 import com.api.crud.services.EmailService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.NoResultException;
 import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.TypedQuery;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,21 +55,22 @@ public class UserDaoImp implements UserDao {
     }
 
     @Override
-    public Optional<UserModel> findUserByName(String firstName, String lastName) {
-        logger.debug("Executing query Searching for user with name: {} {}", firstName, lastName);
-        UserModel user = null;
+    public List<UserModel> findUserByName(String firstName, String lastName) {
+        logger.debug("Executing query searching for users with name: {} {}", firstName, lastName);
+        List<UserModel> users;
+
         try {
-            user = entityManager
-                    .createQuery("SELECT u FROM UserModel u WHERE u.firstName = :firstName AND u.lastName = :lastName", UserModel.class)
+            users = entityManager.createQuery("SELECT u FROM UserModel u " + "WHERE u.firstName = :firstName " + "AND u.lastName = :lastName",
+                            UserModel.class)
                     .setParameter("firstName", firstName)
                     .setParameter("lastName", lastName)
-                    .getSingleResult();
-        } catch (NoResultException e) {
-            logger.warn("No user found with name: {} {}", firstName, lastName);
+                    .getResultList();
+
         } catch (Exception e) {
-            logger.error("Unexpected error while querying searching for user with name {} {}: {}", firstName, lastName, e.getMessage());
+            logger.error("Unexpected error while querying users with name {} {}: {}", firstName, lastName, e.getMessage());
+            users = Collections.emptyList();
         }
-        return Optional.ofNullable(user);
+        return users;
     }
 
     @Override
@@ -91,7 +96,7 @@ public class UserDaoImp implements UserDao {
     }
 
     @Override
-    public UserModel updateUserByEmail(String email, UserUpdateDTO dto) {
+    public UserModel updateMyProfile(String email, UserUpdateRequestDTO dto) {
         Optional<UserModel> optionalUser = findUserByEmail(email);
 
         if (optionalUser.isPresent()) {
@@ -109,28 +114,6 @@ public class UserDaoImp implements UserDao {
     }
 
     @Override
-    public boolean deleteUserByEmail(String email) {
-        logger.debug("Executing query Attempting to delete user with Email: {}", email);
-        boolean response = false;
-        try {
-            UserModel user = entityManager.createQuery(
-                            "SELECT u FROM UserModel u WHERE u.email = :email", UserModel.class)
-                    .setParameter("email", email)
-                    .getSingleResult();
-
-            if (user != null) {
-                entityManager.remove(user);
-                response = true;
-            }
-        } catch (NoResultException e) {
-            logger.warn("No user found with email: {}", email);
-        } catch (Exception e) {
-            logger.error("Error while querying delete user with Email {}: {}", email, e.getMessage(), e);
-        }
-        return response;
-    }
-
-    @Override
     public List<UserModel> getUsers() {
         logger.debug("Executing query to fetch user");
         List<UserModel> users;
@@ -145,26 +128,71 @@ public class UserDaoImp implements UserDao {
     }
 
     @Override
-    public Page<UserModel> getUsersModel(Pageable pageable) {
-        logger.debug("Executing query to fetch users with pagination: page={}, size={}", pageable.getPageNumber(), pageable.getPageSize());
-        String query = "FROM UserModel u ORDER BY u." + pageable.getSort().iterator().next().getProperty();
+    public Page<UserModel> getUserAdmin(Pageable pageable, String role) {
 
-        List<UserModel> users;
-        Long total;
-        Page<UserModel> response;
+        logger.debug("Executing query to fetch users with pagination: page={}, size={}, role={}",
+                pageable.getPageNumber(), pageable.getPageSize(), role
+        );
+
+        Sort.Order order = pageable.getSort().iterator().next();
+
+        String property = order.getProperty();
+        String direction = order.isDescending() ? "DESC" : "ASC";
+
+        Set<String> allowedProperties = Set.of("id", "firstName", "lastName", "email", "phone", "active");
+
+        if (!allowedProperties.contains(property)) {
+            throw new IllegalArgumentException("Invalid sort property: " + property);
+        }
+
+        boolean filterByRole = role != null && !role.isBlank();
+
+        String query;
+
+        if (filterByRole) {
+            query = "SELECT DISTINCT u " + "FROM UserModel u " + "JOIN u.roles r " + "WHERE r.nameRole = :role " + "ORDER BY u." + property +
+                    " " + direction;
+        } else {
+            query = "FROM UserModel u " + "ORDER BY u." + property + " " + direction;
+        }
+
         try {
-            users = entityManager.createQuery(query, UserModel.class)
+
+            TypedQuery<UserModel> userQuery = entityManager.createQuery(query, UserModel.class);
+
+            if (filterByRole) {
+                userQuery.setParameter("role", role);
+            }
+
+            List<UserModel> users = userQuery
                     .setFirstResult(pageable.getPageNumber() * pageable.getPageSize())
                     .setMaxResults(pageable.getPageSize())
                     .getResultList();
-            total = entityManager.createQuery("SELECT COUNT(u) FROM UserModel u", Long.class)
-                    .getSingleResult();
-            response = new PageImpl<>(users, pageable, total);
+
+            String countQuery;
+
+            if (filterByRole) {
+                countQuery = "SELECT COUNT(DISTINCT u) " + "FROM UserModel u " + "JOIN u.roles r " + "WHERE r.nameRole = :role";
+            } else {
+                countQuery = "SELECT COUNT(u) " + "FROM UserModel u";
+            }
+
+            TypedQuery<Long> totalQuery = entityManager.createQuery(countQuery, Long.class);
+
+            if (filterByRole) {
+                totalQuery.setParameter("role", role);
+            }
+
+            Long total = totalQuery.getSingleResult();
+
+            return new PageImpl<>(users, pageable, total);
+
         } catch (Exception e) {
-            logger.error("Error while querying fetching paginated users: {}", e.getMessage());
-            response = Page.empty();
+
+            logger.error("Error while querying fetching paginated users: {}", e.getMessage(), e);
+
+            return Page.empty(pageable);
         }
-        return response;
     }
 
     @Override
