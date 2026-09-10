@@ -77,16 +77,16 @@ public class CartItemService {
         }
     }
 
+    public Optional<CartItemDTO> findCartItemById(Long cartItemId) {
+        return cartItemDao.findCartItemById(cartItemId)
+                .map(item -> modelMapper.map(item, CartItemDTO.class));
+    }
+
     public List<CartItemDTO> findItemsByCartId(Long cartId) {
         return cartItemDao.findItemsByCartId(cartId)
                 .stream()
                 .map(item -> modelMapper.map(item, CartItemDTO.class))
                 .collect(Collectors.toList());
-    }
-
-    public Optional<CartItemDTO> findCartItemById(Long cartItemId) {
-        return cartItemDao.findCartItemById(cartItemId)
-                .map(item -> modelMapper.map(item, CartItemDTO.class));
     }
 
     @Transactional
