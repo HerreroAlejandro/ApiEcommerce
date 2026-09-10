@@ -3,7 +3,7 @@ package com.api.crud.DTO;
 import lombok.Getter;
 import lombok.Setter;
 
-public class UserDTO {
+public class UserResponseDTO {
 
     @Getter @Setter
     private long id;
@@ -17,12 +17,16 @@ public class UserDTO {
     @Getter @Setter
     private String email;
 
-    public UserDTO(long id, String firstName, String lastName, String email){
+    @Getter @Setter
+    private String phone;
+
+    public UserResponseDTO(long id, String firstName, String lastName, String email, String phone){
         this.id=id;
         this.firstName=firstName;
         this.lastName=lastName;
         this.email=email;
+        this.phone=phone;
     }
 
-    public UserDTO(){}
+    public UserResponseDTO(){}
 }
