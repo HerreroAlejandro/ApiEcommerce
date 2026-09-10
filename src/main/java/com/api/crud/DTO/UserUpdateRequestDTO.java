@@ -3,7 +3,7 @@ package com.api.crud.DTO;
 import lombok.Getter;
 import lombok.Setter;
 
-public class UserUpdateDTO {
+public class UserUpdateRequestDTO {
 
     @Getter @Setter
     private String firstName;
@@ -14,11 +14,11 @@ public class UserUpdateDTO {
     @Getter @Setter
     private String phone;
 
-    public UserUpdateDTO(String firstName, String lastName, String phone) {
+    public UserUpdateRequestDTO(String firstName, String lastName, String phone) {
         this.firstName = firstName;
         this.lastName = lastName;
         this.phone = phone;
     }
 
-    public UserUpdateDTO(){}
+    public UserUpdateRequestDTO(){}
 }
