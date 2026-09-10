@@ -19,11 +19,7 @@ public class CartItemDaoImp implements CartItemDao{
     @Override
     @Transactional
     public void saveCartItem(CartItem cartItem) {
-        try{
             entityManager.merge(cartItem);
-        } catch (Exception e){
-         System.out.print("error :" + e.getMessage());
-        }
     }
 
     @Override
