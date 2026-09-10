@@ -1,6 +1,6 @@
 package com.api.crud.repositories;
 
-import com.api.crud.DTO.UserUpdateDTO;
+import com.api.crud.DTO.UserUpdateRequestDTO;
 import com.api.crud.models.entity.UserModel;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,17 +13,15 @@ public interface UserDao {
 
     void register(UserModel user);
 
-    public Optional<UserModel> findUserByName(String firstName, String lastName);
+    public List<UserModel> findUserByName(String firstName, String lastName);
 
     Optional<UserModel> findUserByEmail(String email);
 
-    UserModel updateUserByEmail(String email, UserUpdateDTO dto);
-
-    boolean deleteUserByEmail(String email);
+    UserModel updateMyProfile(String email, UserUpdateRequestDTO dto);
 
     List<UserModel> getUsers();
 
-    Page<UserModel> getUsersModel(Pageable pageable);
+    public Page<UserModel> getUserAdmin(Pageable pageable, String role);
 
     void update(UserModel user);
 
