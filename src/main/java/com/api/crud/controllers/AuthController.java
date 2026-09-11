@@ -1,6 +1,6 @@
 package com.api.crud.controllers;
 
-import com.api.crud.DTO.AdminPasswordResetDTO;
+import com.api.crud.DTO.PasswordResetDTO;
 import com.api.crud.DTO.UserDetailAdminResponseDTO;
 import com.api.crud.DTO.UserListAdminResponseDTO;
 import com.api.crud.DTO.UserResponseDTO;
@@ -130,11 +130,11 @@ public class AuthController {
     }
 
     @PatchMapping("/{id}/password")
-    public ResponseEntity<String> resetUserPassword(@PathVariable Long id, @RequestBody AdminPasswordResetDTO dto) {
+    public ResponseEntity<String> resetPasswordByAdmin(@PathVariable Long id, @RequestBody PasswordResetDTO dto) {
         logger.info("Received request to reset password for user with ID: {}", id);
 
         try {
-            userService.resetUserPassword(id, dto);
+            userService.resetPasswordByAdmin(id, dto);
             logger.info("Password reset successfully for user with ID: {}", id);
 
             return ResponseEntity.ok("Password reset successfully");
