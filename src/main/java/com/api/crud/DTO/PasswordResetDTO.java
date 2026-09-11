@@ -3,7 +3,7 @@ package com.api.crud.DTO;
 import lombok.Getter;
 import lombok.Setter;
 
-public class AdminPasswordResetDTO {
+public class PasswordResetDTO {
 
     @Getter @Setter
     private String newPassword;
@@ -11,10 +11,10 @@ public class AdminPasswordResetDTO {
     @Getter @Setter
     private String confirmPassword;
 
-    public AdminPasswordResetDTO(String newPassword, String confirmPassword) {
+    public PasswordResetDTO(String newPassword, String confirmPassword) {
         this.newPassword = newPassword;
         this.confirmPassword = confirmPassword;
     }
 
-    public AdminPasswordResetDTO(){}
+    public PasswordResetDTO(){}
 }

@@ -4,7 +4,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
-public class PasswordChangeDTO {
+public class PasswordChangeRequestDTO {
     @NotNull @Getter @Setter
     private String currentPassword;
 
@@ -14,11 +14,11 @@ public class PasswordChangeDTO {
     @NotNull @Getter @Setter
     private String confirmPassword;
 
-    public PasswordChangeDTO(String currentPassword, String newPassword,String confirmPassword) {
+    public PasswordChangeRequestDTO(String currentPassword, String newPassword, String confirmPassword) {
         this.currentPassword = currentPassword;
         this.newPassword = newPassword;
         this.confirmPassword = confirmPassword;
     }
 
-    public PasswordChangeDTO(){}
+    public PasswordChangeRequestDTO(){}
 }
