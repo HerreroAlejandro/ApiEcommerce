@@ -1,8 +1,6 @@
 package com.api.crud.controllers;
 
-import com.api.crud.DTO.OrderDTO;
 import com.api.crud.DTO.OrderItemDTO;
-import com.api.crud.DTO.ProductDTO;
 import com.api.crud.models.entity.*;
 import com.api.crud.services.OrderItemService;
 import com.api.crud.services.OrderService;
@@ -40,7 +38,7 @@ public class OrderItemController {
         this.productService = productService;
         this.modelMapper = modelMapper;
     }
-
+/*
     // 1) Guardar OrderItem
     @PostMapping("/save")
     public ResponseEntity<OrderItemDTO> saveOrderItem(
@@ -56,7 +54,7 @@ public class OrderItemController {
             Order order = modelMapper.map(orderDTO, Order.class);
 
             // Obtener la entidad Product concreta
-            ProductDTO productDTO = productService.findProductById(productId)
+            ProductDTO productDTO = productService.findProductDetailById(productId)
                     .orElseThrow(() -> new RuntimeException("Producto no encontrado"));
 
             Product product;
@@ -77,7 +75,7 @@ public class OrderItemController {
 
         return response;
     }
-
+*/
     // 2) Obtener OrderItem por ID
     @GetMapping("/{idOrderItem}")
     public ResponseEntity<OrderItemDTO> getOrderItemById(@PathVariable Long idOrderItem) {
