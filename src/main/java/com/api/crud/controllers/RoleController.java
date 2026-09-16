@@ -24,11 +24,9 @@ public class RoleController {
 
     @GetMapping(path = "/ShowRoles")
     public ResponseEntity<List<RoleDTO>> getRoles() {
-        logger.info("Starting to fetch roles.");
         List<RoleDTO> roles = roleService.getRoles();
         ResponseEntity<List<RoleDTO>> response;
         if (roles.isEmpty()) {
-            logger.info("No roles found, returning empty list.");
             response = ResponseEntity.status(HttpStatus.NOT_FOUND).body(Collections.emptyList());
         }else{
             logger.info("Roles fetched successfully. Total roles found: {}", roles.size());
@@ -108,10 +106,5 @@ public class RoleController {
         }
         return response;
     }
-
-
-
-
-
 
 }

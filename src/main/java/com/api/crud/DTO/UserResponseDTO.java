@@ -20,8 +20,7 @@ public class UserResponseDTO {
     @Getter @Setter
     private String phone;
 
-    public UserResponseDTO(long id, String firstName, String lastName, String email, String phone){
-        this.id=id;
+    public UserResponseDTO(String firstName, String lastName, String email, String phone){
         this.firstName=firstName;
         this.lastName=lastName;
         this.email=email;

@@ -27,8 +27,7 @@ public class Role {
     @Getter @Setter
     private Set<UserModel> users = new HashSet<>();
 
-    public Role(Long idRole, String nameRole) {
-        this.idRole = idRole;
+    public Role(String nameRole) {
         this.nameRole = nameRole;
     }
 
