@@ -1,9 +1,8 @@
 package com.api.crud.models.entity;
 
+import com.api.crud.models.enums.ProductType;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Digits;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.Setter;
 import java.math.BigDecimal;
@@ -21,29 +20,38 @@ public abstract class Product {
 
     @Column(name = "nameProduct", unique = true)
     @Getter @Setter
-    @NotNull(message = "nameProduct cannot be null")
-    @Size(min =2, max =30)
+    @NotBlank(message = "Product name cannot be blank")
+    @Size(min = 2, max = 30, message = "Product name must contain between 2 and 30 characters")
     private String nameProduct;
 
     @Column(name = "priceProduct")
     @Getter @Setter
+    @NotNull(message = "Product price cannot be null")
+    @DecimalMin(value = "0.0", inclusive = false, message = "Product price must be greater than 0")
     @Digits(integer = 8, fraction = 2)
     private BigDecimal priceProduct;
 
     @Column(name = "description")
-    @Size (min =0, max =200)
+    @Size(max = 200)
     @Getter @Setter
     private String description;
 
     @Column(name = "imageUrl")
     @Getter @Setter
-    @Size (min =0, max =200)
+    @Size(max = 200)
     private String imageUrl;
 
     @Column(name = "category")
     @Getter @Setter
-    @Size (min =0, max =50)
+    @NotBlank(message = "Product category cannot be blank")
+    @Size(max = 50)
     private String category;
+
+    @Getter @Setter
+    @NotNull(message = "Product type cannot be null")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type")
+    private ProductType type;
 
     @Column(name = "active")
     @Getter @Setter
@@ -53,21 +61,13 @@ public abstract class Product {
     @Getter @Setter
     private List<OrderItem> orderItems;
 
-    public Product(Long idProduct, String nameProduct, BigDecimal priceProduct, String description, String imageUrl, String category) {
-        this.idProduct = idProduct;
+    public Product(String nameProduct, BigDecimal priceProduct, String description, String imageUrl, String category, ProductType type) {
         this.nameProduct = nameProduct;
         this.priceProduct = priceProduct;
         this.description = description;
         this.imageUrl = imageUrl;
         this.category = category;
-    }
-
-    public Product(String nameProduct, BigDecimal priceProduct, String description, String imageUrl, String category) {
-        this.nameProduct = nameProduct;
-        this.priceProduct = priceProduct;
-        this.description = description;
-        this.imageUrl = imageUrl;
-        this.category = category;
+        this.type = type;
     }
 
     public Product(){}
