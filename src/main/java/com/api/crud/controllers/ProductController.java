@@ -221,6 +221,43 @@ public class ProductController {
         return response;
     }
 
+    @PutMapping("/AdjustPrice/{idProduct}")
+    public ResponseEntity<String> adjustProductPrice(@PathVariable Long idProduct,
+                                                     @Valid @RequestBody ProductPriceAdjustmentDTO adjustmentDTO) {
+
+        logger.info("Received request to adjust price for product ID {} by {}%", idProduct, adjustmentDTO.getPercentage());
+
+        ResponseEntity<String> response;
+
+        boolean updated = productService.adjustProductPrice(idProduct, adjustmentDTO);
+
+        if (updated) {
+            logger.info("Price for product ID {} adjusted successfully by {}%", idProduct, adjustmentDTO.getPercentage());
+            response = ResponseEntity.ok("Product price adjusted successfully");
+
+        } else {
+            logger.info("Product ID {} not found, price not adjusted", idProduct);
+
+            response = ResponseEntity.status(HttpStatus.NOT_FOUND).body("Product not found");
+        }
+        return response;
+    }
+
+    @PutMapping("/AdjustStock/{idProduct}")
+    public ResponseEntity<String> adjustProductStock(@PathVariable Long idProduct,
+                                                     @Valid @RequestBody ProductStockAdjustmentDTO adjustmentDTO) {
+        ResponseEntity<String> response;
+
+        boolean updated = productService.adjustProductStock(idProduct, adjustmentDTO);
+
+        if (updated) {
+            response = ResponseEntity.ok("Product stock adjusted successfully");
+        } else {
+            response = ResponseEntity.status(HttpStatus.NOT_FOUND).body("Product not found or is not a physical product");
+        }
+        return response;
+    }
+
     @PutMapping("/Disable/{id}")
     public ResponseEntity<String> disableProduct(@PathVariable Long id) {
         logger.info("Received request to disable product with id {}", id);

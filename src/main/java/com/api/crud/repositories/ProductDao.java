@@ -3,8 +3,6 @@ package com.api.crud.repositories;
 import com.api.crud.models.entity.Product;
 import com.api.crud.models.enums.ProductType;
 import org.springframework.data.domain.Pageable;
-
-
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;

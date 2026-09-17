@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.modelmapper.ModelMapper;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 
@@ -143,6 +144,7 @@ public class ProductService {
         return result;
     }
 
+    @Transactional
     public boolean updateProductStock(Long idProduct, ProductStockUpdateDTO stockDTO) {
 
         logger.info("Updating stock for product ID {} in service", idProduct);
@@ -163,6 +165,7 @@ public class ProductService {
         return true;
     }
 
+    @Transactional
     public boolean updateProductPrice(Long idProduct, ProductPriceUpdateDTO priceDTO) {
 
         logger.info("Updating price for product ID {} in service", idProduct);
@@ -177,6 +180,65 @@ public class ProductService {
         return true;
     }
 
+    @Transactional
+    public boolean adjustProductPrice(Long idProduct, ProductPriceAdjustmentDTO adjustmentDTO) {
+
+        logger.info("Adjusting price for product ID {} by {}%", idProduct, adjustmentDTO.getPercentage());
+
+        boolean updated = false;
+
+        Optional<Product> productOpt = productDao.findProductById(idProduct);
+
+        if (productOpt.isPresent()) {
+
+            Product product = productOpt.get();
+
+            BigDecimal currentPrice = product.getPriceProduct();
+            BigDecimal percentage = adjustmentDTO.getPercentage();
+
+            BigDecimal adjustment = currentPrice
+                            .multiply(percentage)
+                            .divide(BigDecimal.valueOf(100));
+
+            BigDecimal newPrice = currentPrice.add(adjustment);
+
+            product.setPriceProduct(newPrice);
+
+            updated = true;
+        }
+        return updated;
+    }
+
+    @Transactional
+    public boolean adjustProductStock(Long idProduct, ProductStockAdjustmentDTO adjustmentDTO) {
+
+        logger.info("Adjusting stock for product ID {} by {} units", idProduct, adjustmentDTO.getAdjustment());
+
+        boolean updated = false;
+
+        Optional<Product> productOpt = productDao.findProductById(idProduct);
+
+        if (productOpt.isPresent()) {
+
+            Product product = productOpt.get();
+
+            if (product instanceof ProductPhysical physicalProduct) {
+
+                int currentStock = physicalProduct.getStockProduct();
+                int adjustment = adjustmentDTO.getAdjustment();
+
+                int newStock = currentStock + adjustment;
+
+                if (newStock >= 0) {
+                    physicalProduct.setStockProduct(newStock);
+                    updated = true;
+                }
+            }
+        }
+        return updated;
+    }
+
+    @Transactional
     public boolean disableProduct(Long idProduct) {
         logger.info("Disabling product with id {}", idProduct);
         boolean success = false;
@@ -191,6 +253,7 @@ public class ProductService {
         return success;
     }
 
+    @Transactional
     public boolean enableProduct(Long idProduct) {
         logger.info("Enabling product with id {}", idProduct);
 
@@ -208,6 +271,7 @@ public class ProductService {
         return success;
     }
 
+    @Transactional
     public boolean updateProductInfo(Long idProduct, ProductUpdateDTO productDTO) {
         logger.info("Updating product information for product ID {}", idProduct);
         boolean updated = false;
