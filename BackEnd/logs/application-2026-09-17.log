@@ -1,0 +1,113 @@
+2026-09-17 00:14:21 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
+2026-09-17 00:14:21 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
+2026-09-17 00:21:08 [main] INFO  com.api.crud.CrudApplication - Starting CrudApplication using Java 21.0.12 with PID 19552 (C:\Users\aleja\Documents\Github\ApiEcommerce\target\classes started by aleja in C:\Users\aleja\Documents\Github\ApiEcommerce)
+2026-09-17 00:21:08 [main] INFO  com.api.crud.CrudApplication - No active profile set, falling back to 1 default profile: "default"
+2026-09-17 00:21:09 [main] INFO  o.a.coyote.http11.Http11NioProtocol - Initializing ProtocolHandler ["http-nio-8080"]
+2026-09-17 00:21:09 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-09-17 00:21:09 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.19]
+2026-09-17 00:21:09 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-09-17 00:21:10 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+2026-09-17 00:21:10 [main] INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@39a7eca5
+2026-09-17 00:21:10 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+2026-09-17 00:21:12 [main] WARN  o.s.b.a.o.j.JpaBaseConfiguration$JpaWebConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-09-17 00:21:12 [main] WARN  o.s.b.a.s.s.UserDetailsServiceAutoConfiguration - 
+
+Using generated security password: 3e96ca1b-2af6-404d-9a85-ca9577faf977
+
+This generated password is for development use only. Your security configuration must be updated before running your application in production.
+
+2026-09-17 00:21:12 [main] INFO  o.a.coyote.http11.Http11NioProtocol - Starting ProtocolHandler ["http-nio-8080"]
+2026-09-17 00:21:12 [main] INFO  com.api.crud.CrudApplication - Started CrudApplication in 4.891 seconds (process running for 5.418)
+2026-09-17 00:21:25 [http-nio-8080-exec-1] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-09-17 00:21:25 [http-nio-8080-exec-1] INFO  c.a.crud.controllers.UserController - Received request to login user with email: magosh90@gmail.com
+2026-09-17 00:21:25 [http-nio-8080-exec-1] INFO  com.api.crud.services.UserService - Attempting Service login for user: magosh90@gmail.com
+2026-09-17 00:21:25 [http-nio-8080-exec-1] INFO  com.api.crud.services.UserService - Starting to process fetching roles for user with email: magosh90@gmail.com
+2026-09-17 00:21:25 [http-nio-8080-exec-1] INFO  com.api.crud.services.UserService - Roles found for user magosh90@gmail.com: [ADMIN]
+2026-09-17 00:21:25 [http-nio-8080-exec-1] INFO  com.api.crud.services.UserService - User magosh90@gmail.com logged in successfully with roles [ADMIN]
+2026-09-17 00:21:25 [http-nio-8080-exec-1] INFO  c.a.crud.controllers.UserController - Login successful for user with email: magosh90@gmail.com
+2026-09-17 00:21:41 [http-nio-8080-exec-3] INFO  com.api.crud.config.JWTUtil - Token válido: true
+2026-09-17 00:21:41 [http-nio-8080-exec-3] INFO  c.a.c.controllers.ProductController - received request to find product with id 34
+2026-09-17 00:21:41 [http-nio-8080-exec-3] INFO  c.a.c.controllers.ProductController - Product with ID: 34 found successfully.
+2026-09-17 00:22:32 [http-nio-8080-exec-2] INFO  com.api.crud.config.JWTUtil - Error de validación del token: JWT expired at 2025-03-17T05:01:51Z. Current time: 2026-09-17T03:22:32Z, a difference of 47427641315 milliseconds.  Allowed clock skew: 0 milliseconds.
+2026-09-17 00:22:32 [http-nio-8080-exec-2] INFO  com.api.crud.config.JWTUtil - Token válido: false
+2026-09-17 00:22:43 [http-nio-8080-exec-4] INFO  com.api.crud.config.JWTUtil - Token válido: true
+2026-09-17 00:22:43 [http-nio-8080-exec-4] INFO  c.a.c.controllers.ProductController - Received request to find product for admin with id 15
+2026-09-17 00:22:43 [http-nio-8080-exec-4] INFO  c.a.c.controllers.ProductController - Product with ID 15 found successfully.
+2026-09-17 00:24:43 [http-nio-8080-exec-6] INFO  com.api.crud.config.JWTUtil - Token válido: true
+2026-09-17 00:24:43 [http-nio-8080-exec-6] INFO  c.a.c.controllers.ProductController - Received request to update stock for product ID 21
+2026-09-17 00:24:43 [http-nio-8080-exec-6] INFO  c.api.crud.services.ProductService - Updating stock for product ID 21 in service
+2026-09-17 00:24:43 [http-nio-8080-exec-6] INFO  c.a.c.controllers.ProductController - Stock for product ID 21 updated successfully to 30
+2026-09-17 00:25:07 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
+2026-09-17 00:25:07 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
+2026-09-17 00:25:50 [main] INFO  com.api.crud.CrudApplication - Starting CrudApplication using Java 21.0.12 with PID 12004 (C:\Users\aleja\Documents\Github\ApiEcommerce\target\classes started by aleja in C:\Users\aleja\Documents\Github\ApiEcommerce)
+2026-09-17 00:25:50 [main] INFO  com.api.crud.CrudApplication - No active profile set, falling back to 1 default profile: "default"
+2026-09-17 00:25:52 [main] INFO  o.a.coyote.http11.Http11NioProtocol - Initializing ProtocolHandler ["http-nio-8080"]
+2026-09-17 00:25:52 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-09-17 00:25:52 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.19]
+2026-09-17 00:25:52 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-09-17 00:25:52 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+2026-09-17 00:25:52 [main] INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@50df37eb
+2026-09-17 00:25:52 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+2026-09-17 00:25:54 [main] WARN  o.s.b.a.o.j.JpaBaseConfiguration$JpaWebConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-09-17 00:25:54 [main] WARN  o.s.b.a.s.s.UserDetailsServiceAutoConfiguration - 
+
+Using generated security password: 920a0d9d-7b86-4adc-a99e-643ca02d5dab
+
+This generated password is for development use only. Your security configuration must be updated before running your application in production.
+
+2026-09-17 00:25:55 [main] INFO  o.a.coyote.http11.Http11NioProtocol - Starting ProtocolHandler ["http-nio-8080"]
+2026-09-17 00:25:55 [main] INFO  com.api.crud.CrudApplication - Started CrudApplication in 4.775 seconds (process running for 5.206)
+2026-09-17 00:25:58 [http-nio-8080-exec-1] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-09-17 00:25:58 [http-nio-8080-exec-1] INFO  com.api.crud.config.JWTUtil - Token válido: true
+2026-09-17 00:25:58 [http-nio-8080-exec-1] INFO  c.a.c.controllers.ProductController - Received request to update stock for product ID 21
+2026-09-17 00:25:58 [http-nio-8080-exec-1] INFO  c.api.crud.services.ProductService - Updating stock for product ID 21 in service
+2026-09-17 00:25:58 [http-nio-8080-exec-1] INFO  c.a.c.controllers.ProductController - Stock for product ID 21 updated successfully to 30
+2026-09-17 00:27:07 [http-nio-8080-exec-3] INFO  com.api.crud.config.JWTUtil - Token válido: true
+2026-09-17 00:27:07 [http-nio-8080-exec-3] INFO  c.a.c.controllers.ProductController - Received request to update price for product ID 11
+2026-09-17 00:27:07 [http-nio-8080-exec-3] INFO  c.api.crud.services.ProductService - Updating price for product ID 11 in service
+2026-09-17 00:27:07 [http-nio-8080-exec-3] INFO  c.a.c.controllers.ProductController - Price for product ID 11 updated successfully to 300
+2026-09-17 00:31:48 [http-nio-8080-exec-5] INFO  com.api.crud.config.JWTUtil - Error de validación del token: JWT expired at 2026-09-07T07:18:47Z. Current time: 2026-09-17T03:31:48Z, a difference of 850381367 milliseconds.  Allowed clock skew: 0 milliseconds.
+2026-09-17 00:31:48 [http-nio-8080-exec-5] INFO  com.api.crud.config.JWTUtil - Token válido: false
+2026-09-17 00:31:56 [http-nio-8080-exec-8] INFO  c.a.crud.controllers.UserController - Received request to login user with email: magosh90@gmail.com
+2026-09-17 00:31:56 [http-nio-8080-exec-8] INFO  com.api.crud.services.UserService - Attempting Service login for user: magosh90@gmail.com
+2026-09-17 00:31:56 [http-nio-8080-exec-8] INFO  com.api.crud.services.UserService - Starting to process fetching roles for user with email: magosh90@gmail.com
+2026-09-17 00:31:56 [http-nio-8080-exec-8] INFO  com.api.crud.services.UserService - Roles found for user magosh90@gmail.com: [ADMIN]
+2026-09-17 00:31:56 [http-nio-8080-exec-8] INFO  com.api.crud.services.UserService - User magosh90@gmail.com logged in successfully with roles [ADMIN]
+2026-09-17 00:31:56 [http-nio-8080-exec-8] INFO  c.a.crud.controllers.UserController - Login successful for user with email: magosh90@gmail.com
+2026-09-17 00:32:06 [http-nio-8080-exec-7] INFO  com.api.crud.config.JWTUtil - Error de validación del token: JWT strings must contain exactly 2 period characters. Found: 4
+2026-09-17 00:32:06 [http-nio-8080-exec-7] INFO  com.api.crud.config.JWTUtil - Token válido: false
+2026-09-17 00:32:12 [http-nio-8080-exec-6] INFO  com.api.crud.config.JWTUtil - Error de validación del token: JWT strings must contain exactly 2 period characters. Found: 4
+2026-09-17 00:32:12 [http-nio-8080-exec-6] INFO  com.api.crud.config.JWTUtil - Token válido: false
+2026-09-17 00:32:30 [http-nio-8080-exec-9] INFO  com.api.crud.config.JWTUtil - Token válido: true
+2026-09-17 00:32:30 [http-nio-8080-exec-9] WARN  o.s.w.s.m.s.DefaultHandlerExceptionResolver - Resolved [org.springframework.web.HttpRequestMethodNotSupportedException: Request method 'PUT' is not supported]
+2026-09-17 00:32:40 [http-nio-8080-exec-10] INFO  com.api.crud.config.JWTUtil - Token válido: true
+2026-09-17 00:32:40 [http-nio-8080-exec-10] INFO  c.a.c.controllers.ProductController - Received request to update product information for product ID 53
+2026-09-17 00:32:40 [http-nio-8080-exec-10] INFO  c.api.crud.services.ProductService - Updating product information for product ID 53
+2026-09-17 00:32:40 [http-nio-8080-exec-10] INFO  c.a.c.controllers.ProductController - Product information for product ID 53 updated successfully
+2026-09-17 00:32:55 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
+2026-09-17 00:32:55 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
+2026-09-17 00:33:16 [main] INFO  com.api.crud.CrudApplication - Starting CrudApplication using Java 21.0.12 with PID 17888 (C:\Users\aleja\Documents\Github\ApiEcommerce\target\classes started by aleja in C:\Users\aleja\Documents\Github\ApiEcommerce)
+2026-09-17 00:33:16 [main] INFO  com.api.crud.CrudApplication - No active profile set, falling back to 1 default profile: "default"
+2026-09-17 00:33:17 [main] INFO  o.a.coyote.http11.Http11NioProtocol - Initializing ProtocolHandler ["http-nio-8080"]
+2026-09-17 00:33:17 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-09-17 00:33:17 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.19]
+2026-09-17 00:33:17 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-09-17 00:33:18 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+2026-09-17 00:33:18 [main] INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@3c09a350
+2026-09-17 00:33:18 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+2026-09-17 00:33:19 [main] WARN  o.s.b.a.o.j.JpaBaseConfiguration$JpaWebConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-09-17 00:33:19 [main] WARN  o.s.b.a.s.s.UserDetailsServiceAutoConfiguration - 
+
+Using generated security password: 11254d78-e311-41c8-9dd0-5f390323d462
+
+This generated password is for development use only. Your security configuration must be updated before running your application in production.
+
+2026-09-17 00:33:20 [main] INFO  o.a.coyote.http11.Http11NioProtocol - Starting ProtocolHandler ["http-nio-8080"]
+2026-09-17 00:33:20 [main] INFO  com.api.crud.CrudApplication - Started CrudApplication in 4.574 seconds (process running for 5.1)
+2026-09-17 00:33:26 [http-nio-8080-exec-1] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-09-17 00:33:26 [http-nio-8080-exec-1] INFO  com.api.crud.config.JWTUtil - Token válido: true
+2026-09-17 00:33:26 [http-nio-8080-exec-1] INFO  c.a.c.controllers.ProductController - Received request to update product information for product ID 53
+2026-09-17 00:33:26 [http-nio-8080-exec-1] INFO  c.api.crud.services.ProductService - Updating product information for product ID 53
+2026-09-17 00:33:26 [http-nio-8080-exec-1] INFO  c.a.c.controllers.ProductController - Product information for product ID 53 updated successfully
+2026-09-17 00:34:01 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
+2026-09-17 00:34:01 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
