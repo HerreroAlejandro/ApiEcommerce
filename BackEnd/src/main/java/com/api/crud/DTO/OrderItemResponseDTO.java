@@ -5,7 +5,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 
-public class OrderItemFrontDTO {
+public class OrderItemResponseDTO {
 
     @Getter @Setter
     private Long idOrderItem;
