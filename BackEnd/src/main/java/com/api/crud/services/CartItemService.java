@@ -136,7 +136,6 @@ public class CartItemService {
             cartItemDao.removeCartItem(itemId);
         } else {
             item.setAmountCartItem((int) next);
-            item.setPriceCartItem(item.getPriceCartItem());
         }
     }
 
@@ -210,7 +209,6 @@ public class CartItemService {
         CartItem item = ownedItem(email, itemId);
         available(item.getProductCartItem(), amount);
         item.setAmountCartItem(amount);
-        item.setPriceCartItem(item.getPriceCartItem());
     }
 
     @Transactional
@@ -220,7 +218,6 @@ public class CartItemService {
         long amount = (long) item.getAmountCartItem() + increment;
         available(item.getProductCartItem(), amount);
         item.setAmountCartItem((int) amount);
-        item.setPriceCartItem(item.getPriceCartItem());
     }
 
     @Transactional
@@ -232,7 +229,6 @@ public class CartItemService {
             cartItemDao.removeCartItem(itemId);
         } else {
             item.setAmountCartItem(item.getAmountCartItem() - decrement);
-            item.setPriceCartItem(item.getPriceCartItem());
         }
     }
 
@@ -247,19 +243,16 @@ public class CartItemService {
         Optional<CartItem> existingCartItem = cartItemDao.findByCartAndProductId(cart.getIdCart(), productId);
         long resultingAmount = (long) amount + existingCartItem.map(CartItem::getAmountCartItem).orElse(0);
         available(product, resultingAmount);
-        BigDecimal price = product.getPriceProduct().multiply(BigDecimal.valueOf(amount));
 
         if (existingCartItem.isPresent()) {
             CartItem cartItem = existingCartItem.get();
             cartItem.setAmountCartItem(cartItem.getAmountCartItem() + amount);
-            cartItem.setPriceCartItem(cartItem.getPriceCartItem());
             cartItemDao.saveCartItem(cartItem);
         } else {
             CartItem newCartItem = new CartItem();
             newCartItem.setCart(cart);
             newCartItem.setProductCartItem(product);
             newCartItem.setAmountCartItem(amount);
-            newCartItem.setPriceCartItem(price);
             cartItemDao.saveCartItem(newCartItem);
         }
     }
@@ -275,7 +268,7 @@ public class CartItemService {
             dto.setNameProduct(product.getNameProduct());
             dto.setAmountCartItem(item.getAmountCartItem());
             dto.setPriceProduct(product.getPriceProduct());
-            dto.setSubtotal(item.getPriceCartItem());
+            dto.setSubtotal(item.getSubtotal());
             dto.setImageUrl(product.getImageUrl());
             dto.setType(product.getType());
             dto.setActive(product.isActive());
@@ -297,7 +290,7 @@ public class CartItemService {
             dto.setNameProduct(item.getProductCartItem().getNameProduct());
             dto.setAmountCartItem(item.getAmountCartItem());
             dto.setPriceProduct(item.getProductCartItem().getPriceProduct());
-            dto.setSubtotal(item.getPriceCartItem());
+            dto.setSubtotal(item.getSubtotal());
             return dto;
         }).toList();
     }

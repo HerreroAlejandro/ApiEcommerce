@@ -83,7 +83,7 @@ public class CartService {
         response.setImageUrl(item.getProductCartItem().getImageUrl());
         response.setPriceProduct(item.getProductCartItem().getPriceProduct());
         response.setAmountCartItem(item.getAmountCartItem());
-        response.setSubtotal(item.getPriceCartItem());
+        response.setSubtotal(item.getSubtotal());
         return response;
     }
 
@@ -176,7 +176,7 @@ public class CartService {
     public BigDecimal getCartTotal(Long cartId) {
         List<CartItem> items = cartItemDao.findItemsByCartId(cartId);
         return items.stream()
-                .map(CartItem::getPriceCartItem)
+                .map(CartItem::getSubtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 

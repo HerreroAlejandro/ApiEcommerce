@@ -28,17 +28,17 @@ public class CartItemDTO {
     private int amountCartItem;
 
     @Getter @Setter
-    private BigDecimal priceCartItem;
+    private BigDecimal subtotal;
 
-    public CartItemDTO(Long idCartItem, Long cartId, Long productId, int amountCartItem, BigDecimal priceCartItem) {
+    public CartItemDTO(Long idCartItem, Long cartId, Long productId, int amountCartItem, BigDecimal subtotal) {
         this.idCartItem = idCartItem;
         this.cartId = cartId;
         this.productId = productId;
         this.amountCartItem = amountCartItem;
-        this.priceCartItem = priceCartItem;
+        this.subtotal = subtotal;
     }
 
-    public CartItemDTO(Long idCartItem, Long cartId, Long productId, String nameProduct, BigDecimal priceProduct, String imageUrl, int amountCartItem, BigDecimal priceCartItem) {
+    public CartItemDTO(Long idCartItem, Long cartId, Long productId, String nameProduct, BigDecimal priceProduct, String imageUrl, int amountCartItem, BigDecimal subtotal) {
         this.idCartItem = idCartItem;
         this.cartId = cartId;
         this.productId = productId;
@@ -46,7 +46,7 @@ public class CartItemDTO {
         this.priceProduct = priceProduct;
         this.imageUrl = imageUrl;
         this.amountCartItem = amountCartItem;
-        this.priceCartItem = priceCartItem;
+        this.subtotal = subtotal;
     }
 
     public CartItemDTO(){}

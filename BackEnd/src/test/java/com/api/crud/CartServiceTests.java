@@ -40,7 +40,6 @@ class CartServiceTests {
         ProductPhysical product = new ProductPhysical();
         product.setPriceProduct(new BigDecimal("100.00"));
         item.setProductCartItem(product);
-        item.setPriceCartItem(new BigDecimal("200.00"));
         when(users.findUserByEmail("client@example.com")).thenReturn(Optional.of(user));
         when(carts.findActiveCartByUserId(7L)).thenReturn(Optional.of(cart));
         when(items.findItemsByCartId(12L)).thenReturn(List.of(item));
@@ -77,7 +76,7 @@ class CartServiceTests {
     }
 
     @Test
-    void cartResponseUsesCurrentPriceEvenWhenStoredSubtotalIsOld() {
+    void cartResponseRecalculatesSubtotalWhenProductPriceChanges() {
         UserModel user = new UserModel();
         user.setId(7L);
         Cart cart = new Cart();
@@ -87,7 +86,6 @@ class CartServiceTests {
         CartItem item = new CartItem();
         item.setProductCartItem(product);
         item.setAmountCartItem(2);
-        item.setPriceCartItem(new BigDecimal("200.00"));
         cart.getItemsCart().add(item);
         when(users.findUserByEmail("client@example.com")).thenReturn(Optional.of(user));
         when(carts.findActiveCartByUserId(7L)).thenReturn(Optional.of(cart));

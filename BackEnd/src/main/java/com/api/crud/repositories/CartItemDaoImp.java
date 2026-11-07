@@ -56,8 +56,6 @@ public class CartItemDaoImp implements CartItemDao{
         CartItem cartItem = entityManager.find(CartItem.class, cartItemId);
         if (cartItem != null) {
             cartItem.setAmountCartItem(newAmount);
-            cartItem.setPriceCartItem(cartItem.getProductCartItem().getPriceProduct()
-                    .multiply(java.math.BigDecimal.valueOf(newAmount)));
             entityManager.merge(cartItem);
         }
     }
@@ -79,8 +77,6 @@ public class CartItemDaoImp implements CartItemDao{
         CartItem item = entityManager.find(CartItem.class, cartItemId);
         if (item != null) {
             item.setAmountCartItem(item.getAmountCartItem() + increment);
-            item.setPriceCartItem(item.getProductCartItem().getPriceProduct()
-                    .multiply(java.math.BigDecimal.valueOf(item.getAmountCartItem())));
             entityManager.merge(item);
         }
     }
@@ -91,8 +87,6 @@ public class CartItemDaoImp implements CartItemDao{
         if (item != null) {
             int newAmount = item.getAmountCartItem() - decrement;
             item.setAmountCartItem(Math.max(newAmount, 0));
-            item.setPriceCartItem(item.getProductCartItem().getPriceProduct()
-                    .multiply(java.math.BigDecimal.valueOf(item.getAmountCartItem())));
             entityManager.merge(item);
         }
     }

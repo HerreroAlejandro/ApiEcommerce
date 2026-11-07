@@ -32,23 +32,19 @@ public class CartItem {
     @Digits(integer = 8, fraction = 0)
     private int amountCartItem;
 
-    @Column(name = "priceCartItem")
-    @Getter @Setter
-    @Digits(integer = 8, fraction = 2)
-    private BigDecimal priceCartItem;
 
 
-    public CartItem(Long idCartItem, Cart cart, Product productCartItem, int amountCartItem, BigDecimal priceCartItem) {
+    public CartItem(Long idCartItem, Cart cart, Product productCartItem, int amountCartItem) {
         this.idCartItem = idCartItem;
         this.cart = cart;
         this.productCartItem = productCartItem;
         this.amountCartItem = amountCartItem;
-        this.priceCartItem = priceCartItem;
     }
 
     public CartItem(){}
 
-    public BigDecimal getPriceCartItem() {
+    @Transient
+    public BigDecimal getSubtotal() {
         return productCartItem.getPriceProduct().multiply(BigDecimal.valueOf(amountCartItem));
     }
 

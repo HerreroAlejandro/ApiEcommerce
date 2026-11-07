@@ -164,7 +164,7 @@ class CartItemServiceTests {
         when(items.findByCartAndProductId(12L, 4L)).thenReturn(Optional.of(item));
         service.addMyItem("client@example.com", 4L, 2);
         assertEquals(4, item.getAmountCartItem());
-        assertEquals(new BigDecimal("600.00"), item.getPriceCartItem());
+        assertEquals(new BigDecimal("600.00"), item.getSubtotal());
         verify(carts).getOrCreateActiveCart(7L);
         assertThrows(ResponseStatusException.class, () -> service.addMyItem("client@example.com", 4L, 2));
         assertEquals(4, item.getAmountCartItem());
