@@ -14,6 +14,12 @@ import java.util.List;
 @Entity
 @Table(name = "orders")
 public class Order {
+    @Version
+    private Long version;
+
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    @Getter @Setter
+    private boolean stockDeducted;
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Getter @Setter

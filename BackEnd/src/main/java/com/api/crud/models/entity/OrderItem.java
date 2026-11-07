@@ -9,6 +9,9 @@ import java.math.BigDecimal;
 @Entity
 @Table(name = "order_items")
 public class OrderItem {
+    @Column(name = "productName", nullable = false)
+    @Getter @Setter
+    private String productName;
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Getter @Setter
