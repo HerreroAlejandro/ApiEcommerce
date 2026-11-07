@@ -12,6 +12,8 @@ import java.util.List;
 @Entity
 @Table (name = "carts")
 public class Cart {
+    @Version
+    private Long version;
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Getter @Setter
