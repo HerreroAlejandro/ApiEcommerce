@@ -1,6 +1,8 @@
 package com.api.crud.services;
 
-import com.api.crud.DTO.CartDTO;
+import com.api.crud.DTO.CartAdminListDTO;
+import com.api.crud.DTO.CartAdminDetailDTO;
+import com.api.crud.DTO.CartItemAdminListDTO;
 import com.api.crud.DTO.CartItemDTO;
 import com.api.crud.DTO.MyCartResponseDTO;
 import com.api.crud.DTO.MyCartItemResponseDTO;
@@ -99,93 +101,85 @@ public class CartService {
     }
 
 
-    public void saveCart(CartDTO cartDTO) {
-        try {
-            Cart cart = modelMapper.map(cartDTO, Cart.class);
+    @Transactional(readOnly = true)
+    public List<CartAdminListDTO> getCarts() {
+        return cartDao.getCarts().stream().map(this::toAdminList).toList();
+    }
 
-            UserModel user = userDao.findUserById(cartDTO.getUserCart())
-                    .orElseThrow(() ->
-                            new RuntimeException("Usuario no encontrado"));
+    private CartAdminListDTO toAdminList(Cart cart) {
+        CartAdminListDTO dto = new CartAdminListDTO();
+        dto.setIdCart(cart.getIdCart());
+        dto.setUserId(cart.getUserCart().getId());
+        dto.setActive(cart.isActive());
+        dto.setCreationDate(cart.getCreationDate());
+        dto.setItemCount(cart.getItemsCart().size());
+        dto.setTotal(cart.getItemsCart().stream().map(CartItem::getSubtotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        return dto;
+    }
 
-            cart.setUserCart(user);
-            cart.setCreationDate(LocalDate.now());
+    private CartAdminDetailDTO toAdminDetail(Cart cart) {
+        CartAdminListDTO summary = toAdminList(cart);
+        CartAdminDetailDTO dto = new CartAdminDetailDTO();
+        dto.setIdCart(summary.getIdCart());
+        dto.setUserId(summary.getUserId());
+        dto.setActive(summary.isActive());
+        dto.setCreationDate(summary.getCreationDate());
+        dto.setItemCount(summary.getItemCount());
+        dto.setTotal(summary.getTotal());
+        dto.setItemsCart(cart.getItemsCart().stream().map(item -> {
+            CartItemAdminListDTO row = new CartItemAdminListDTO();
+            row.setIdCartItem(item.getIdCartItem());
+            row.setProductId(item.getProductCartItem().getIdProduct());
+            row.setNameProduct(item.getProductCartItem().getNameProduct());
+            row.setAmountCartItem(item.getAmountCartItem());
+            row.setPriceProduct(item.getProductCartItem().getPriceProduct());
+            row.setSubtotal(item.getSubtotal());
+            return row;
+        }).toList());
+        return dto;
+    }
 
-            cartDao.saveCart(cart);
+    @Transactional(readOnly = true)
+    public Optional<CartAdminDetailDTO> findCartByUserEmail(String email) {
+        return cartDao.findCartByUserEmail(email).map(this::toAdminDetail);
+    }
 
-        } catch (Exception e) {
-            logger.error("Error guardando el carrito: ", e);
-            throw new RuntimeException("No se pudo guardar el carrito");
+    @Transactional(readOnly = true)
+    public Optional<CartAdminDetailDTO> findCartById(Long id) {
+        return cartDao.findCartById(id).map(this::toAdminDetail);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<CartAdminDetailDTO> findCartByUserId(Long id) {
+        return cartDao.findCartByUserId(id).map(this::toAdminDetail);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<CartAdminDetailDTO> findActiveCartByUserId(Long id) {
+        return cartDao.findActiveCartByUserId(id).map(this::toAdminDetail);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CartAdminListDTO> getCartsByDateRange(LocalDate start, LocalDate end) {
+        if (start.isAfter(end)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "Rango de fechas invalido");
         }
+        return cartDao.getCartsByDateRange(start, end).stream().map(this::toAdminList).toList();
     }
 
-    public List<CartDTO> getCarts() {
-        return cartDao.getCarts()
-                .stream()
-                .map(cart -> modelMapper.map(cart, CartDTO.class))
-                .collect(Collectors.toList());
-    }
-
-    public Optional<CartDTO> findCartByUserEmail(String email) {
-        return cartDao.findCartByUserEmail(email)
-                .map(cart -> modelMapper.map(cart, CartDTO.class));
-    }
-
-    public Optional<CartDTO> findCartById(Long idCart) {
-        return cartDao.findCartById(idCart)
-                .map(cart -> modelMapper.map(cart, CartDTO.class));
-    }
-
-    public Optional<CartDTO> findCartByUserId(Long userId) {
-        return cartDao.findCartByUserId(userId)
-                .map(cart -> modelMapper.map(cart, CartDTO.class));
-    }
-
-    public boolean deleteCartById(Long idCart) {
-        try {
-            return cartDao.deleteCartById(idCart);
-        } catch (Exception e) {
-            logger.error("Error eliminando el carrito: ", e);
-            throw new RuntimeException("No se pudo eliminar el carrito");
+    @Transactional(readOnly = true)
+    public List<CartAdminListDTO> getCartsWithMoreThanNItems(int minItems) {
+        if (minItems < 0) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "Cantidad invalida");
         }
-    }
-
-    public Optional<CartItemDTO> findByCartAndProductId(Long cartId, Long productId) {
-        return cartItemDao.findByCartAndProductId(cartId, productId)
-                .map(item -> modelMapper.map(item, CartItemDTO.class));
-    }
-
-    public Optional<CartDTO> findActiveCartByUserId(Long userId) {
-        return cartDao.findActiveCartByUserId(userId)
-                .map(cart -> modelMapper.map(cart, CartDTO.class));
-    }
-
-    public List<CartDTO> getCartsByDateRange(LocalDate start, LocalDate end) {
-        return cartDao.getCartsByDateRange(start, end)
-                .stream()
-                .map(cart -> modelMapper.map(cart, CartDTO.class))
-                .collect(Collectors.toList());
-    }
-
-    public List<CartDTO> getCartsWithMoreThanNItems(int minItems) {
-        return cartDao.getCartsWithMoreThanNItems(minItems)
-                .stream()
-                .map(cart -> modelMapper.map(cart, CartDTO.class))
-                .collect(Collectors.toList());
+        return cartDao.getCartsWithMoreThanNItems(minItems).stream().map(this::toAdminList).toList();
     }
 
     public BigDecimal getCartTotal(Long cartId) {
-        List<CartItem> items = cartItemDao.findItemsByCartId(cartId);
-        return items.stream()
-                .map(CartItem::getSubtotal)
+        return cartItemDao.findItemsByCartId(cartId).stream().map(CartItem::getSubtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
-
-    public void clearCart(Long cartId) {
-        List<CartItem> items = cartItemDao.findItemsByCartId(cartId);
-        for (CartItem item : items) {
-            cartItemDao.removeCartItem(item.getIdCartItem());
-        }
-    }
-
-
 }

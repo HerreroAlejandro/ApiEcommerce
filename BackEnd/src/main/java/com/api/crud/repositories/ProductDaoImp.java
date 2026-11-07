@@ -35,6 +35,7 @@ public class ProductDaoImp implements ProductDao{
             logger.debug("Query Product with ID {} was successfully saved", product.getIdProduct());
         }catch(Exception e){
             logger.error("Error query saving Product with ID {}: {}", product.getIdProduct(), e.getMessage());
+            throw e;
         }
     }
 

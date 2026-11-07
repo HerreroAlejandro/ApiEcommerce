@@ -1,6 +1,11 @@
 package com.api.crud.controllers;
 
-import com.api.crud.DTO.CartDTO;
+import com.api.crud.DTO.CartAdminListDTO;
+import com.api.crud.DTO.CartAdminDetailDTO;
+import com.api.crud.DTO.AdminCartChangeReasonDTO;
+import com.api.crud.services.CartItemService;
+import org.springframework.security.core.Authentication;
+import jakarta.validation.Valid;
 import com.api.crud.services.CartService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,18 +27,42 @@ public class AdminCartController {
     @Autowired
     private CartService cartService;
 
+    @Autowired
+    private CartItemService cartItemService;
+
+    @PatchMapping("/{id}/disable")
+    public ResponseEntity<Void> disableCart(Authentication authentication, @PathVariable Long id,
+            @Valid @RequestBody AdminCartChangeReasonDTO dto) {
+        cartItemService.changeAdminCartState(authentication.getName(), id, false, dto.getReason());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{id}/enable")
+    public ResponseEntity<Void> enableCart(Authentication authentication, @PathVariable Long id,
+            @Valid @RequestBody AdminCartChangeReasonDTO dto) {
+        cartItemService.changeAdminCartState(authentication.getName(), id, true, dto.getReason());
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/deleteCartById/{id}")
+    public ResponseEntity<Void> deleteCartById(Authentication authentication, @PathVariable Long id,
+            @Valid @RequestBody AdminCartChangeReasonDTO dto) {
+        cartItemService.deleteAdminCart(authentication.getName(), id, dto.getReason());
+        return ResponseEntity.noContent().build();
+    }
+
     private static final Logger logger = LoggerFactory.getLogger(AdminCartController.class);
 
 
     @GetMapping(path = "/getCarts")
-    public ResponseEntity<List<CartDTO>> getCarts(){
+    public ResponseEntity<List<CartAdminListDTO>> getCarts(){
         logger.info("Starting to fetch carts.");
-        List<CartDTO> carts = cartService.getCarts();
-        ResponseEntity<List<CartDTO>> response;
+        List<CartAdminListDTO> carts = cartService.getCarts();
+        ResponseEntity<List<CartAdminListDTO>> response;
 
         if (carts.isEmpty()) {
             logger.info("No users found");
-            response = ResponseEntity.status(HttpStatus.NOT_FOUND).body(Collections.emptyList());
+            response = ResponseEntity.ok(Collections.emptyList());
         } else {
             logger.info("Successfully found {} carts.", carts.size());
             response = ResponseEntity.ok(carts);
@@ -43,51 +72,22 @@ public class AdminCartController {
 
 
     @GetMapping(path = "/findCartById/{id}")
-    public ResponseEntity<CartDTO> getCartById(@PathVariable Long id) {
+    public ResponseEntity<CartAdminDetailDTO> getCartById(@PathVariable Long id) {
         return cartService.findCartById(id)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
     }
 
     @GetMapping(path = "/findCartByUserId/{userId}")
-    public ResponseEntity<CartDTO> getCartByUserId(@PathVariable Long userId) {
+    public ResponseEntity<CartAdminDetailDTO> getCartByUserId(@PathVariable Long userId) {
         return cartService.findCartByUserId(userId)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
     }
 
-    // La creacion se realiza automaticamente al agregar el primer producto.
-    /*
-    @PostMapping(path = "/saveCart")
-    public ResponseEntity<String> saveCart(@RequestBody CartDTO cartDTO) {
-        ResponseEntity<String> response;
-        try {
-            cartService.saveCart(cartDTO);
-            response = ResponseEntity.status(HttpStatus.CREATED).body("Cart created successfully");
-        } catch (Exception e) {
-            response = ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error cart dont be created");
-        }
-        return response;
-    }
-
-    */
-    @DeleteMapping("/deleteCartById/{id}")
-    public ResponseEntity<String> deleteCartById(@PathVariable Long id) {
-
-        boolean deleted = cartService.deleteCartById(id);
-
-        if (deleted) {
-            return ResponseEntity.ok("Cart was erased");
-        }
-
-        return ResponseEntity
-                .status(HttpStatus.NOT_FOUND)
-                .body("Cart not found");
-    }
-
     // 1) Buscar carrito por email de usuario
     @GetMapping("/findCartByUserEmail/{email}")
-    public ResponseEntity<CartDTO> findCartByUserEmail(@PathVariable String email) {
+    public ResponseEntity<CartAdminDetailDTO> findCartByUserEmail(@PathVariable String email) {
         logger.info("Received request to find cart for user with email {}", email);
         return cartService.findCartByUserEmail(email)
                 .map(cart -> {
@@ -102,7 +102,7 @@ public class AdminCartController {
 
     // 2) Buscar carrito activo por userId
     @GetMapping("/findActiveCartByUserId/{userId}")
-    public ResponseEntity<CartDTO> findActiveCartByUserId(@PathVariable Long userId) {
+    public ResponseEntity<CartAdminDetailDTO> findActiveCartByUserId(@PathVariable Long userId) {
         logger.info("Received request to find active cart for userId {}", userId);
         return cartService.findActiveCartByUserId(userId)
                 .map(cart -> {
@@ -117,13 +117,13 @@ public class AdminCartController {
 
     // 3) Buscar carritos en un rango de fechas
     @GetMapping("/getCartsByDateRange")
-    public ResponseEntity<List<CartDTO>> getCartsByDateRange(@RequestParam("start") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
+    public ResponseEntity<List<CartAdminListDTO>> getCartsByDateRange(@RequestParam("start") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
                                                              @RequestParam("end") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end) {
         logger.info("Received request to get carts from {} to {}", start, end);
-        List<CartDTO> carts = cartService.getCartsByDateRange(start, end);
+        List<CartAdminListDTO> carts = cartService.getCartsByDateRange(start, end);
         if (carts.isEmpty()) {
             logger.warn("No carts found in date range {} - {}", start, end);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Collections.emptyList());
+            return ResponseEntity.ok(Collections.emptyList());
         }
         logger.info("Found {} carts in date range", carts.size());
         return ResponseEntity.ok(carts);
@@ -131,12 +131,12 @@ public class AdminCartController {
 
     // 4) Buscar carritos con mÃ¡s de N items
     @GetMapping("/getCartsWithMoreThanNItems/{minItems}")
-    public ResponseEntity<List<CartDTO>> getCartsWithMoreThanNItems(@PathVariable int minItems) {
+    public ResponseEntity<List<CartAdminListDTO>> getCartsWithMoreThanNItems(@PathVariable int minItems) {
         logger.info("Received request to get carts with more than {} items", minItems);
-        List<CartDTO> carts = cartService.getCartsWithMoreThanNItems(minItems);
+        List<CartAdminListDTO> carts = cartService.getCartsWithMoreThanNItems(minItems);
         if (carts.isEmpty()) {
             logger.warn("No carts found with more than {} items", minItems);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Collections.emptyList());
+            return ResponseEntity.ok(Collections.emptyList());
         }
         logger.info("Found {} carts with more than {} items", carts.size(), minItems);
         return ResponseEntity.ok(carts);
