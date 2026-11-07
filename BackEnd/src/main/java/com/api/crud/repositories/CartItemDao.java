@@ -15,12 +15,9 @@ public interface CartItemDao {
     Optional<CartItem> findByCartAndProductId(Long cartId, Long productId);
 
 
-    public void updateCartItemAmount(Long cartItemId, int newAmount);
 
     void removeCartItem(Long cartItemId);
 
-    void increaseCartItemAmount(Long cartItemId, int increment);
 
-    void decreaseCartItemAmount(Long cartItemId, int decrement);
 
 }

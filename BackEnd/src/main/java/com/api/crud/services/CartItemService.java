@@ -80,6 +80,32 @@ public class CartItemService {
     }
 
     @Transactional
+    public void changeAdminCartState(String email, Long cartId, boolean active, String reason) {
+        String motive = validReason(reason);
+        UserModel actor = authenticatedUser(email);
+        Cart cart = cartDao.findCartById(cartId).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "Carrito no encontrado"));
+        if (cart.isActive() != active) {
+            audit(actor, cart, null, active ? "ENABLE" : "DISABLE", 0, 0, motive);
+            cart.setActive(active);
+        }
+    }
+
+    @Transactional
+    public void deleteAdminCart(String email, Long cartId, String reason) {
+        String motive = validReason(reason);
+        UserModel actor = authenticatedUser(email);
+        Cart cart = cartDao.findCartById(cartId).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "Carrito no encontrado"));
+        for (CartItem item : cart.getItemsCart()) {
+            audit(actor, cart, item.getProductCartItem().getIdProduct(), "DELETE_ITEM",
+                    item.getAmountCartItem(), 0, motive);
+        }
+        audit(actor, cart, null, "DELETE_CART", 0, 0, motive);
+        cartDao.deleteCartById(cartId);
+    }
+
+    @Transactional
     public void addAdminItem(String email, Long userId, Long productId, int amount, String reason) {
         String motive = validReason(reason);
         UserModel actor = authenticatedUser(email);
@@ -294,36 +320,4 @@ public class CartItemService {
             return dto;
         }).toList();
     }
-    @Transactional
-    public void removeItemFromCart(Long cartId, Long cartItemId) {
-        Cart cart = cartDao.findCartById(cartId)
-                .orElseThrow(() -> new IllegalArgumentException("Carrito no encontrado"));
-
-        CartItem cartItem = cartItemDao.findCartItemById(cartItemId)
-                .orElseThrow(() -> new IllegalArgumentException("Item no encontrado en el carrito"));
-
-        if (!cartItem.getCart().getIdCart().equals(cartId)) {
-            throw new IllegalArgumentException("El item no pertenece a este carrito.");
-        }
-
-        cartItemDao.removeCartItem(cartItemId);
-    }
-
-    public void updateCartItemAmount(Long cartItemId, int newAmount) {
-        try {
-            cartItemDao.updateCartItemAmount(cartItemId, newAmount);
-        } catch (Exception e) {
-            logger.error("Error al actualizar la cantidad del artÃƒÂ­culo: ", e);
-            throw new RuntimeException("No se pudo actualizar la cantidad del artÃƒÂ­culo");
-        }
-    }
-
-    public void increaseItemAmount(Long cartItemId, int increment) {
-        cartItemDao.increaseCartItemAmount(cartItemId, increment);
-    }
-
-    public void decreaseItemAmount(Long cartItemId, int decrement) {
-        cartItemDao.decreaseCartItemAmount(cartItemId, decrement);
-    }
-
 }

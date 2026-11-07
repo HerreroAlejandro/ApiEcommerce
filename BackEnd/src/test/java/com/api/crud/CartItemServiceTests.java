@@ -55,6 +55,31 @@ class CartItemServiceTests {
     }
 
     @Test
+    void disablingPreservesItemsAndRecordsAudit() {
+        when(carts.findCartById(12L)).thenReturn(Optional.of(item.getCart()));
+        service.changeAdminCartState("client@example.com", 12L, false, "Revision");
+        assertFalse(item.getCart().isActive());
+        assertEquals(1, item.getCart().getItemsCart().size());
+        var capture = org.mockito.ArgumentCaptor.forClass(CartChangeAudit.class);
+        verify(audits).save(capture.capture());
+        assertEquals("DISABLE", capture.getValue().getAction());
+        assertThrows(ResponseStatusException.class,
+                () -> service.increaseMyItemAmount("client@example.com", 1L, 1));
+        service.changeAdminCartState("client@example.com", 12L, true, "Revision finalizada");
+        assertTrue(item.getCart().isActive());
+    }
+
+    @Test
+    void extremeDeletionAuditsCartAndItemsBeforeDeleting() {
+        when(carts.findCartById(12L)).thenReturn(Optional.of(item.getCart()));
+        service.deleteAdminCart("client@example.com", 12L, "Caso extremo");
+        var ordered = inOrder(audits, carts);
+        ordered.verify(carts).findCartById(12L);
+        ordered.verify(audits, times(2)).save(any(CartChangeAudit.class));
+        ordered.verify(carts).deleteCartById(12L);
+    }
+
+    @Test
     void adminQuantityChangeRecordsActorTargetAndPreviousAmount() {
         UserModel actor = new UserModel();
         actor.setId(99L);

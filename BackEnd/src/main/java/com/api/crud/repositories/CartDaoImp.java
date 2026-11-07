@@ -39,7 +39,10 @@ public class CartDaoImp implements CartDao{
             entityManager.persist(created);
             return created;
         });
-        cart.setActive(true);
+        if (!cart.isActive()) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.CONFLICT, "Carrito deshabilitado");
+        }
         return cart;
     }
 
