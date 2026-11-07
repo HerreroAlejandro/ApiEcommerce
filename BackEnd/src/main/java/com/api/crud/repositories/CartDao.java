@@ -16,15 +16,15 @@ public interface CartDao {
 
     Cart getOrCreateActiveCart(Long userId);
 
-    public Optional<Cart> findCartByUserEmail(String email);
+    public Optional<Cart> getCartByUserEmail(String email);
 
-    Optional<Cart> findCartById(Long idCart);
+    Optional<Cart> getCartById(Long idCart);
 
-    Optional<Cart> findCartByUserId(Long userId);
+    Optional<Cart> getCartByUserId(Long userId);
 
     boolean deleteCartById(Long idCart);
 
-    Optional<Cart> findActiveCartByUserId(Long userId);
+    Optional<Cart> getActiveCartByUserId(Long userId);
 
     List<Cart> getCartsByDateRange(LocalDate start, LocalDate end);
 

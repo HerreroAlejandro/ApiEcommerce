@@ -23,7 +23,7 @@ public class AccountRecoveryTokenDaoImpl implements AccountRecoveryTokenDao {
     }
 
     @Override
-    public Optional<AccountRecoveryToken> findByToken(String token) {
+    public Optional<AccountRecoveryToken> getByToken(String token) {
         try {
             AccountRecoveryToken recoveryToken = entityManager
                     .createQuery(

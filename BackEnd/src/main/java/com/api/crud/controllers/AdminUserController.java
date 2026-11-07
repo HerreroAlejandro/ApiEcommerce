@@ -78,10 +78,10 @@ public class AdminUserController {
         return ResponseEntity.ok(users);
     }
 
-    @GetMapping(path = "/findUserById/{id}")
-    public ResponseEntity<UserDetailAdminResponseDTO> findUserById(@PathVariable Long id) {
+    @GetMapping(path = "/getUserById/{id}")
+    public ResponseEntity<UserDetailAdminResponseDTO> getUserById(@PathVariable Long id) {
         logger.info("Starting to fetch user with id: {}", id);
-        Optional<UserDetailAdminResponseDTO> user = userService.findUserById(id);
+        Optional<UserDetailAdminResponseDTO> user = userService.getUserById(id);
         ResponseEntity<UserDetailAdminResponseDTO> response;
 
         if (user.isPresent()) {
@@ -94,11 +94,11 @@ public class AdminUserController {
         return response;
     }
 
-    @GetMapping(path = "/findUserByName")
-    public ResponseEntity<List<UserListAdminResponseDTO>> findUserByName(@RequestParam String firstName, @RequestParam String lastName) {
+    @GetMapping(path = "/getUserByName")
+    public ResponseEntity<List<UserListAdminResponseDTO>> getUserByName(@RequestParam String firstName, @RequestParam String lastName) {
         logger.info("Received request to fetch users with name: {} {}", firstName, lastName);
 
-        List<UserListAdminResponseDTO> users = userService.findUserByName(firstName, lastName);
+        List<UserListAdminResponseDTO> users = userService.getUserByName(firstName, lastName);
         ResponseEntity<List<UserListAdminResponseDTO>> response;
 
         if (!users.isEmpty()) {
@@ -111,11 +111,11 @@ public class AdminUserController {
         return response;
     }
 
-    @GetMapping(path = "/findUserByEmail/{email}")
-    public ResponseEntity<UserDetailAdminResponseDTO> findUserByEmail(@PathVariable String email) {
+    @GetMapping(path = "/getUserByEmail/{email}")
+    public ResponseEntity<UserDetailAdminResponseDTO> getUserByEmail(@PathVariable String email) {
         logger.info("Starting to fetch user with email: {}", email);
 
-        Optional<UserDetailAdminResponseDTO> user = userService.findUserByEmail(email);
+        Optional<UserDetailAdminResponseDTO> user = userService.getUserByEmail(email);
         ResponseEntity<UserDetailAdminResponseDTO> response;
 
         if (user.isEmpty()) {

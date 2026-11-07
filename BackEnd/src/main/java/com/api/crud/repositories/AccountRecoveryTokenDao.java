@@ -9,7 +9,7 @@ public interface AccountRecoveryTokenDao {
 
     void save(AccountRecoveryToken recoveryToken);
 
-    Optional<AccountRecoveryToken> findByToken(String token);
+    Optional<AccountRecoveryToken> getByToken(String token);
 
     void invalidateTokensByUser(UserModel user);
 

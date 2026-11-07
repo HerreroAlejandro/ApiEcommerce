@@ -22,15 +22,15 @@ public interface ProductDao {
     long countAdminProducts(String name, String category, ProductType type, BigDecimal minPrice, BigDecimal maxPrice, Boolean active,
                             Boolean inStock);
 
-    Optional<Product> findProductById(Long idProduct);
+    Optional<Product> getProductById(Long idProduct);
 
     boolean deleteProduct(Long idProduct);
 /*
-    List<Product> findProductsByName(String nameProduct, Pageable pageable);
+    List<Product> getProductsByName(String nameProduct, Pageable pageable);
 
     long countProductsByName(String nameProduct);
 
-    List<Product> findProductsByNameAdmin(String nameProduct, Boolean active, Pageable pageable);
+    List<Product> getProductsByNameAdmin(String nameProduct, Boolean active, Pageable pageable);
 
     long countProductsByNameAdmin(String nameProduct, Boolean active);
 */

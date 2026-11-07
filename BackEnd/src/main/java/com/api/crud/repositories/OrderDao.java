@@ -12,7 +12,7 @@ public interface OrderDao {
 
     void saveOrder(Order order);
 
-    Optional<Order> findOrderById(Long idOrder);
+    Optional<Order> getOrderById(Long idOrder);
 
     List<Order> getOrders();
 
@@ -32,6 +32,6 @@ public interface OrderDao {
 
     List<Order> getOrdersByUserAndStatus(Long userId, OrderStatus status);
 
-    Optional<Product> findProductById(Long productId);
+    Optional<Product> getProductById(Long productId);
 
 }

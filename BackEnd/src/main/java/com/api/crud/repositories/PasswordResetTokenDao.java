@@ -9,7 +9,7 @@ public interface PasswordResetTokenDao {
 
     void save(PasswordResetToken resetToken);
 
-    Optional<PasswordResetToken> findByToken(String token);
+    Optional<PasswordResetToken> getByToken(String token);
 
     void invalidateTokensByUser(UserModel user);
 

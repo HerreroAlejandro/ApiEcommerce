@@ -449,7 +449,7 @@ public class ProductDaoImp implements ProductDao{
     }
 
     @Override
-    public Optional<Product> findProductById(Long idProduct) {
+    public Optional<Product> getProductById(Long idProduct) {
         logger.debug("Executing query to find product with ID: {}", idProduct);
 
         Optional<Product> response;
@@ -476,7 +476,7 @@ public class ProductDaoImp implements ProductDao{
     }
 /*
     @Override
-    public List<Product> findProductsByName(String nameProduct, Pageable pageable) {
+    public List<Product> getProductsByName(String nameProduct, Pageable pageable) {
         logger.debug("Executing query to find active products by name: {}", nameProduct);
 
         String jpql = """
@@ -514,7 +514,7 @@ public class ProductDaoImp implements ProductDao{
     }
 
     @Override
-    public List<Product> findProductsByNameAdmin(String nameProduct, Boolean active, Pageable pageable) {
+    public List<Product> getProductsByNameAdmin(String nameProduct, Boolean active, Pageable pageable) {
 
         logger.debug("Executing query to find products by name for admin: {} - active: {}", nameProduct, active);
 

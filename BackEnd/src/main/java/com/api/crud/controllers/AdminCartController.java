@@ -71,25 +71,25 @@ public class AdminCartController {
     }
 
 
-    @GetMapping(path = "/findCartById/{id}")
+    @GetMapping(path = "/getCartById/{id}")
     public ResponseEntity<CartAdminDetailDTO> getCartById(@PathVariable Long id) {
-        return cartService.findCartById(id)
+        return cartService.getCartById(id)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
     }
 
-    @GetMapping(path = "/findCartByUserId/{userId}")
+    @GetMapping(path = "/getCartByUserId/{userId}")
     public ResponseEntity<CartAdminDetailDTO> getCartByUserId(@PathVariable Long userId) {
-        return cartService.findCartByUserId(userId)
+        return cartService.getCartByUserId(userId)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
     }
 
     // 1) Buscar carrito por email de usuario
-    @GetMapping("/findCartByUserEmail/{email}")
-    public ResponseEntity<CartAdminDetailDTO> findCartByUserEmail(@PathVariable String email) {
+    @GetMapping("/getCartByUserEmail/{email}")
+    public ResponseEntity<CartAdminDetailDTO> getCartByUserEmail(@PathVariable String email) {
         logger.info("Received request to find cart for user with email {}", email);
-        return cartService.findCartByUserEmail(email)
+        return cartService.getCartByUserEmail(email)
                 .map(cart -> {
                     logger.info("Cart found for user {}", email);
                     return ResponseEntity.ok(cart);
@@ -101,10 +101,10 @@ public class AdminCartController {
     }
 
     // 2) Buscar carrito activo por userId
-    @GetMapping("/findActiveCartByUserId/{userId}")
-    public ResponseEntity<CartAdminDetailDTO> findActiveCartByUserId(@PathVariable Long userId) {
+    @GetMapping("/getActiveCartByUserId/{userId}")
+    public ResponseEntity<CartAdminDetailDTO> getActiveCartByUserId(@PathVariable Long userId) {
         logger.info("Received request to find active cart for userId {}", userId);
-        return cartService.findActiveCartByUserId(userId)
+        return cartService.getActiveCartByUserId(userId)
                 .map(cart -> {
                     logger.info("Active cart found for userId {}", userId);
                     return ResponseEntity.ok(cart);
@@ -129,7 +129,7 @@ public class AdminCartController {
         return ResponseEntity.ok(carts);
     }
 
-    // 4) Buscar carritos con mÃ¡s de N items
+    // 4) Buscar carritos con mas de N items
     @GetMapping("/getCartsWithMoreThanNItems/{minItems}")
     public ResponseEntity<List<CartAdminListDTO>> getCartsWithMoreThanNItems(@PathVariable int minItems) {
         logger.info("Received request to get carts with more than {} items", minItems);

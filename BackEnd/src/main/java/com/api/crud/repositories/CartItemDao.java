@@ -8,11 +8,11 @@ public interface CartItemDao {
 
     void saveCartItem(CartItem cartItem);
 
-    Optional<CartItem> findCartItemById(Long cartItemId);
+    Optional<CartItem> getCartItemById(Long cartItemId);
 
-    public List<CartItem> findItemsByCartId(Long idCart);
+    public List<CartItem> getItemsByCartId(Long idCart);
 
-    Optional<CartItem> findByCartAndProductId(Long cartId, Long productId);
+    Optional<CartItem> getByCartAndProductId(Long cartId, Long productId);
 
 
 

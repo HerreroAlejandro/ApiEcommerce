@@ -33,7 +33,7 @@ public class JWTFilter extends OncePerRequestFilter {
         if (token != null && jwtUtil.validateToken(token)) {
             String email = jwtUtil.extractUsername(token);
 
-            Optional<UserModel> optionalUser = userDao.findUserByEmail(email);
+            Optional<UserModel> optionalUser = userDao.getUserByEmail(email);
 
             if(optionalUser.isPresent() && optionalUser.get().isActive()) {
                 List<String> roles = jwtUtil.extractRoles(token);

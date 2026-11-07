@@ -23,13 +23,13 @@ public class CartItemDaoImp implements CartItemDao{
     }
 
     @Override
-    public Optional<CartItem> findCartItemById(Long cartItemId) {
+    public Optional<CartItem> getCartItemById(Long cartItemId) {
         CartItem cartItem = entityManager.find(CartItem.class, cartItemId);
         return Optional.ofNullable(cartItem);
     }
 
     @Override
-    public List<CartItem> findItemsByCartId(Long idCart) {
+    public List<CartItem> getItemsByCartId(Long idCart) {
         String jpql = "SELECT ci FROM CartItem ci WHERE ci.cart.idCart = :idCart";
         return entityManager.createQuery(jpql, CartItem.class)
                 .setParameter("idCart", idCart)
@@ -37,7 +37,7 @@ public class CartItemDaoImp implements CartItemDao{
     }
 
     @Override
-    public Optional<CartItem> findByCartAndProductId(Long cartId, Long productId) {
+    public Optional<CartItem> getByCartAndProductId(Long cartId, Long productId) {
         String jpql = "SELECT ci FROM CartItem ci WHERE ci.cart.idCart = :cartId AND ci.productCartItem.idProduct = :productId";
 
         try {

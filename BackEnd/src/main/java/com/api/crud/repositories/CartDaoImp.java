@@ -32,7 +32,7 @@ public class CartDaoImp implements CartDao{
         if (user == null) {
             throw new IllegalArgumentException("Usuario no encontrado");
         }
-        Cart cart = findCartByUserId(userId).orElseGet(() -> {
+        Cart cart = getCartByUserId(userId).orElseGet(() -> {
             Cart created = new Cart();
             created.setUserCart(user);
             created.setCreationDate(LocalDate.now());
@@ -75,7 +75,7 @@ public class CartDaoImp implements CartDao{
     }
 
     @Override
-    public Optional<Cart> findCartByUserEmail(String email) {
+    public Optional<Cart> getCartByUserEmail(String email) {
         String jpql = "SELECT c FROM Cart c WHERE c.userCart.email = :email ORDER BY c.creationDate DESC";
         try {
             Cart cart = entityManager.createQuery(jpql, Cart.class)
@@ -89,7 +89,7 @@ public class CartDaoImp implements CartDao{
 
 
     @Override
-    public Optional<Cart> findCartById(Long idCart) {
+    public Optional<Cart> getCartById(Long idCart) {
         try {
             Cart cart = entityManager.find(Cart.class, idCart);
             return Optional.ofNullable(cart);
@@ -99,7 +99,7 @@ public class CartDaoImp implements CartDao{
     }
 
     @Override
-    public Optional<Cart> findCartByUserId(Long userId) {
+    public Optional<Cart> getCartByUserId(Long userId) {
         String jpql = "SELECT c FROM Cart c WHERE c.userCart.id = :userId";
 
         try {
@@ -126,7 +126,7 @@ public class CartDaoImp implements CartDao{
 
     // 🔹 Nuevo método: Carrito activo
     @Override
-    public Optional<Cart> findActiveCartByUserId(Long userId) {
+    public Optional<Cart> getActiveCartByUserId(Long userId) {
         String jpql = "SELECT c FROM Cart c WHERE c.userCart.id = :userId AND c.active = true";
         try {
             Cart cart = entityManager.createQuery(jpql, Cart.class)

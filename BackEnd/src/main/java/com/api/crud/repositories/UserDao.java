@@ -13,9 +13,9 @@ public interface UserDao {
 
     void register(UserModel user);
 
-    public List<UserModel> findUserByName(String firstName, String lastName);
+    public List<UserModel> getUserByName(String firstName, String lastName);
 
-    Optional<UserModel> findUserByEmail(String email);
+    Optional<UserModel> getUserByEmail(String email);
 
     UserModel updateMyProfile(String email, UserUpdateRequestDTO dto);
 
@@ -26,7 +26,7 @@ public interface UserDao {
     void update(UserModel user);
 
     @Query("SELECT u FROM UserModel u WHERE u.id = :id")
-    Optional<UserModel> findUserById(@Param("id") Long id);
+    Optional<UserModel> getUserById(@Param("id") Long id);
 
     public UserModel updateUserById(UserModel Request, Long id);
 

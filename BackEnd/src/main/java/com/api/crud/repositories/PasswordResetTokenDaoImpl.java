@@ -23,7 +23,7 @@ public class PasswordResetTokenDaoImpl implements PasswordResetTokenDao {
     }
 
     @Override
-    public Optional<PasswordResetToken> findByToken(String token) {
+    public Optional<PasswordResetToken> getByToken(String token) {
         try {
             PasswordResetToken resetToken = entityManager
                     .createQuery("SELECT t FROM PasswordResetToken t " + "JOIN FETCH t.user " + "WHERE t.token = :token", PasswordResetToken.class)

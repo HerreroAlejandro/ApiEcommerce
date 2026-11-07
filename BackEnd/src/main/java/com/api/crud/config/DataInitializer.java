@@ -25,7 +25,7 @@ public class DataInitializer {
 
     private void createRoleIfNotExists(RoleDao roleDao, String roleName) {
 
-        if (roleDao.findRoleByName(roleName).isEmpty()) {
+        if (roleDao.getRoleByName(roleName).isEmpty()) {
 
             Role role = new Role();
             role.setNameRole(roleName);

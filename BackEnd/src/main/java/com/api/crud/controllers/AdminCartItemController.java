@@ -21,7 +21,7 @@ public class AdminCartItemController {
         this.cartItemService = cartItemService;
     }
 
-    @PostMapping
+    @PostMapping("/addItem")
     public ResponseEntity<Void> addItem(Authentication authentication,
             @Valid @RequestBody AdminCartItemAddRequestDTO dto) {
         cartItemService.addAdminItem(authentication.getName(), dto.getUserId(), dto.getProductId(),
@@ -64,14 +64,14 @@ public class AdminCartItemController {
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/findCartItemById/{cartItemId}")
-    public ResponseEntity<CartItemAdminDetailDTO> findCartItemById(@PathVariable Long cartItemId) {
-        return cartItemService.findCartItemById(cartItemId).map(ResponseEntity::ok)
+    @GetMapping("/getCartItemById/{cartItemId}")
+    public ResponseEntity<CartItemAdminDetailDTO> getCartItemById(@PathVariable Long cartItemId) {
+        return cartItemService.getCartItemById(cartItemId).map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    @GetMapping("/findItemsByCartId/{cartId}")
+    @GetMapping("/getItemsByCartId/{cartId}")
     public ResponseEntity<List<CartItemAdminListDTO>> getItemsByCartId(@PathVariable Long cartId) {
-        return ResponseEntity.ok(cartItemService.findItemsByCartId(cartId));
+        return ResponseEntity.ok(cartItemService.getItemsByCartId(cartId));
     }
 }

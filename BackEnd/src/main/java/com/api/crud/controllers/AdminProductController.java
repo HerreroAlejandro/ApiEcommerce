@@ -76,8 +76,8 @@ public class AdminProductController {
         return response;
     }
 
-    @GetMapping("/AdminFindProductById/{id}")
-    public ResponseEntity<ProductAdminDetailDTO> findProductAdminDetailById(
+    @GetMapping("/AdminGetProductById/{id}")
+    public ResponseEntity<ProductAdminDetailDTO> getProductAdminDetailById(
             @PathVariable Long id) {
 
         logger.info("Received request to find product for admin with id {}", id);
@@ -85,7 +85,7 @@ public class AdminProductController {
         ResponseEntity<ProductAdminDetailDTO> response;
 
         Optional<ProductAdminDetailDTO> product =
-                productService.findProductAdminDetailById(id);
+                productService.getProductAdminDetailById(id);
 
         if (product.isPresent()) {
             logger.info("Product with ID {} found successfully.", id);

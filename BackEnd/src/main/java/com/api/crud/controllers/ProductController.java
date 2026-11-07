@@ -48,13 +48,13 @@ public class ProductController {
         return response;
     }
 
-    @GetMapping(path = "/FindProductById/{id}")
-    public ResponseEntity<ProductDetailDTO> findProductDetailById(@PathVariable Long id) {
+    @GetMapping(path = "/GetProductById/{id}")
+    public ResponseEntity<ProductDetailDTO> getProductDetailById(@PathVariable Long id) {
         logger.info("received request to find product with id {}", id);
 
         ResponseEntity<ProductDetailDTO> response;
 
-        Optional<ProductDetailDTO> product = productService.findProductDetailById(id);
+        Optional<ProductDetailDTO> product = productService.getProductDetailById(id);
 
         if (product.isPresent()) {
             logger.info("Product with ID: {} found successfully.", id);

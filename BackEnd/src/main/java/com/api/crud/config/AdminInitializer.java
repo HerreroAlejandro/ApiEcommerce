@@ -37,14 +37,14 @@ public class AdminInitializer {
     CommandLineRunner createAdmin() {
         return args -> {
 
-            Optional<UserModel> existingAdmin = userDao.findUserByEmail(adminEmail);
+            Optional<UserModel> existingAdmin = userDao.getUserByEmail(adminEmail);
 
             if (existingAdmin.isPresent()) {
                 System.out.println("El usuario ADMIN ya existe: " + adminEmail);
                 return;
             }
 
-            Role adminRole = roleDao.findRoleByName("ADMIN")
+            Role adminRole = roleDao.getRoleByName("ADMIN")
                     .orElseThrow(() ->
                             new RuntimeException("El rol ADMIN no existe en la base de datos"));
 

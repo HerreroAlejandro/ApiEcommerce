@@ -21,7 +21,7 @@ public class RoleDaoImp implements RoleDao {
     private static final Logger logger = LoggerFactory.getLogger(RoleDaoImp.class);
 
     @Override
-    public Optional<Role> findRoleByName(String roleName) {
+    public Optional<Role> getRoleByName(String roleName) {
         logger.debug("Executing query to fetch role by name: {}", roleName);
         Role role = null;
         try {
@@ -36,7 +36,7 @@ public class RoleDaoImp implements RoleDao {
     }
 
     @Override
-    public Optional<Role> findRoleById(Long id) {
+    public Optional<Role> getRoleById(Long id) {
         logger.debug("Executing query to find role with ID: {}", id);
         Optional<Role> response;
         try {

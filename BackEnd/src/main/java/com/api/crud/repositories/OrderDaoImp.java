@@ -30,7 +30,7 @@ public class OrderDaoImp implements OrderDao {
     }
 
     @Override
-    public Optional<Order> findOrderById(Long idOrder) {
+    public Optional<Order> getOrderById(Long idOrder) {
         return Optional.ofNullable(entityManager.find(Order.class, idOrder));
     }
 
@@ -104,7 +104,7 @@ public class OrderDaoImp implements OrderDao {
     }
 
     @Override
-    public Optional<Product> findProductById(Long productId) {
+    public Optional<Product> getProductById(Long productId) {
         return Optional.ofNullable(entityManager.find(Product.class, productId));
     }
 }

@@ -34,7 +34,7 @@ public class UserController {
     public ResponseEntity<String> register(@RequestBody UserRegisterDTO userRegisterDTO) {
         ResponseEntity<String> response;
         try {
-            if (userService.findUserByEmail(userRegisterDTO.getEmail()).isPresent()) {
+            if (userService.getUserByEmail(userRegisterDTO.getEmail()).isPresent()) {
                 logger.warn("User already registered with email: {}", userRegisterDTO.getEmail());
                 response = ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User already registered with this email");
             } else {

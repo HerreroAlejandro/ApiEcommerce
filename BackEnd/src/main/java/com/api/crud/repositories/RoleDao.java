@@ -9,9 +9,9 @@ import java.util.Optional;
 public interface RoleDao {
 
     @Query("SELECT r FROM Role r WHERE r.nameRole = :roleName")
-    Optional<Role> findRoleByName(@Param("roleName") String roleName);
+    Optional<Role> getRoleByName(@Param("roleName") String roleName);
 
-    Optional<Role> findRoleById(Long id);
+    Optional<Role> getRoleById(Long id);
 
     void saveRole(Role role);
 

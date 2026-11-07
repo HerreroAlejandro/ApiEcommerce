@@ -35,10 +35,10 @@ public class RoleController {
         return response;
     }
 
-    @GetMapping(path = "/findRoleById/{id}")
-    public ResponseEntity<RoleDTO> findRoleById(@PathVariable Long id) {
+    @GetMapping(path = "/getRoleById/{id}")
+    public ResponseEntity<RoleDTO> getRoleById(@PathVariable Long id) {
         logger.info("Starting to find role with id {}", id);
-        Optional<RoleDTO> roleDTO = roleService.findRoleById(id);
+        Optional<RoleDTO> roleDTO = roleService.getRoleById(id);
         ResponseEntity<RoleDTO> response;
 
         if (roleDTO.isPresent()) {
@@ -51,10 +51,10 @@ public class RoleController {
         return response;
     }
 
-    @GetMapping(path = "/findRoleByName/{roleName}")
-    public ResponseEntity<RoleDTO> findRoleByName(@PathVariable String roleName) {
+    @GetMapping(path = "/getRoleByName/{roleName}")
+    public ResponseEntity<RoleDTO> getRoleByName(@PathVariable String roleName) {
         logger.info("Starting to find role with name {}", roleName);
-        Optional<RoleDTO> roleDTO = roleService.findRoleByName(roleName);
+        Optional<RoleDTO> roleDTO = roleService.getRoleByName(roleName);
         ResponseEntity<RoleDTO> response;
 
         if (roleDTO.isPresent()) {
@@ -72,7 +72,7 @@ public class RoleController {
         logger.info("Starting to save role: {}", roleDto.getNameRole());
         ResponseEntity<String> response;
         try {
-            if (roleService.findRoleByName(roleDto.getNameRole()).isPresent()) {
+            if (roleService.getRoleByName(roleDto.getNameRole()).isPresent()) {
                 logger.warn("The Role '{}' already exists.", roleDto.getNameRole());
                 response = ResponseEntity.status(HttpStatus.BAD_REQUEST).body("The Role already exists");
             } else {
