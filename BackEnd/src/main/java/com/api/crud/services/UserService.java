@@ -61,7 +61,7 @@ public class UserService {
 
     public String login(LoginRequestDTO loginRequestDTO) {
         logger.info("Attempting Service login for user: {}", loginRequestDTO.getEmail());
-        Optional<UserModel> userModel = userDao.findUserByEmail(loginRequestDTO.getEmail());
+        Optional<UserModel> userModel = userDao.getUserByEmail(loginRequestDTO.getEmail());
 
         if (userModel.isEmpty()) {
             logger.debug("Login failed: User {} not found", loginRequestDTO.getEmail());
@@ -87,7 +87,7 @@ public class UserService {
 
     private List<String> getRolesForEmail(String email) {
         logger.info("Starting to process fetching roles for user with email: {}", email);
-        Optional<UserModel> response = userDao.findUserByEmail(email);
+        Optional<UserModel> response = userDao.getUserByEmail(email);
 
         if (response.isPresent()) {
             List<String> roles = response.get().getRoles().stream()
@@ -112,7 +112,7 @@ public class UserService {
             userModel.setRoles(new HashSet<>());
         }
 
-        Role role = roleDao.findRoleByName("CLIENT")
+        Role role = roleDao.getRoleByName("CLIENT")
                 .orElseThrow(() -> {
                     logger.debug("Registration failed: Role CLIENT does not exist");
                     return new IllegalArgumentException("El rol CLIENT no existe en la base de datos");
@@ -127,10 +127,10 @@ public class UserService {
         logger.info("User {} registered successfully", userRegisterDTO.getEmail());
     }
 
-    public List<UserListAdminResponseDTO> findUserByName(String firstName, String lastName) {
+    public List<UserListAdminResponseDTO> getUserByName(String firstName, String lastName) {
         logger.info("Starting to process search for users with name: {} and lastName: {}", firstName, lastName);
 
-        List<UserModel> users = userDao.findUserByName(firstName, lastName);
+        List<UserModel> users = userDao.getUserByName(firstName, lastName);
 
         List<UserListAdminResponseDTO> response = users.stream()
                         .map(user -> modelMapper.map(user, UserListAdminResponseDTO.class))
@@ -142,10 +142,10 @@ public class UserService {
         return response;
     }
 
-    public Optional<UserDetailAdminResponseDTO> findUserByEmail(String email) {
+    public Optional<UserDetailAdminResponseDTO> getUserByEmail(String email) {
         logger.info("Starting to process search for user with email: {}", email);
 
-        Optional<UserDetailAdminResponseDTO> response = userDao.findUserByEmail(email)
+        Optional<UserDetailAdminResponseDTO> response = userDao.getUserByEmail(email)
                 .map(user -> modelMapper.map(user, UserDetailAdminResponseDTO.class));
 
         if (response.isEmpty()) {
@@ -159,7 +159,7 @@ public class UserService {
 
         logger.info("Starting to process profile for user with email: {}", email);
 
-        Optional<UserResponseDTO> userResponseDTO = userDao.findUserByEmail(email)
+        Optional<UserResponseDTO> userResponseDTO = userDao.getUserByEmail(email)
                 .map(user -> modelMapper.map(user, UserResponseDTO.class));
 
         if (userResponseDTO.isEmpty()) {
@@ -188,7 +188,7 @@ public class UserService {
 
         String email = authentication.getName();
 
-        UserModel user = userDao.findUserByEmail(email)
+        UserModel user = userDao.getUserByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
         user.setActive(false);
@@ -198,7 +198,7 @@ public class UserService {
 
     public void deactivateUserByAdmin(Long id) {
 
-        UserModel user = userDao.findUserById(id)
+        UserModel user = userDao.getUserById(id)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
         user.setActive(false);
@@ -206,7 +206,7 @@ public class UserService {
     }
 
     public void activateUserByAdmin(Long id) {
-        UserModel user = userDao.findUserById(id)
+        UserModel user = userDao.getUserById(id)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
         user.setActive(true);
@@ -216,7 +216,7 @@ public class UserService {
 
     public void changePassword(String email, PasswordChangeRequestDTO dto) {
 
-        UserModel user = userDao.findUserByEmail(email).orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        UserModel user = userDao.getUserByEmail(email).orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
         if (!passwordEncoder.matches(dto.getCurrentPassword(), user.getPassword())) {
 
@@ -263,10 +263,10 @@ public class UserService {
         return userResponseDTOs;
     }
 
-    public Optional<UserDetailAdminResponseDTO> findUserById(Long id) {
+    public Optional<UserDetailAdminResponseDTO> getUserById(Long id) {
         logger.info("Starting to process search for user with ID: {}", id);
 
-        Optional<UserDetailAdminResponseDTO> userAdminDetailResponseDTO = userDao.findUserById(id)
+        Optional<UserDetailAdminResponseDTO> userAdminDetailResponseDTO = userDao.getUserById(id)
                 .map(user -> modelMapper.map(user, UserDetailAdminResponseDTO.class));
 
         if (userAdminDetailResponseDTO.isEmpty()) {
@@ -278,7 +278,7 @@ public class UserService {
 
     public void resetPasswordByAdmin(Long id, PasswordResetDTO dto) {
 
-        UserModel user = userDao.findUserById(id)
+        UserModel user = userDao.getUserById(id)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
         if (!dto.getNewPassword().equals(dto.getConfirmPassword())) {
@@ -307,7 +307,7 @@ public class UserService {
 
         logger.info("Starting account recovery request for email: {}", email);
 
-        Optional<UserModel> optionalUser = userDao.findUserByEmail(email);
+        Optional<UserModel> optionalUser = userDao.getUserByEmail(email);
 
         if (optionalUser.isEmpty()) {
             logger.debug("No user found for account recovery request");
@@ -346,7 +346,7 @@ public class UserService {
 
         logger.info("Starting account activation with recovery token");
 
-        AccountRecoveryToken recoveryToken = accountRecoveryTokenDao.findByToken(token)
+        AccountRecoveryToken recoveryToken = accountRecoveryTokenDao.getByToken(token)
                 .orElseThrow(() -> new RuntimeException("Token de recuperación inválido"));
 
         if (recoveryToken.isUsed()) {
@@ -372,7 +372,7 @@ public class UserService {
 
         logger.info("Starting password reset request for email: {}", email);
 
-        Optional<UserModel> optionalUser = userDao.findUserByEmail(email);
+        Optional<UserModel> optionalUser = userDao.getUserByEmail(email);
 
         if (optionalUser.isEmpty()) {
             logger.debug("No user found for password reset request");
@@ -405,7 +405,7 @@ public class UserService {
     @Transactional
     public void resetPasswordByToken(String token, PasswordResetDTO dto) {
 
-        PasswordResetToken resetToken = passwordResetTokenDao.findByToken(token)
+        PasswordResetToken resetToken = passwordResetTokenDao.getByToken(token)
                 .orElseThrow(() -> new RuntimeException("Token de recuperación inválido"));
 
         if (resetToken.isUsed()) {

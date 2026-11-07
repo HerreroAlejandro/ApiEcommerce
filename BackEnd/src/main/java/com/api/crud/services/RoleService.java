@@ -23,8 +23,8 @@ public class RoleService {
 
     private static final Logger logger = LoggerFactory.getLogger(RoleService.class);
 
-    public Optional<RoleDTO> findRoleByName(String roleName) {
-        Optional<RoleDTO> roleDTO = roleDao.findRoleByName(roleName)
+    public Optional<RoleDTO> getRoleByName(String roleName) {
+        Optional<RoleDTO> roleDTO = roleDao.getRoleByName(roleName)
                 .map(role -> modelMapper.map(role, RoleDTO.class));
 
         if (roleDTO.isPresent()) {
@@ -35,9 +35,9 @@ public class RoleService {
         return roleDTO;
     }
 
-    public Optional<RoleDTO> findRoleById(Long id){
-        logger.info("Starting to process findRoleBy id with id {} in services", id);
-        Optional<RoleDTO> roleDTO = roleDao.findRoleById(id)
+    public Optional<RoleDTO> getRoleById(Long id){
+        logger.info("Starting to process getRoleBy id with id {} in services", id);
+        Optional<RoleDTO> roleDTO = roleDao.getRoleById(id)
                 .map(role -> modelMapper.map(role, RoleDTO.class));
 
         if (roleDTO.isPresent()){
