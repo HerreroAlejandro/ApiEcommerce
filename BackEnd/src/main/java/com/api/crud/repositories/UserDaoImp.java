@@ -55,7 +55,7 @@ public class UserDaoImp implements UserDao {
     }
 
     @Override
-    public List<UserModel> findUserByName(String firstName, String lastName) {
+    public List<UserModel> getUserByName(String firstName, String lastName) {
         logger.debug("Executing query searching for users with name: {} {}", firstName, lastName);
         List<UserModel> users;
 
@@ -74,7 +74,7 @@ public class UserDaoImp implements UserDao {
     }
 
     @Override
-    public Optional<UserModel> findUserByEmail(String email) {
+    public Optional<UserModel> getUserByEmail(String email) {
         logger.debug("Executing query to find user with email: {}", email);
         Optional<UserModel> response;
         try {
@@ -97,7 +97,7 @@ public class UserDaoImp implements UserDao {
 
     @Override
     public UserModel updateMyProfile(String email, UserUpdateRequestDTO dto) {
-        Optional<UserModel> optionalUser = findUserByEmail(email);
+        Optional<UserModel> optionalUser = getUserByEmail(email);
 
         if (optionalUser.isPresent()) {
             UserModel user = optionalUser.get();
@@ -202,7 +202,7 @@ public class UserDaoImp implements UserDao {
     }
 
     @Override
-    public Optional<UserModel> findUserById(Long id) {
+    public Optional<UserModel> getUserById(Long id) {
         logger.debug("Executing query to find user with ID: {}", id);
         Optional<UserModel> response;
         try {

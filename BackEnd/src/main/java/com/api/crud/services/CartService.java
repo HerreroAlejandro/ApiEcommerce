@@ -53,15 +53,15 @@ public class CartService {
 
     private static final Logger logger = LoggerFactory.getLogger(CartService.class);
 
-    private Optional<Cart> findMyCart(String email) {
-        UserModel user = userDao.findUserByEmail(email)
+    private Optional<Cart> getMyCart(String email) {
+        UserModel user = userDao.getUserByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
-        return cartDao.findActiveCartByUserId(user.getId());
+        return cartDao.getActiveCartByUserId(user.getId());
     }
 
     @Transactional(readOnly = true)
-    public MyCartResponseDTO findMyActiveCart(String email) {
-        return findMyCart(email).map(cart -> {
+    public MyCartResponseDTO getMyActiveCart(String email) {
+        return getMyCart(email).map(cart -> {
             List<MyCartItemResponseDTO> items = cart.getItemsCart().stream()
                     .map(this::toMyCartItemResponse).toList();
             MyCartResponseDTO response = new MyCartResponseDTO();
@@ -91,13 +91,13 @@ public class CartService {
 
     @Transactional(readOnly = true)
     public BigDecimal getMyCartTotal(String email) {
-        return findMyCart(email).map(cart -> getCartTotal(cart.getIdCart()))
+        return getMyCart(email).map(cart -> getCartTotal(cart.getIdCart()))
                 .orElse(BigDecimal.ZERO);
     }
 
     @Transactional
     public void clearMyCart(String email) {
-        findMyCart(email).ifPresent(cart -> cart.getItemsCart().clear());
+        getMyCart(email).ifPresent(cart -> cart.getItemsCart().clear());
     }
 
 
@@ -141,23 +141,23 @@ public class CartService {
     }
 
     @Transactional(readOnly = true)
-    public Optional<CartAdminDetailDTO> findCartByUserEmail(String email) {
-        return cartDao.findCartByUserEmail(email).map(this::toAdminDetail);
+    public Optional<CartAdminDetailDTO> getCartByUserEmail(String email) {
+        return cartDao.getCartByUserEmail(email).map(this::toAdminDetail);
     }
 
     @Transactional(readOnly = true)
-    public Optional<CartAdminDetailDTO> findCartById(Long id) {
-        return cartDao.findCartById(id).map(this::toAdminDetail);
+    public Optional<CartAdminDetailDTO> getCartById(Long id) {
+        return cartDao.getCartById(id).map(this::toAdminDetail);
     }
 
     @Transactional(readOnly = true)
-    public Optional<CartAdminDetailDTO> findCartByUserId(Long id) {
-        return cartDao.findCartByUserId(id).map(this::toAdminDetail);
+    public Optional<CartAdminDetailDTO> getCartByUserId(Long id) {
+        return cartDao.getCartByUserId(id).map(this::toAdminDetail);
     }
 
     @Transactional(readOnly = true)
-    public Optional<CartAdminDetailDTO> findActiveCartByUserId(Long id) {
-        return cartDao.findActiveCartByUserId(id).map(this::toAdminDetail);
+    public Optional<CartAdminDetailDTO> getActiveCartByUserId(Long id) {
+        return cartDao.getActiveCartByUserId(id).map(this::toAdminDetail);
     }
 
     @Transactional(readOnly = true)
@@ -179,7 +179,7 @@ public class CartService {
     }
 
     public BigDecimal getCartTotal(Long cartId) {
-        return cartItemDao.findItemsByCartId(cartId).stream().map(CartItem::getSubtotal)
+        return cartItemDao.getItemsByCartId(cartId).stream().map(CartItem::getSubtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }

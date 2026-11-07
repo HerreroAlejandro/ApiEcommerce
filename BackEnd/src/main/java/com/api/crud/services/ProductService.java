@@ -96,20 +96,20 @@ public class ProductService {
         return new PageImpl<>(adminProducts, pageable, totalProducts);
     }
 
-    public Optional<ProductDetailDTO> findProductDetailById(Long idProduct) {
-        return productDao.findProductById(idProduct)
+    public Optional<ProductDetailDTO> getProductDetailById(Long idProduct) {
+        return productDao.getProductById(idProduct)
                 .filter(Product::isActive)
                 .map(product -> modelMapper.map(product, ProductDetailDTO.class));
     }
 
-    public Optional<ProductAdminDetailDTO> findProductAdminDetailById(Long idProduct) {
-        return productDao.findProductById(idProduct)
+    public Optional<ProductAdminDetailDTO> getProductAdminDetailById(Long idProduct) {
+        return productDao.getProductById(idProduct)
                 .map(product -> modelMapper.map(product, ProductAdminDetailDTO.class));
     }
 /*
-    public Page<ProductCatalogDTO> findProductsByName(String nameProduct, Pageable pageable) {
+    public Page<ProductCatalogDTO> getProductsByName(String nameProduct, Pageable pageable) {
 
-        List<Product> products = productDao.findProductsByName(nameProduct, pageable);
+        List<Product> products = productDao.getProductsByName(nameProduct, pageable);
         long totalProducts = productDao.countProductsByName(nameProduct);
 
         List<ProductCatalogDTO> catalogProducts = products.stream()
@@ -119,9 +119,9 @@ public class ProductService {
         return new PageImpl<>(catalogProducts, pageable, totalProducts);
     }
 
-    public Page<ProductAdminDetailDTO> findProductsByNameAdmin(String nameProduct, Boolean active, Pageable pageable) {
+    public Page<ProductAdminDetailDTO> getProductsByNameAdmin(String nameProduct, Boolean active, Pageable pageable) {
 
-        List<Product> products = productDao.findProductsByNameAdmin(nameProduct, active, pageable);
+        List<Product> products = productDao.getProductsByNameAdmin(nameProduct, active, pageable);
 
         long totalProducts = productDao.countProductsByNameAdmin(nameProduct, active);
 
@@ -150,7 +150,7 @@ public class ProductService {
 
         logger.info("Updating stock for product ID {} in service", idProduct);
 
-        Optional<Product> product = productDao.findProductById(idProduct);
+        Optional<Product> product = productDao.getProductById(idProduct);
 
         if (product.isEmpty()) {
             return false;
@@ -171,7 +171,7 @@ public class ProductService {
 
         logger.info("Updating price for product ID {} in service", idProduct);
 
-        Optional<Product> product = productDao.findProductById(idProduct);
+        Optional<Product> product = productDao.getProductById(idProduct);
 
         if (product.isEmpty()) {
             return false;
@@ -188,7 +188,7 @@ public class ProductService {
 
         boolean updated = false;
 
-        Optional<Product> productOpt = productDao.findProductById(idProduct);
+        Optional<Product> productOpt = productDao.getProductById(idProduct);
 
         if (productOpt.isPresent()) {
 
@@ -217,7 +217,7 @@ public class ProductService {
 
         boolean updated = false;
 
-        Optional<Product> productOpt = productDao.findProductById(idProduct);
+        Optional<Product> productOpt = productDao.getProductById(idProduct);
 
         if (productOpt.isPresent()) {
 
@@ -244,7 +244,7 @@ public class ProductService {
         logger.info("Disabling product with id {}", idProduct);
         boolean success = false;
 
-        Optional<Product> productOpt = productDao.findProductById(idProduct);
+        Optional<Product> productOpt = productDao.getProductById(idProduct);
 
         if (productOpt.isPresent()) {
             Product product = productOpt.get();
@@ -261,7 +261,7 @@ public class ProductService {
         boolean success = false;
 
         Optional<Product> productOpt =
-                productDao.findProductById(idProduct);
+                productDao.getProductById(idProduct);
 
         if (productOpt.isPresent()) {
             Product product = productOpt.get();
@@ -277,7 +277,7 @@ public class ProductService {
         logger.info("Updating product information for product ID {}", idProduct);
         boolean updated = false;
 
-        Optional<Product> productOpt = productDao.findProductById(idProduct);
+        Optional<Product> productOpt = productDao.getProductById(idProduct);
 
         if (productOpt.isPresent()) {
             Product product = productOpt.get();

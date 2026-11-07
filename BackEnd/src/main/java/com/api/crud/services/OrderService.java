@@ -1,128 +1,233 @@
 package com.api.crud.services;
 
-import com.api.crud.DTO.OrderDTO;
-import com.api.crud.DTO.OrderItemDTO;
-import com.api.crud.models.entity.Order;
-import com.api.crud.models.entity.OrderItem;
-import com.api.crud.models.entity.Product;
-import com.api.crud.models.entity.UserModel;
-import com.api.crud.models.enums.OrderStatus;
-import com.api.crud.models.enums.PaymentStatus;
-import com.api.crud.repositories.OrderDao;
-import com.api.crud.repositories.UserDao;
+import com.api.crud.DTO.*;
+import com.api.crud.models.entity.*;
+import com.api.crud.models.enums.*;
+import com.api.crud.repositories.*;
 import org.modelmapper.ModelMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.data.domain.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 @Service
+@Transactional(readOnly = true)
 public class OrderService {
-
     private final OrderDao orderDao;
     private final UserDao userDao;
-    private final ModelMapper modelMapper;
+    private final OrderWorkflowDao workflow;
+    private final ModelMapper mapper;
 
-    private static final Logger logger = LoggerFactory.getLogger(OrderService.class);
-
-    @Autowired
-    public OrderService(OrderDao orderDao, UserDao userDao, ModelMapper modelMapper) {
+    public OrderService(OrderDao orderDao, UserDao userDao, OrderWorkflowDao workflow, ModelMapper mapper) {
         this.orderDao = orderDao;
         this.userDao = userDao;
-        this.modelMapper = modelMapper;
+        this.workflow = workflow;
+        this.mapper = mapper;
     }
 
-    // Obtener todas las órdenes
-    public List<OrderDTO> getAllOrders() {
-        return orderDao.getOrders().stream()
-                .map(this::mapToOrderDTO)
-                .toList();
+    private UserModel user(String email) {
+        return userDao.getUserByEmail(email).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.UNAUTHORIZED));
     }
 
-    // Crear una orden
-    public OrderDTO createOrder(Long userId, List<OrderItemDTO> itemsDto) {
-        UserModel user = userDao.findUserById(userId)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+    private Order owned(String email, Long id) {
+        long userId = user(email).getId();
+        return orderDao.getOrderById(id).filter(order -> order.getUserOrder().getId() == userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Orden no encontrada"));
+    }
 
-        Order order = new Order();
-        order.setUserOrder(user);
-        order.setPurchaseDateOrder(LocalDateTime.now());
-        order.setPaymentStatus(PaymentStatus.PENDING);
-        order.setOrderStatus(OrderStatus.PENDING);
+    private ResponseStatusException conflict(String message) {
+        return new ResponseStatusException(HttpStatus.CONFLICT, message);
+    }
 
-        List<OrderItem> items = new ArrayList<>();
-        BigDecimal total = BigDecimal.ZERO;
-
-        for (OrderItemDTO itemDTO : itemsDto) {
-            OrderItem item = modelMapper.map(itemDTO, OrderItem.class);
-
-            Product product = orderDao.findProductById(itemDTO.getProductOrderItem())
-                    .orElseThrow(() -> new RuntimeException("Producto no encontrado"));
-
-            item.setProductOrderItem(product);
-            item.setPriceOrderItem(product.getPriceProduct());
-            item.setOrder(order);
-
-            total = total.add(item.getSubtotal());
-            items.add(item);
+    private String reason(String reason) {
+        if (reason == null || reason.isBlank() || reason.length() > 500) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Debe indicar un motivo de hasta 500 caracteres");
         }
-
-        order.setItemsOrder(items);
-        order.setTotalOrder(total);
-        orderDao.saveOrder(order);
-
-        return mapToOrderDTO(order);
+        return reason.trim();
     }
 
-    public OrderDTO getOrderById(Long idOrder) {
-        Order order = orderDao.findOrderById(idOrder)
-                .orElseThrow(() -> new RuntimeException("Orden no encontrada"));
-        return mapToOrderDTO(order);
+    public Page<OrderListDTO> getMyOrders(String email, OrderStatus status, PaymentStatus payment, Pageable pageable) {
+        return workflow.search(user(email).getId(), null, status, payment, null, null, pageable)
+                .map(order -> mapper.map(order, OrderListDTO.class));
     }
 
-    public List<OrderDTO> getOrdersByUserEmail(String email) {
-        return orderDao.getOrdersByUserEmail(email).stream()
-                .map(this::mapToOrderDTO)
-                .toList();
+    public OrderDetailDTO getMyOrder(String email, Long id) { return detail(owned(email, id)); }
+
+    public Page<OrderAdminListDTO> getAdminOrders(String email, OrderStatus status, PaymentStatus payment,
+                                                LocalDateTime start, LocalDateTime end, Pageable pageable) {
+        return workflow.search(null, email, status, payment, start, end, pageable).map(order -> {
+            OrderAdminListDTO dto = mapper.map(order, OrderAdminListDTO.class);
+            dto.setUserId(order.getUserOrder().getId());
+            dto.setUserEmail(order.getUserOrder().getEmail());
+            return dto;
+        });
     }
 
-    public void updateOrderStatus(Long orderId, OrderStatus status) {
-        Order order = orderDao.findOrderById(orderId)
-                .orElseThrow(() -> new RuntimeException("Orden no encontrada"));
-        order.setOrderStatus(status);
-        orderDao.updateOrder(order);
-    }
-
-    public void updatePaymentStatus(Long orderId, PaymentStatus status) {
-        Order order = orderDao.findOrderById(orderId)
-                .orElseThrow(() -> new RuntimeException("Orden no encontrada"));
-        order.setPaymentStatus(status);
-        orderDao.updateOrder(order);
-    }
-
-    public void cancelOrder(Long orderId) {
-        updateOrderStatus(orderId, OrderStatus.CANCELED);
-    }
-
-    public void deleteOrder(Long orderId) {
-        orderDao.deleteOrderById(orderId);
-    }
-
-    private OrderDTO mapToOrderDTO(Order order) {
-        OrderDTO dto = modelMapper.map(order, OrderDTO.class);
+    public OrderAdminDetailDTO getAdminOrder(Long id) {
+        Order order = orderDao.getOrderById(id).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "Orden no encontrada"));
+        OrderAdminDetailDTO dto = mapper.map(order, OrderAdminDetailDTO.class);
         dto.setUserId(order.getUserOrder().getId());
         dto.setUserEmail(order.getUserOrder().getEmail());
-        dto.setItemsOrder(order.getItemsOrder().stream()
-                .map(item -> {
-                    OrderItemDTO itemDTO = modelMapper.map(item, OrderItemDTO.class);
-                    itemDTO.setOrder(item.getOrder().getIdOrder());
-                    itemDTO.setProductOrderItem(item.getProductOrderItem().getIdProduct());
-                    return itemDTO;
-                }).toList());
+        dto.setItemsOrder(items(order));
         return dto;
+    }
+
+    private List<OrderItemResponseDTO> items(Order order) {
+        return order.getItemsOrder().stream().map(item -> {
+            OrderItemResponseDTO dto = new OrderItemResponseDTO();
+            dto.setIdOrderItem(item.getIdOrderItem());
+            dto.setProductId(item.getProductOrderItem().getIdProduct());
+            dto.setProductName(item.getProductName());
+            dto.setPriceOrderItem(item.getPriceOrderItem());
+            dto.setAmountOrderItem(item.getAmountOrderItem());
+            dto.setSubtotal(item.getSubtotal());
+            return dto;
+        }).toList();
+    }
+
+    private OrderDetailDTO detail(Order order) {
+        OrderDetailDTO dto = mapper.map(order, OrderDetailDTO.class);
+        dto.setItemsOrder(items(order));
+        return dto;
+    }
+
+    private void audit(Order order, UserModel actor, String action, String before, String after, String reason) {
+        OrderChangeAudit audit = new OrderChangeAudit();
+        audit.setOrderId(order.getIdOrder());
+        audit.setActorUserId(actor.getId());
+        audit.setAction(action);
+        audit.setPreviousValue(before);
+        audit.setNewValue(after);
+        audit.setReason(reason);
+        audit.setCreatedAt(LocalDateTime.now());
+        workflow.saveAudit(audit);
+    }
+
+    @Transactional
+    public OrderDetailDTO createMyOrder(String email) {
+        UserModel buyer = user(email);
+        workflow.lockUser(buyer.getId());
+        Cart cart = workflow.lockCart(buyer.getId()).orElseThrow(() -> conflict("Carrito vacio"));
+        if (!cart.isActive()) throw conflict("Carrito deshabilitado");
+        if (cart.getItemsCart().isEmpty()) throw conflict("Carrito vacio");
+        Order order = new Order();
+        order.setUserOrder(buyer);
+        order.setPurchaseDateOrder(LocalDateTime.now());
+        order.setOrderStatus(OrderStatus.PENDING);
+        order.setPaymentStatus(PaymentStatus.PENDING);
+        List<OrderItem> purchased = new ArrayList<>();
+        BigDecimal total = BigDecimal.ZERO;
+        List<CartItem> sorted = cart.getItemsCart().stream()
+                .sorted(Comparator.comparing(item -> item.getProductCartItem().getIdProduct())).toList();
+        for (CartItem item : sorted) {
+            int amount = item.getAmountCartItem();
+            Product product = workflow.lockProduct(item.getProductCartItem().getIdProduct());
+            if (amount <= 0 || !product.isActive()) throw conflict("Producto o cantidad no disponible");
+            if (product instanceof ProductPhysical physical) {
+                if (physical.getStockProduct() < amount) throw conflict("Stock insuficiente");
+                physical.setStockProduct(physical.getStockProduct() - amount);
+            }
+            OrderItem line = new OrderItem(order, product, amount, product.getPriceProduct());
+            line.setProductName(product.getNameProduct());
+            purchased.add(line);
+            total = total.add(line.getSubtotal());
+        }
+        if (total.compareTo(new BigDecimal("99999999.99")) > 0) throw conflict("Total fuera del limite admitido");
+        order.setItemsOrder(purchased);
+        order.setTotalOrder(total);
+        order.setStockDeducted(true);
+        orderDao.saveOrder(order);
+        cart.getItemsCart().clear();
+        workflow.flush();
+        audit(order, buyer, "CREATE", null, "PENDING", "Compra desde el carrito");
+        return detail(order);
+    }
+
+    @Transactional
+    public void cancelMyOrder(String email, Long id, String reason) {
+        String motive = reason(reason);
+        UserModel actor = user(email);
+        // Check ownership before locking or revealing the order state.
+        owned(email, id);
+        Order order = workflow.lockOrder(id);
+        if (order.getUserOrder().getId() != actor.getId()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Orden no encontrada");
+        }
+        if (order.getOrderStatus() == OrderStatus.CANCELED) return;
+        if (order.getOrderStatus() != OrderStatus.PENDING ||
+                (order.getPaymentStatus() != PaymentStatus.PENDING && order.getPaymentStatus() != PaymentStatus.FAILED)) {
+            throw conflict("Esta orden no admite cancelacion por el cliente");
+        }
+        cancel(order, actor, motive);
+    }
+
+    @Transactional
+    public void cancelAdminOrder(String email, Long id, String reason) {
+        UserModel actor = user(email);
+        Order order = workflow.lockOrder(id);
+        cancel(order, actor, reason(reason));
+    }
+
+    private void cancel(Order order, UserModel actor, String reason) {
+        if (order.getOrderStatus() == OrderStatus.CANCELED) return;
+        if ((order.getOrderStatus() != OrderStatus.PENDING && order.getOrderStatus() != OrderStatus.CONFIRMED)
+                || order.getPaymentStatus() == PaymentStatus.PAID) {
+            throw conflict("La cancelacion requiere una orden sin enviar y sin pago pendiente de reembolso");
+        }
+        for (OrderItem item : (order.isStockDeducted() ? order.getItemsOrder() : List.<OrderItem>of()).stream()
+                .sorted(Comparator.comparing(line -> line.getProductOrderItem().getIdProduct())).toList()) {
+            Product product = workflow.lockProduct(item.getProductOrderItem().getIdProduct());
+            if (product instanceof ProductPhysical physical) {
+                long stock = (long) physical.getStockProduct() + item.getAmountOrderItem();
+                if (stock > Integer.MAX_VALUE) throw conflict("Stock fuera del limite admitido");
+                physical.setStockProduct((int) stock);
+            }
+        }
+        String before = order.getOrderStatus().name();
+        order.setOrderStatus(OrderStatus.CANCELED);
+        order.setStockDeducted(false);
+        audit(order, actor, "CANCEL", before, "CANCELED", reason);
+    }
+
+    @Transactional
+    public void updateOrderStatus(String email, Long id, OrderStatus status, String reason) {
+        String motive = reason(reason);
+        if (status == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado requerido");
+        UserModel actor = user(email);
+        Order order = workflow.lockOrder(id);
+        if (status == OrderStatus.CANCELED) { cancel(order, actor, motive); return; }
+        OrderStatus previous = order.getOrderStatus();
+        if (previous == status) return;
+        boolean digitalOnly = order.getItemsOrder().stream().allMatch(item -> item.getProductOrderItem() instanceof ProductDigital);
+        boolean allowed = (previous == OrderStatus.PENDING && status == OrderStatus.CONFIRMED)
+                || (previous == OrderStatus.CONFIRMED && status == OrderStatus.SHIPPED && !digitalOnly)
+                || (previous == OrderStatus.SHIPPED && status == OrderStatus.DELIVERED)
+                || (previous == OrderStatus.CONFIRMED && status == OrderStatus.DELIVERED && digitalOnly);
+        if (!allowed || order.getPaymentStatus() != PaymentStatus.PAID) throw conflict("Transicion de orden no permitida");
+        order.setOrderStatus(status);
+        audit(order, actor, "ORDER_STATUS", previous.name(), status.name(), motive);
+    }
+
+    @Transactional
+    public void updatePaymentStatus(String email, Long id, PaymentStatus status, String reason) {
+        String motive = reason(reason);
+        if (status == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado requerido");
+        UserModel actor = user(email);
+        Order order = workflow.lockOrder(id);
+        PaymentStatus previous = order.getPaymentStatus();
+        if (previous == status) return;
+        boolean beforeShipping = order.getOrderStatus() == OrderStatus.PENDING || order.getOrderStatus() == OrderStatus.CONFIRMED;
+        boolean allowed = (previous == PaymentStatus.PENDING && (status == PaymentStatus.PAID || status == PaymentStatus.FAILED))
+                || (previous == PaymentStatus.FAILED && (status == PaymentStatus.PENDING || status == PaymentStatus.PAID))
+                || (previous == PaymentStatus.PAID && status == PaymentStatus.REFUNDED);
+        if (!beforeShipping || !allowed) throw conflict("Transicion de pago no permitida");
+        order.setPaymentStatus(status);
+        audit(order, actor, "PAYMENT_STATUS", previous.name(), status.name(), motive);
     }
 }

@@ -71,7 +71,7 @@ public class CartItemService {
     }
 
     private CartItem adminItem(Long itemId) {
-        CartItem item = cartItemDao.findCartItemById(itemId).orElseThrow(() ->
+        CartItem item = cartItemDao.getCartItemById(itemId).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Item no encontrado"));
         if (!item.getCart().isActive()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Carrito inactivo");
@@ -83,7 +83,7 @@ public class CartItemService {
     public void changeAdminCartState(String email, Long cartId, boolean active, String reason) {
         String motive = validReason(reason);
         UserModel actor = authenticatedUser(email);
-        Cart cart = cartDao.findCartById(cartId).orElseThrow(() ->
+        Cart cart = cartDao.getCartById(cartId).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Carrito no encontrado"));
         if (cart.isActive() != active) {
             audit(actor, cart, null, active ? "ENABLE" : "DISABLE", 0, 0, motive);
@@ -95,7 +95,7 @@ public class CartItemService {
     public void deleteAdminCart(String email, Long cartId, String reason) {
         String motive = validReason(reason);
         UserModel actor = authenticatedUser(email);
-        Cart cart = cartDao.findCartById(cartId).orElseThrow(() ->
+        Cart cart = cartDao.getCartById(cartId).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Carrito no encontrado"));
         for (CartItem item : cart.getItemsCart()) {
             audit(actor, cart, item.getProductCartItem().getIdProduct(), "DELETE_ITEM",
@@ -109,11 +109,11 @@ public class CartItemService {
     public void addAdminItem(String email, Long userId, Long productId, int amount, String reason) {
         String motive = validReason(reason);
         UserModel actor = authenticatedUser(email);
-        userDao.findUserById(userId).orElseThrow(() ->
+        userDao.getUserById(userId).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
         positive(amount);
         Cart cart = cartDao.getOrCreateActiveCart(userId);
-        int previous = cartItemDao.findByCartAndProductId(cart.getIdCart(), productId)
+        int previous = cartItemDao.getByCartAndProductId(cart.getIdCart(), productId)
                 .map(CartItem::getAmountCartItem).orElse(0);
         addItemToCart(userId, productId, amount);
         audit(actor, cart, productId, "ADD", previous, previous + amount, motive);
@@ -169,7 +169,7 @@ public class CartItemService {
     public void clearAdminCart(String email, Long cartId, String reason) {
         String motive = validReason(reason);
         UserModel actor = authenticatedUser(email);
-        Cart cart = cartDao.findCartById(cartId).orElseThrow(() ->
+        Cart cart = cartDao.getCartById(cartId).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Carrito no encontrado"));
         if (!cart.isActive()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Carrito inactivo");
@@ -187,13 +187,13 @@ public class CartItemService {
     private static final Logger logger = LoggerFactory.getLogger(CartItemService.class);
 
     private UserModel authenticatedUser(String email) {
-        return userDao.findUserByEmail(email).orElseThrow(() ->
+        return userDao.getUserByEmail(email).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.UNAUTHORIZED));
     }
 
     private CartItem ownedItem(String email, Long itemId) {
         UserModel user = authenticatedUser(email);
-        CartItem item = cartItemDao.findCartItemById(itemId).orElseThrow(() ->
+        CartItem item = cartItemDao.getCartItemById(itemId).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Item no encontrado"));
         if (item.getCart().getUserCart().getId() != user.getId() || !item.getCart().isActive()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Item no encontrado");
@@ -263,10 +263,10 @@ public class CartItemService {
         positive(amount);
         Cart cart = cartDao.getOrCreateActiveCart(userId);
 
-        Product product = productDao.findProductById(productId)
+        Product product = productDao.getProductById(productId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
 
-        Optional<CartItem> existingCartItem = cartItemDao.findByCartAndProductId(cart.getIdCart(), productId);
+        Optional<CartItem> existingCartItem = cartItemDao.getByCartAndProductId(cart.getIdCart(), productId);
         long resultingAmount = (long) amount + existingCartItem.map(CartItem::getAmountCartItem).orElse(0);
         available(product, resultingAmount);
 
@@ -284,8 +284,8 @@ public class CartItemService {
     }
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
-    public Optional<CartItemAdminDetailDTO> findCartItemById(Long cartItemId) {
-        return cartItemDao.findCartItemById(cartItemId).map(item -> {
+    public Optional<CartItemAdminDetailDTO> getCartItemById(Long cartItemId) {
+        return cartItemDao.getCartItemById(cartItemId).map(item -> {
             Product product = item.getProductCartItem();
             CartItemAdminDetailDTO dto = new CartItemAdminDetailDTO();
             dto.setIdCartItem(item.getIdCartItem());
@@ -306,10 +306,10 @@ public class CartItemService {
     }
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
-    public List<CartItemAdminListDTO> findItemsByCartId(Long cartId) {
-        cartDao.findCartById(cartId).orElseThrow(() ->
+    public List<CartItemAdminListDTO> getItemsByCartId(Long cartId) {
+        cartDao.getCartById(cartId).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Carrito no encontrado"));
-        return cartItemDao.findItemsByCartId(cartId).stream().map(item -> {
+        return cartItemDao.getItemsByCartId(cartId).stream().map(item -> {
             CartItemAdminListDTO dto = new CartItemAdminListDTO();
             dto.setIdCartItem(item.getIdCartItem());
             dto.setProductId(item.getProductCartItem().getIdProduct());
