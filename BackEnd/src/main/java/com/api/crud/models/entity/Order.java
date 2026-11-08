@@ -15,7 +15,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
-@Table(name = "orders")
+@Table(
+        name = "orders",
+        indexes =
+                @Index(
+                        name = "idx_orders_expiration",
+                        columnList = "orderStatus,paymentStatus,expiresAt"))
 public class Order {
 
     @Version
@@ -39,11 +44,38 @@ public class Order {
     @Column(name = "totalOrder")
     private BigDecimal totalOrder;
 
+    @Column(
+            nullable = false,
+            precision = 10,
+            scale = 2,
+            columnDefinition = "decimal(10,2) default 0")
+    @Getter
+    @Setter
+    private BigDecimal itemsSubtotal = new BigDecimal("0.00");
+
+    @Column(
+            nullable = false,
+            precision = 10,
+            scale = 2,
+            columnDefinition = "decimal(10,2) default 0")
+    @Getter
+    @Setter
+    private BigDecimal shippingCost = new BigDecimal("0.00");
+
+    @Embedded @Getter @Setter private OrderShippingAddress shippingAddress;
+
+    @Embedded @Getter @Setter private OrderShipmentTracking shipmentTracking;
+
     @NotNull(message = "purchaseDate cannot be null")
     @Getter
     @Setter
     @Column(name = "purchaseDateOrder")
     private LocalDateTime purchaseDateOrder;
+
+    @Getter
+    @Setter
+    @Column(name = "expiresAt")
+    private LocalDateTime expiresAt;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "paymentStatus", nullable = false)

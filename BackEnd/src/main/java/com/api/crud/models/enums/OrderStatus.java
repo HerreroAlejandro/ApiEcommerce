@@ -11,5 +11,7 @@ public enum OrderStatus {
     // Entregado
     DELIVERED,
     // Cancelado
-    CANCELED
+    CANCELED,
+    // Reserva vencida sin pago
+    EXPIRED
 }

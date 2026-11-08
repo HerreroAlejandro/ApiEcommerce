@@ -22,6 +22,9 @@ public interface OrderWorkflowDao {
 
     void flush();
 
+    List<Long> getExpiredOrderIds(
+            LocalDateTime now, LocalDateTime legacyCutoff, long afterId, int limit);
+
     Page<Order> search(
             Long userId,
             String email,

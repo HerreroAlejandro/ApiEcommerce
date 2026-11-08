@@ -3,16 +3,22 @@ package com.api.crud;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import com.api.crud.DTO.*;
 import com.api.crud.config.ModelMapperConfig;
 import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.*;
 import com.api.crud.models.enums.*;
 import com.api.crud.repositories.*;
+import com.api.crud.services.DigitalDeliveryService;
 import com.api.crud.services.OrderService;
+import com.api.crud.services.OrderShippingService;
+
+import jakarta.validation.Validation;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.*;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -35,12 +41,43 @@ class OrderServiceTests {
 
     private Order order;
 
+    private static OrderShippingService shippingService() {
+        OrderShippingService shipping =
+                new OrderShippingService(
+                        new ModelMapperConfig().modelMapper(),
+                        Validation.buildDefaultValidatorFactory().getValidator());
+        ReflectionTestUtils.setField(shipping, "flatRate", "0.00");
+        return shipping;
+    }
+
+    private static OrderCreateRequestDTO checkoutRequest() {
+        ShippingAddressDTO address = new ShippingAddressDTO();
+        address.setRecipientName("Cliente Prueba");
+        address.setPhone("1112345678");
+        address.setStreet("Calle de prueba");
+        address.setStreetNumber("123");
+        address.setCity("Ciudad");
+        address.setRegion("Provincia");
+        address.setPostalCode("1234");
+        address.setCountryCode("AR");
+        OrderCreateRequestDTO request = new OrderCreateRequestDTO();
+        request.setShippingAddress(address);
+        return request;
+    }
+
     @BeforeEach
     void setUp() {
         orders = mock(OrderDao.class);
         users = mock(UserDao.class);
         workflow = mock(OrderWorkflowDao.class);
-        service = new OrderService(orders, users, workflow, new ModelMapperConfig().modelMapper());
+        service =
+                new OrderService(
+                        orders,
+                        users,
+                        workflow,
+                        new ModelMapperConfig().modelMapper(),
+                        mock(DigitalDeliveryService.class),
+                        shippingService());
         user = new UserModel();
         user.setId(7L);
         user.setEmail("client@example.com");
@@ -66,6 +103,14 @@ class OrderServiceTests {
         line.setProductName("Nombre comprado");
         order.setItemsOrder(List.of(line));
         order.setTotalOrder(new BigDecimal("200.00"));
+        order.setShippingAddress(
+                new ModelMapperConfig()
+                        .modelMapper()
+                        .map(checkoutRequest().getShippingAddress(), OrderShippingAddress.class));
+        OrderShipmentTracking tracking = new OrderShipmentTracking();
+        tracking.setCarrier("Carrier");
+        tracking.setTrackingNumber("TRACK123");
+        order.setShipmentTracking(tracking);
         when(orders.getOrderById(10L)).thenReturn(Optional.of(order));
         when(workflow.lockOrder(10L)).thenReturn(order);
         doAnswer(
@@ -79,8 +124,9 @@ class OrderServiceTests {
 
     @Test
     void checkoutUsesCurrentPriceCapturesNameDecreasesStockAndClearsCart() {
-        var result = service.createMyOrder("client@example.com");
+        var result = service.createMyOrder("client@example.com", checkoutRequest());
         assertEquals(11L, result.getIdOrder());
+        assertEquals(result.getPurchaseDateOrder().plusMinutes(30), result.getExpiresAt());
         assertEquals(new BigDecimal("300.00"), result.getTotalOrder());
         assertEquals("Articulo", result.getItemsOrder().get(0).getProductName());
         assertEquals(3, product.getStockProduct());
@@ -97,13 +143,19 @@ class OrderServiceTests {
                 ExceptionProblems.status(
                                 assertThrows(
                                         ApplicationException.class,
-                                        () -> service.createMyOrder("client@example.com")))
+                                        () ->
+                                                service.createMyOrder(
+                                                        "client@example.com", checkoutRequest())))
                         .value());
         cart.setActive(false);
-        assertThrows(ApplicationException.class, () -> service.createMyOrder("client@example.com"));
+        assertThrows(
+                ApplicationException.class,
+                () -> service.createMyOrder("client@example.com", checkoutRequest()));
         cart.setActive(true);
         cart.getItemsCart().clear();
-        assertThrows(ApplicationException.class, () -> service.createMyOrder("client@example.com"));
+        assertThrows(
+                ApplicationException.class,
+                () -> service.createMyOrder("client@example.com", checkoutRequest()));
         verify(orders, never()).saveOrder(any());
     }
 
@@ -193,5 +245,41 @@ class OrderServiceTests {
         var admin = service.getAdminOrder(10L);
         assertEquals(7L, admin.getUserId());
         assertEquals("client@example.com", admin.getUserEmail());
+    }
+
+    @Test
+    void digitalCheckoutRejectsMultipleUnitsAndCapturesThePurchasedSource() {
+        ProductDigital digital = new ProductDigital();
+        digital.setIdProduct(4L);
+        digital.setActive(true);
+        digital.setNameProduct("Archivo");
+        digital.setPriceProduct(BigDecimal.TEN);
+        digital.setDownloadLink("https://example.com/file.zip");
+        when(workflow.lockProduct(4L)).thenReturn(digital);
+        cart.getItemsCart().get(0).setProductCartItem(digital);
+        assertThrows(
+                ApplicationException.class,
+                () -> service.createMyOrder("client@example.com", null));
+        cart.getItemsCart().get(0).setAmountCartItem(1);
+        service.createMyOrder("client@example.com", null);
+        var saved = org.mockito.ArgumentCaptor.forClass(Order.class);
+        verify(orders).saveOrder(saved.capture());
+        assertEquals(
+                digital.getDownloadLink(),
+                saved.getValue().getItemsOrder().get(0).getDigitalDownloadLink());
+    }
+
+    @Test
+    void paymentAndRefundDelegateDeliveryChangesInsideTheOrderWorkflow() {
+        DigitalDeliveryService deliveries =
+                (DigitalDeliveryService)
+                        org.springframework.test.util.ReflectionTestUtils.getField(
+                                service, "digitalDeliveries");
+        service.updatePaymentStatus(
+                "client@example.com", 10L, PaymentStatus.PAID, "Pago confirmado");
+        verify(deliveries).enablePaidOrder(order);
+        service.updatePaymentStatus(
+                "client@example.com", 10L, PaymentStatus.REFUNDED, "Reembolso confirmado");
+        verify(deliveries).revokeOrder(order);
     }
 }

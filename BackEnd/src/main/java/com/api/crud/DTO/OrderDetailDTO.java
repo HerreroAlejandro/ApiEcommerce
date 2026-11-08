@@ -22,7 +22,27 @@ public class OrderDetailDTO {
 
     @Getter
     @Setter
+    private BigDecimal itemsSubtotal;
+
+    @Getter
+    @Setter
+    private BigDecimal shippingCost;
+
+    @Getter
+    @Setter
+    private ShippingAddressDTO shippingAddress;
+
+    @Getter
+    @Setter
+    private ShipmentTrackingDTO shipmentTracking;
+
+    @Getter
+    @Setter
     private LocalDateTime purchaseDateOrder;
+
+    @Getter
+    @Setter
+    private LocalDateTime expiresAt;
 
     @Getter
     @Setter

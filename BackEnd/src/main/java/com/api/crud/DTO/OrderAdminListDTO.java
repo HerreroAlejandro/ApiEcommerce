@@ -25,6 +25,10 @@ public class OrderAdminListDTO {
 
     @Getter
     @Setter
+    private LocalDateTime expiresAt;
+
+    @Getter
+    @Setter
     private OrderStatus orderStatus;
 
     @Getter

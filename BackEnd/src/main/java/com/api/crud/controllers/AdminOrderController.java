@@ -26,6 +26,15 @@ public class AdminOrderController {
         this.orderService = orderService;
     }
 
+    @PatchMapping("/{orderId}/shipment")
+    public ResponseEntity<Void> updateShipment(
+            Authentication authentication,
+            @PathVariable @Positive Long orderId,
+            @Valid @RequestBody ShipmentTrackingUpdateRequestDTO request) {
+        orderService.updateShipment(authentication.getName(), orderId, request);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/getOrders")
     public ResponseEntity<Page<OrderAdminListDTO>> getOrders(
             @RequestParam(required = false) @Email @Size(max = 254) String email,

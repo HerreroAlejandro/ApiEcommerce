@@ -17,6 +17,11 @@ public class OrderItem {
     @Setter
     private String productName;
 
+    @Getter
+    @Setter
+    @Column(length = 200, updatable = false)
+    private String digitalDownloadLink;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Getter

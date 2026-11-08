@@ -13,6 +13,8 @@ import com.api.crud.repositories.PasswordResetTokenDao;
 import com.api.crud.repositories.RoleDao;
 import com.api.crud.repositories.UserDao;
 import com.api.crud.services.AccountStatusService;
+import com.api.crud.services.DigitalDeliveryService;
+import com.api.crud.services.DigitalFileGateway;
 import com.api.crud.services.EmailService;
 import com.api.crud.services.OrderItemService;
 import com.api.crud.services.OrderService;
@@ -44,6 +46,22 @@ class OrderSecurityTests {
     @EnableWebMvc
     @EnableSpringDataWebSupport
     static class Config {
+
+        @Bean
+        DigitalDeliveryService digitalDeliveryService() {
+            return mock(DigitalDeliveryService.class);
+        }
+
+        @Bean
+        DigitalDeliveryController digitalDeliveryController() {
+            return new DigitalDeliveryController(
+                    digitalDeliveryService(), mock(DigitalFileGateway.class));
+        }
+
+        @Bean
+        AdminDigitalDeliveryController adminDigitalDeliveryController() {
+            return new AdminDigitalDeliveryController(digitalDeliveryService());
+        }
 
         @Bean
         JWTUtil jwtUtil() {
@@ -149,6 +167,7 @@ class OrderSecurityTests {
         context.setServletContext(new MockServletContext());
         context.register(Config.class, SecurityConfig.class);
         context.refresh();
+        clearInvocations(context.getBean(OrderService.class));
         mvc =
                 MockMvcBuilders.webAppContextSetup(context)
                         .addFilters(context.getBean(FilterChainProxy.class))
@@ -246,6 +265,54 @@ class OrderSecurityTests {
                                 .param("increment", "2")
                                 .header("Authorization", "Bearer admin"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void digitalDeliveryRoutesRequireOwnershipFlowAndStaffForReopening() throws Exception {
+        mvc.perform(get("/digital-deliveries/20/download")).andExpect(status().isUnauthorized());
+        String reason = "{\"reason\":\"Conexion interrumpida\"}";
+        mvc.perform(
+                        post("/admin/digital-deliveries/20/reopen")
+                                .header("Authorization", "Bearer client")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(reason))
+                .andExpect(status().isForbidden());
+        mvc.perform(
+                        post("/admin/digital-deliveries/20/reopen")
+                                .header("Authorization", "Bearer support")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(reason))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/orders/10/digital-deliveries").header("Authorization", "Bearer client"))
+                .andExpect(status().isOk());
+        mvc.perform(
+                        get("/admin/digital-deliveries/order/10")
+                                .header("Authorization", "Bearer support"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shipmentManagementRequiresStaffAndValidatedTracking() throws Exception {
+        String body =
+                "{\"carrier\":\"Carrier\",\"trackingNumber\":\"TRACK123\",\"reason\":\"Despacho\"}";
+        mvc.perform(
+                        patch("/admin/orders/10/shipment")
+                                .header("Authorization", "Bearer client")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isForbidden());
+        mvc.perform(
+                        patch("/admin/orders/10/shipment")
+                                .header("Authorization", "Bearer support")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isNoContent());
+        mvc.perform(
+                        patch("/admin/orders/10/shipment")
+                                .header("Authorization", "Bearer support")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"reason\":\"Despacho\"}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

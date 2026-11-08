@@ -22,7 +22,7 @@ public class OrderChangeAudit {
     @Setter
     private Long orderId;
 
-    @Column(nullable = false, updatable = false)
+    @Column(updatable = false)
     @Getter
     @Setter
     private Long actorUserId;

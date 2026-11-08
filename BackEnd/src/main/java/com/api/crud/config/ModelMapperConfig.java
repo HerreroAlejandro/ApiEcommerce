@@ -44,8 +44,82 @@ public class ModelMapperConfig {
         configureCartItems(modelMapper);
         configureCarts(modelMapper);
         configureOrderItems(modelMapper);
+        configureShipping(modelMapper);
         configureOrders(modelMapper);
+        configureDigitalDeliveries(modelMapper);
         return modelMapper;
+    }
+
+    private void configureShipping(ModelMapper mapper) {
+        Converter<String, String> optionalUrl =
+                context ->
+                        context.getSource() == null || context.getSource().isBlank()
+                                ? null
+                                : context.getSource();
+        mapper.createTypeMap(
+                ShippingAddressDTO.class,
+                OrderShippingAddress.class,
+                mapper.getConfiguration().copy().setMatchingStrategy(MatchingStrategies.STRICT));
+        mapper.createTypeMap(
+                OrderShippingAddress.class,
+                ShippingAddressDTO.class,
+                mapper.getConfiguration().copy().setMatchingStrategy(MatchingStrategies.STRICT));
+        mapper.createTypeMap(
+                OrderShipmentTracking.class,
+                ShipmentTrackingDTO.class,
+                mapper.getConfiguration().copy().setMatchingStrategy(MatchingStrategies.STRICT));
+        mapper.createTypeMap(
+                        ShipmentTrackingUpdateRequestDTO.class,
+                        OrderShipmentTracking.class,
+                        mapper.getConfiguration()
+                                .copy()
+                                .setMatchingStrategy(MatchingStrategies.STRICT))
+                .addMappings(
+                        mapping -> {
+                            mapping.using(optionalUrl)
+                                    .map(
+                                            ShipmentTrackingUpdateRequestDTO::getTrackingUrl,
+                                            OrderShipmentTracking::setTrackingUrl);
+                            mapping.skip(OrderShipmentTracking::setShippedAt);
+                            mapping.skip(OrderShipmentTracking::setDeliveredAt);
+                        });
+    }
+
+    private void configureDigitalDeliveries(ModelMapper mapper) {
+        mapper.createTypeMap(
+                        DigitalDelivery.class,
+                        DigitalDeliveryResponseDTO.class,
+                        mapper.getConfiguration()
+                                .copy()
+                                .setMatchingStrategy(MatchingStrategies.STRICT))
+                .addMappings(
+                        mapping -> {
+                            mapping.map(
+                                    source -> source.getOrderItem().getIdOrderItem(),
+                                    DigitalDeliveryResponseDTO::setOrderItemId);
+                            mapping.map(
+                                    source -> source.getOrderItem().getProductName(),
+                                    DigitalDeliveryResponseDTO::setProductName);
+                        });
+        Converter<Long, String> path =
+                context -> "/digital-deliveries/" + context.getSource() + "/download";
+        mapper.createTypeMap(
+                        DigitalDelivery.class,
+                        DownloadTokenResponseDTO.class,
+                        mapper.getConfiguration()
+                                .copy()
+                                .setMatchingStrategy(MatchingStrategies.STRICT))
+                .addMappings(
+                        mapping -> {
+                            mapping.skip(DownloadTokenResponseDTO::setToken);
+                            mapping.map(
+                                    DigitalDelivery::getTokenExpiresAt,
+                                    DownloadTokenResponseDTO::setExpiresAt);
+                            mapping.using(path)
+                                    .map(
+                                            DigitalDelivery::getId,
+                                            DownloadTokenResponseDTO::setDownloadPath);
+                        });
     }
 
     private void configureCartItems(ModelMapper mapper) {

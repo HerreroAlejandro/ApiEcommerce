@@ -26,9 +26,16 @@ public class OrderController {
     }
 
     @PostMapping("/createOrder")
-    public ResponseEntity<OrderDetailDTO> createOrder(Authentication authentication) {
-        OrderDetailDTO dto = orderService.createMyOrder(authentication.getName());
+    public ResponseEntity<OrderDetailDTO> createOrder(
+            Authentication authentication,
+            @Valid @RequestBody(required = false) OrderCreateRequestDTO request) {
+        OrderDetailDTO dto = orderService.createMyOrder(authentication.getName(), request);
         return ResponseEntity.created(URI.create("/orders/" + dto.getIdOrder())).body(dto);
+    }
+
+    @GetMapping("/shipping-rate")
+    public ResponseEntity<ShippingRateDTO> getShippingRate() {
+        return ResponseEntity.ok(orderService.getShippingRate());
     }
 
     @GetMapping("/getMyOrders")

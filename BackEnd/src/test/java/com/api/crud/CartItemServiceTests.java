@@ -247,4 +247,28 @@ class CartItemServiceTests {
         verify(items).removeCartItem(1L);
         assertTrue(item.getCart().getItemsCart().isEmpty());
     }
+
+    @Test
+    void digitalQuantityIsOneForBothCustomerAndAdministrativeMutations() {
+        ProductDigital digital = new ProductDigital();
+        digital.setIdProduct(4L);
+        digital.setActive(true);
+        digital.setPriceProduct(BigDecimal.TEN);
+        item.setProductCartItem(digital);
+        item.setAmountCartItem(1);
+        when(products.getProductById(4L)).thenReturn(Optional.of(digital));
+        when(items.getByCartAndProductId(12L, 4L)).thenReturn(Optional.of(item));
+        assertThrows(
+                ApplicationException.class, () -> service.addMyItem("client@example.com", 4L, 1));
+        assertThrows(
+                ApplicationException.class,
+                () -> service.updateMyItemAmount("client@example.com", 1L, 2));
+        assertThrows(
+                ApplicationException.class,
+                () -> service.increaseMyItemAmount("client@example.com", 1L, 1));
+        assertThrows(
+                ApplicationException.class,
+                () -> service.updateAdminItemAmount("client@example.com", 1L, 2, "Revision"));
+        assertEquals(1, item.getAmountCartItem());
+    }
 }

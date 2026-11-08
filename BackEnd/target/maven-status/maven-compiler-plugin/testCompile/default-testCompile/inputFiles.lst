@@ -1,5 +1,6 @@
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\test\java\com\api\crud\AdminCartQueryTests.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\test\java\com\api\crud\PersistenceExceptionTests.java
+C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\test\java\com\api\crud\DigitalFileGatewayTests.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\test\java\com\api\crud\OrderItemServiceTests.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\test\java\com\api\crud\CrudApplicationTests.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\test\java\com\api\crud\CartItemServiceTests.java
@@ -8,11 +9,16 @@ C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\test\java\com\api\crud\
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\test\java\com\api\crud\CartServiceTests.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\test\java\com\api\crud\UserExceptionTests.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\test\java\com\api\crud\ProductDaoTests.java
+C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\test\java\com\api\crud\DigitalDownloadControllerTests.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\test\java\com\api\crud\ProductValidationRulesTests.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\test\java\com\api\crud\ExceptionHandlingTests.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\test\java\com\api\crud\OrderSecurityTests.java
+C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\test\java\com\api\crud\OrderExpirationTests.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\test\java\com\api\crud\AccountStatusServiceTests.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\test\java\com\api\crud\EndpointValidationTests.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\test\java\com\api\crud\AdminCartItemControllerTests.java
+C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\test\java\com\api\crud\DigitalDeliveryServiceTests.java
+C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\test\java\com\api\crud\OrderShippingTests.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\test\java\com\api\crud\InputValidationTests.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\test\java\com\api\crud\ModelMapperConfigTests.java
+C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\test\java\com\api\crud\ShippingControllerTests.java

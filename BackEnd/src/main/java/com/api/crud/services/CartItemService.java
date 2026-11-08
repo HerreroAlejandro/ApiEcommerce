@@ -7,6 +7,7 @@ import com.api.crud.models.entity.Cart;
 import com.api.crud.models.entity.CartChangeAudit;
 import com.api.crud.models.entity.CartItem;
 import com.api.crud.models.entity.Product;
+import com.api.crud.models.entity.ProductDigital;
 import com.api.crud.models.entity.ProductPhysical;
 import com.api.crud.models.entity.UserModel;
 import com.api.crud.repositories.CartChangeAuditDao;
@@ -243,6 +244,9 @@ public class CartItemService {
     }
 
     private void available(Product product, long amount) {
+        if (product instanceof ProductDigital && amount != 1) {
+            throw new BusinessConflictException("Solo se permite una unidad por producto digital");
+        }
         if (!product.isActive()) {
             throw new BusinessConflictException("Producto desactivado");
         }

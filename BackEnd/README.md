@@ -265,6 +265,140 @@ after verification. No database migration is executed by this change automatical
 
 ## Orders workflow
 
+Physical delivery uses one shipment per order. Set `ORDER_SHIPPING_FLAT_RATE` to
+the nonnegative fixed delivery amount (up to two decimal places, in the same
+monetary unit as product prices). There is no implicit free-shipping default:
+physical checkout and `GET /orders/shipping-rate` return 503 until the rate is
+configured. Set it explicitly to `0` for free shipping. Negative, malformed or
+out-of-range configured rates prevent startup.
+
+`POST /orders/createOrder` accepts this body for physical or mixed carts:
+
+```json
+{
+  "shippingAddress": {
+    "recipientName": "Nombre del destinatario",
+    "phone": "+54 11 1234-5678",
+    "street": "Calle de entrega",
+    "streetNumber": "123",
+    "apartment": "Piso 2",
+    "city": "Ciudad",
+    "region": "Provincia",
+    "postalCode": "1234",
+    "countryCode": "AR"
+  }
+}
+```
+
+Apartment is optional. Country must be a valid uppercase two-letter ISO code.
+The address is an order-owned snapshot with non-updatable persistence columns;
+profile changes never modify it. The server snapshots the current fixed shipping
+rate once per physical/mixed order, regardless of item count. Order details return
+`itemsSubtotal`, `shippingCost`, `totalOrder`, `shippingAddress` and
+`shipmentTracking`; list DTOs omit the address and tracking payload. The total
+includes shipping and keeps the existing monetary limit. Client-supplied prices
+or shipping costs are not checkout inputs. Digital-only checkout still accepts
+an empty body or `{}`, requires no delivery address, and has zero shipping cost.
+
+ADMIN/SUPPORT can call `PATCH /admin/orders/{orderId}/shipment` with:
+
+```json
+{
+  "carrier": "Transportista",
+  "trackingNumber": "TRACK123",
+  "trackingUrl": "https://example.com/track/TRACK123",
+  "reason": "Registro del despacho"
+}
+```
+
+Tracking URL is optional; null or an empty value clears it. Tracking updates
+require a physical/mixed PAID order in CONFIRMED or SHIPPED state and record
+each changed field with actor, previous/new values and reason. They never change
+the order address or price. Marking a physical order SHIPPED requires a complete
+address, carrier and tracking number; SHIPPED/DELIVERED transitions record their
+respective timestamps. Corrections while SHIPPED preserve the dispatch timestamp;
+DELIVERED tracking is read-only. Tracking is manual, without a carrier integration.
+
+Apply `src/main/resources/db/manual/2026-11-08-order-shipping.sql` to an existing
+database before startup, checking for columns Hibernate may already have added.
+It preserves previous totals as product subtotals and defaults historical shipping
+to zero. Review actual addresses/tracking for legacy physical orders still to be
+shipped; historical delivery data cannot be inferred from current profiles.
+
+Digital products allow one unit per product in a cart/order. Checkout snapshots
+the digital source in `OrderItem.digitalDownloadLink`; later catalog edits or
+deactivation do not replace the purchased source. Licenses are not delivered by
+this flow. Digital rights are created transactionally when payment becomes PAID,
+one record per order item. REFUNDED revokes rights and outstanding tokens under
+the same order lock. Existing administrative refund eligibility is unchanged.
+
+Digital delivery routes:
+
+- `GET /orders/{orderId}/digital-deliveries`: buyer-owned delivery history.
+- `POST /digital-deliveries/{id}/download-token`: creates a fifteen-minute permission.
+- `GET /digital-deliveries/{id}/download`: authenticated buyer sends the permission
+  in `X-Download-Token`, in addition to the JWT Authorization header.
+- `GET /admin/digital-deliveries/order/{orderId}`: ADMIN/SUPPORT inspection.
+- `POST /admin/digital-deliveries/{id}/reopen`: ADMIN/SUPPORT, JSON `reason`.
+
+The permission is stored only as SHA-256. Issuing another permission replaces the
+old one; expiration without use does not consume the download right. Claiming a
+valid permission atomically marks the delivery USED before transfer begins. All
+claims, reopenings and payment/refund operations lock the order before the
+delivery, so concurrent claims cannot both succeed. An interrupted transfer or
+upstream failure after claim still consumes that attempt. Support may reopen a
+USED, still-paid delivery with a reason; refunded rights cannot be reopened.
+Attempt count/time and reopening actions are retained in the audit. A refund
+cannot erase a file already received or stop an already claimed transfer.
+
+Files are proxied through the backend without exposing the source URL. Set
+`DIGITAL_DOWNLOAD_ALLOWED_HOSTS` to a comma-separated list of exact, trusted HTTPS
+hosts before enabling downloads (empty by default). Sources must be direct file
+URLs, not HTML pages or redirects; no provider-specific login or signing adapter
+is included. The upstream source must remain usable by the server. Use private
+storage or unguessable protected origins; never place sources in public DTOs.
+Only trusted hosts belong in the allowlist; arbitrary customer-controlled hosts
+must not be allowed. Local/private destinations, credentials in URLs, redirects
+and non-HTTPS sources are rejected. Token lifetime defaults to fifteen minutes via
+`DIGITAL_DOWNLOAD_TOKEN_MINUTES`; file limit defaults to 100 MiB via
+`DIGITAL_DOWNLOAD_MAX_BYTES`. Transfers have connect/read timeouts. HEAD and Range
+requests cannot consume a permission; retries/resume require staff reopening.
+
+Apply `src/main/resources/db/manual/2026-11-08-digital-deliveries.sql` before
+starting against an existing database, first checking whether Hibernate has
+already changed the schema. For legacy digital orders, review the actual
+purchased source and any prior delivery before initializing rights; the script
+documents the optional manual backfill. Current catalog URLs cannot reconstruct
+historical purchased content automatically.
+
+Unpaid orders reserve inventory for 30 minutes by default. Set
+`ORDER_RESERVATION_MINUTES` to a positive number of minutes to change this period.
+New orders store `expiresAt`, which is also returned by the order DTOs. Existing
+deadlines do not change when the configured period changes.
+
+The expiration scheduler checks every 60000 ms (configurable through
+`ORDER_EXPIRATION_CHECK_DELAY_MS`). It processes candidates in pages of 100 IDs,
+with a separate transaction and an order lock for each reservation. Orders still
+in PENDING with payment PENDING or FAILED become EXPIRED when their deadline is
+reached. Stock is restored once through `stockDeducted`; paid, canceled and
+confirmed orders are excluded. Failures roll back that order and are retried in
+the next cycle without preventing other candidates from being processed.
+
+Payment changes on an overdue unpaid reservation return 409 even if the scheduler
+has not processed it yet. The scheduler subsequently releases its inventory. A
+successful payment made before expiry prevents automatic expiration. EXPIRED is
+an automatic state; it cannot be assigned through the manual status endpoint.
+Expired orders and their items remain available in history.
+
+Automatic expiration writes an EXPIRE audit with a null `actorUserId` to identify
+a system action. Before starting this version against an existing MySQL database,
+apply `src/main/resources/db/manual/2026-11-08-order-expiration.sql`, checking the
+current schema first if Hibernate has already updated it. The script adds the
+deadline/index, extends the order status enum, allows null audit actors and
+backfills pending unpaid orders. Set its reservation period to match the app.
+Legacy pending orders without a stored deadline also use purchase date plus the
+configured reservation period, so they do not reserve inventory indefinitely.
+
 Users are deactivated rather than physically deleted. The former administrative
 DeleteUserById endpoint and deletion methods have been removed. User-to-order
 mapping does not cascade deletion; order history is retained. Cart clearing is

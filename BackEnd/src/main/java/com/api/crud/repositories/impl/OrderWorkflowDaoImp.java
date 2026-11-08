@@ -66,6 +66,25 @@ public class OrderWorkflowDaoImp implements OrderWorkflowDao {
     }
 
     @Override
+    public List<Long> getExpiredOrderIds(
+            LocalDateTime now, LocalDateTime legacyCutoff, long afterId, int limit) {
+        return entityManager
+                .createQuery(
+                        "SELECT o.idOrder FROM Order o WHERE o.idOrder > :afterId"
+                                + " AND o.orderStatus = :status AND o.paymentStatus IN :payments"
+                                + " AND (o.expiresAt <= :now OR (o.expiresAt IS NULL"
+                                + " AND o.purchaseDateOrder <= :legacyCutoff)) ORDER BY o.idOrder",
+                        Long.class)
+                .setParameter("afterId", afterId)
+                .setParameter("status", OrderStatus.PENDING)
+                .setParameter("payments", List.of(PaymentStatus.PENDING, PaymentStatus.FAILED))
+                .setParameter("now", now)
+                .setParameter("legacyCutoff", legacyCutoff)
+                .setMaxResults(limit)
+                .getResultList();
+    }
+
+    @Override
     public Page<Order> search(
             Long userId,
             String email,
