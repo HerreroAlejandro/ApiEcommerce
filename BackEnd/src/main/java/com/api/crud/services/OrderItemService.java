@@ -6,6 +6,7 @@ import com.api.crud.models.entity.Order;
 import com.api.crud.models.entity.OrderItem;
 import com.api.crud.repositories.*;
 
+import org.modelmapper.ModelMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,10 +24,14 @@ public class OrderItemService {
 
     private final UserDao users;
 
-    public OrderItemService(OrderItemDao items, OrderDao orders, UserDao users) {
+    private final ModelMapper modelMapper;
+
+    public OrderItemService(
+            OrderItemDao items, OrderDao orders, UserDao users, ModelMapper modelMapper) {
         this.items = items;
         this.orders = orders;
         this.users = users;
+        this.modelMapper = modelMapper;
     }
 
     private long userId(String email) {
@@ -48,14 +53,7 @@ public class OrderItemService {
     }
 
     private OrderItemResponseDTO response(OrderItem item) {
-        OrderItemResponseDTO dto = new OrderItemResponseDTO();
-        dto.setIdOrderItem(item.getIdOrderItem());
-        dto.setProductId(item.getProductOrderItem().getIdProduct());
-        dto.setProductName(item.getProductName());
-        dto.setAmountOrderItem(item.getAmountOrderItem());
-        dto.setPriceOrderItem(item.getPriceOrderItem());
-        dto.setSubtotal(item.getSubtotal());
-        return dto;
+        return modelMapper.map(item, OrderItemResponseDTO.class);
     }
 
     public OrderItemResponseDTO getMyItem(String email, Long id) {
@@ -73,20 +71,7 @@ public class OrderItemService {
     }
 
     public OrderItemAdminDetailDTO getAdminItem(Long id) {
-        OrderItem item = item(id);
-        OrderItemResponseDTO row = response(item);
-        OrderItemAdminDetailDTO dto = new OrderItemAdminDetailDTO();
-        dto.setIdOrderItem(row.getIdOrderItem());
-        dto.setProductId(row.getProductId());
-        dto.setProductName(row.getProductName());
-        dto.setAmountOrderItem(row.getAmountOrderItem());
-        dto.setPriceOrderItem(row.getPriceOrderItem());
-        dto.setSubtotal(row.getSubtotal());
-        dto.setOrderId(item.getOrder().getIdOrder());
-        dto.setUserId(item.getOrder().getUserOrder().getId());
-        dto.setOrderStatus(item.getOrder().getOrderStatus());
-        dto.setPaymentStatus(item.getOrder().getPaymentStatus());
-        return dto;
+        return modelMapper.map(item(id), OrderItemAdminDetailDTO.class);
     }
 
     public List<OrderItemResponseDTO> getAdminItems(Long orderId) {

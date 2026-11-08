@@ -3,6 +3,7 @@ package com.api.crud;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import com.api.crud.config.ModelMapperConfig;
 import com.api.crud.models.entity.*;
 import com.api.crud.models.entity.Order;
 import com.api.crud.models.enums.*;
@@ -36,7 +37,7 @@ class OrderItemServiceTests {
         UserModel user = new UserModel();
         user.setId(7L);
         when(users.getUserByEmail("client@example.com")).thenReturn(Optional.of(user));
-        service = new OrderItemService(items, orders, users);
+        service = new OrderItemService(items, orders, users, new ModelMapperConfig().modelMapper());
         order = new Order();
         order.setIdOrder(10L);
         order.setUserOrder(user);

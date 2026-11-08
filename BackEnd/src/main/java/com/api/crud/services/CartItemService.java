@@ -349,25 +349,7 @@ public class CartItemService {
     public Optional<CartItemAdminDetailDTO> getCartItemById(Long cartItemId) {
         return cartItemDao
                 .getCartItemById(cartItemId)
-                .map(
-                        item -> {
-                            Product product = item.getProductCartItem();
-                            CartItemAdminDetailDTO dto = new CartItemAdminDetailDTO();
-                            dto.setIdCartItem(item.getIdCartItem());
-                            dto.setCartId(item.getCart().getIdCart());
-                            dto.setProductId(product.getIdProduct());
-                            dto.setNameProduct(product.getNameProduct());
-                            dto.setAmountCartItem(item.getAmountCartItem());
-                            dto.setPriceProduct(product.getPriceProduct());
-                            dto.setSubtotal(item.getSubtotal());
-                            dto.setImageUrl(product.getImageUrl());
-                            dto.setType(product.getType());
-                            dto.setActive(product.isActive());
-                            if (product instanceof ProductPhysical physical) {
-                                dto.setStockProduct(physical.getStockProduct());
-                            }
-                            return dto;
-                        });
+                .map(item -> modelMapper.map(item, CartItemAdminDetailDTO.class));
     }
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
@@ -378,17 +360,7 @@ public class CartItemService {
                                 new ResponseStatusException(
                                         HttpStatus.NOT_FOUND, "Carrito no encontrado"));
         return cartItemDao.getItemsByCartId(cartId).stream()
-                .map(
-                        item -> {
-                            CartItemAdminListDTO dto = new CartItemAdminListDTO();
-                            dto.setIdCartItem(item.getIdCartItem());
-                            dto.setProductId(item.getProductCartItem().getIdProduct());
-                            dto.setNameProduct(item.getProductCartItem().getNameProduct());
-                            dto.setAmountCartItem(item.getAmountCartItem());
-                            dto.setPriceProduct(item.getProductCartItem().getPriceProduct());
-                            dto.setSubtotal(item.getSubtotal());
-                            return dto;
-                        })
+                .map(item -> modelMapper.map(item, CartItemAdminListDTO.class))
                 .toList();
     }
 }

@@ -5,6 +5,7 @@ import static org.mockito.Mockito.*;
 
 import com.api.crud.DTO.CartAdminFilterDTO;
 import com.api.crud.DTO.CartAdminListDTO;
+import com.api.crud.config.ModelMapperConfig;
 import com.api.crud.models.entity.*;
 import com.api.crud.repositories.*;
 import com.api.crud.services.CartService;
@@ -33,6 +34,7 @@ class CartServiceTests {
     @BeforeEach
     void setUp() {
         service = new CartService();
+        ReflectionTestUtils.setField(service, "modelMapper", new ModelMapperConfig().modelMapper());
         carts = mock(CartDao.class);
         items = mock(CartItemDao.class);
         users = mock(UserDao.class);

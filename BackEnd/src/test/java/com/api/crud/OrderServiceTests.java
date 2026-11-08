@@ -3,6 +3,7 @@ package com.api.crud;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import com.api.crud.config.ModelMapperConfig;
 import com.api.crud.models.entity.*;
 import com.api.crud.models.enums.*;
 import com.api.crud.repositories.*;
@@ -10,7 +11,6 @@ import com.api.crud.services.OrderService;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -40,7 +40,7 @@ class OrderServiceTests {
         orders = mock(OrderDao.class);
         users = mock(UserDao.class);
         workflow = mock(OrderWorkflowDao.class);
-        service = new OrderService(orders, users, workflow, new ModelMapper());
+        service = new OrderService(orders, users, workflow, new ModelMapperConfig().modelMapper());
         user = new UserModel();
         user.setId(7L);
         user.setEmail("client@example.com");

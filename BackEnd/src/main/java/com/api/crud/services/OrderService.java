@@ -81,13 +81,7 @@ public class OrderService {
             LocalDateTime end,
             Pageable pageable) {
         return workflow.search(null, email, status, payment, start, end, pageable)
-                .map(
-                        order -> {
-                            OrderAdminListDTO dto = mapper.map(order, OrderAdminListDTO.class);
-                            dto.setUserId(order.getUserOrder().getId());
-                            dto.setUserEmail(order.getUserOrder().getEmail());
-                            return dto;
-                        });
+                .map(order -> mapper.map(order, OrderAdminListDTO.class));
     }
 
     public OrderAdminDetailDTO getAdminOrder(Long id) {
@@ -97,33 +91,11 @@ public class OrderService {
                                 () ->
                                         new ResponseStatusException(
                                                 HttpStatus.NOT_FOUND, "Orden no encontrada"));
-        OrderAdminDetailDTO dto = mapper.map(order, OrderAdminDetailDTO.class);
-        dto.setUserId(order.getUserOrder().getId());
-        dto.setUserEmail(order.getUserOrder().getEmail());
-        dto.setItemsOrder(items(order));
-        return dto;
-    }
-
-    private List<OrderItemResponseDTO> items(Order order) {
-        return order.getItemsOrder().stream()
-                .map(
-                        item -> {
-                            OrderItemResponseDTO dto = new OrderItemResponseDTO();
-                            dto.setIdOrderItem(item.getIdOrderItem());
-                            dto.setProductId(item.getProductOrderItem().getIdProduct());
-                            dto.setProductName(item.getProductName());
-                            dto.setPriceOrderItem(item.getPriceOrderItem());
-                            dto.setAmountOrderItem(item.getAmountOrderItem());
-                            dto.setSubtotal(item.getSubtotal());
-                            return dto;
-                        })
-                .toList();
+        return mapper.map(order, OrderAdminDetailDTO.class);
     }
 
     private OrderDetailDTO detail(Order order) {
-        OrderDetailDTO dto = mapper.map(order, OrderDetailDTO.class);
-        dto.setItemsOrder(items(order));
-        return dto;
+        return mapper.map(order, OrderDetailDTO.class);
     }
 
     private void audit(

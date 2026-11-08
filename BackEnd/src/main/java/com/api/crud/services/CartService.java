@@ -3,8 +3,6 @@ package com.api.crud.services;
 import com.api.crud.DTO.CartAdminDetailDTO;
 import com.api.crud.DTO.CartAdminFilterDTO;
 import com.api.crud.DTO.CartAdminListDTO;
-import com.api.crud.DTO.CartItemAdminListDTO;
-import com.api.crud.DTO.MyCartItemResponseDTO;
 import com.api.crud.DTO.MyCartResponseDTO;
 import com.api.crud.models.entity.Cart;
 import com.api.crud.models.entity.CartItem;
@@ -65,40 +63,7 @@ public class CartService {
 
     @Transactional(readOnly = true)
     public MyCartResponseDTO getMyActiveCart(String email) {
-        return getMyCart(email)
-                .map(
-                        cart -> {
-                            List<MyCartItemResponseDTO> items =
-                                    cart.getItemsCart().stream()
-                                            .map(this::toMyCartItemResponse)
-                                            .toList();
-                            MyCartResponseDTO response = new MyCartResponseDTO();
-                            response.setItemsCart(items);
-                            response.setTotal(
-                                    items.stream()
-                                            .map(MyCartItemResponseDTO::getSubtotal)
-                                            .reduce(BigDecimal.ZERO, BigDecimal::add));
-                            return response;
-                        })
-                .orElseGet(
-                        () -> {
-                            MyCartResponseDTO response = new MyCartResponseDTO();
-                            response.setItemsCart(List.of());
-                            response.setTotal(BigDecimal.ZERO);
-                            return response;
-                        });
-    }
-
-    private MyCartItemResponseDTO toMyCartItemResponse(CartItem item) {
-        MyCartItemResponseDTO response = new MyCartItemResponseDTO();
-        response.setIdCartItem(item.getIdCartItem());
-        response.setProductId(item.getProductCartItem().getIdProduct());
-        response.setNameProduct(item.getProductCartItem().getNameProduct());
-        response.setImageUrl(item.getProductCartItem().getImageUrl());
-        response.setPriceProduct(item.getProductCartItem().getPriceProduct());
-        response.setAmountCartItem(item.getAmountCartItem());
-        response.setSubtotal(item.getSubtotal());
-        return response;
+        return modelMapper.map(getMyCart(email).orElseGet(Cart::new), MyCartResponseDTO.class);
     }
 
     @Transactional(readOnly = true)
@@ -130,60 +95,21 @@ public class CartService {
         return cartDao.getCarts(filter, pageable);
     }
 
-    private CartAdminListDTO toAdminList(Cart cart) {
-        CartAdminListDTO dto = new CartAdminListDTO();
-        dto.setIdCart(cart.getIdCart());
-        dto.setUserId(cart.getUserCart().getId());
-        dto.setActive(cart.isActive());
-        dto.setCreationDate(cart.getCreationDate());
-        dto.setItemCount(cart.getItemsCart().size());
-        dto.setTotal(
-                cart.getItemsCart().stream()
-                        .map(CartItem::getSubtotal)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add));
-        return dto;
-    }
-
-    private CartAdminDetailDTO toAdminDetail(Cart cart) {
-        CartAdminListDTO summary = toAdminList(cart);
-        CartAdminDetailDTO dto = new CartAdminDetailDTO();
-        dto.setIdCart(summary.getIdCart());
-        dto.setUserId(summary.getUserId());
-        dto.setActive(summary.isActive());
-        dto.setCreationDate(summary.getCreationDate());
-        dto.setItemCount(summary.getItemCount());
-        dto.setTotal(summary.getTotal());
-        dto.setItemsCart(
-                cart.getItemsCart().stream()
-                        .map(
-                                item -> {
-                                    CartItemAdminListDTO row = new CartItemAdminListDTO();
-                                    row.setIdCartItem(item.getIdCartItem());
-                                    row.setProductId(item.getProductCartItem().getIdProduct());
-                                    row.setNameProduct(item.getProductCartItem().getNameProduct());
-                                    row.setAmountCartItem(item.getAmountCartItem());
-                                    row.setPriceProduct(
-                                            item.getProductCartItem().getPriceProduct());
-                                    row.setSubtotal(item.getSubtotal());
-                                    return row;
-                                })
-                        .toList());
-        return dto;
-    }
-
     @Transactional(readOnly = true)
     public Optional<CartAdminDetailDTO> getCartByUserEmail(String email) {
-        return cartDao.getCartByUserEmail(email).map(this::toAdminDetail);
+        return cartDao.getCartByUserEmail(email)
+                .map(cart -> modelMapper.map(cart, CartAdminDetailDTO.class));
     }
 
     @Transactional(readOnly = true)
     public Optional<CartAdminDetailDTO> getCartById(Long id) {
-        return cartDao.getCartById(id).map(this::toAdminDetail);
+        return cartDao.getCartById(id).map(cart -> modelMapper.map(cart, CartAdminDetailDTO.class));
     }
 
     @Transactional(readOnly = true)
     public Optional<CartAdminDetailDTO> getCartByUserId(Long id) {
-        return cartDao.getCartByUserId(id).map(this::toAdminDetail);
+        return cartDao.getCartByUserId(id)
+                .map(cart -> modelMapper.map(cart, CartAdminDetailDTO.class));
     }
 
     @Transactional(readOnly = true)
@@ -191,7 +117,9 @@ public class CartService {
         if (start.isAfter(end)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rango de fechas invalido");
         }
-        return cartDao.getCartsByDateRange(start, end).stream().map(this::toAdminList).toList();
+        return cartDao.getCartsByDateRange(start, end).stream()
+                .map(cart -> modelMapper.map(cart, CartAdminListDTO.class))
+                .toList();
     }
 
     public BigDecimal getCartTotal(Long cartId) {

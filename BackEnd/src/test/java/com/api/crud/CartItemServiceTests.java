@@ -3,6 +3,7 @@ package com.api.crud;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import com.api.crud.config.ModelMapperConfig;
 import com.api.crud.models.entity.*;
 import com.api.crud.repositories.*;
 import com.api.crud.services.CartItemService;
@@ -36,6 +37,7 @@ class CartItemServiceTests {
     @BeforeEach
     void setUp() {
         service = new CartItemService();
+        ReflectionTestUtils.setField(service, "modelMapper", new ModelMapperConfig().modelMapper());
         items = mock(CartItemDao.class);
         carts = mock(CartDao.class);
         users = mock(UserDao.class);

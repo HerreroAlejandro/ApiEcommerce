@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.api.crud.config.*;
+import com.api.crud.config.ModelMapperConfig;
 import com.api.crud.controllers.*;
 import com.api.crud.models.entity.UserModel;
 import com.api.crud.models.enums.AccountStatus;
@@ -118,7 +119,7 @@ class OrderSecurityTests {
 
         @Bean
         ModelMapper modelMapper() {
-            return new ModelMapper();
+            return new ModelMapperConfig().modelMapper();
         }
 
         @Bean
