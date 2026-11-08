@@ -29,7 +29,7 @@ class AdminCartItemControllerTests {
 
     @Test
     void rejectsMissingReasonAndInvalidQuantityBeforeCallingService() throws Exception {
-        mvc.perform(post("/admin/cart-items").principal(actor)
+        mvc.perform(post("/admin/cart-items/addItem").principal(actor)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"userId\":7,\"productId\":4,\"amount\":0,\"reason\":\" \"}"))
                 .andExpect(status().isBadRequest());

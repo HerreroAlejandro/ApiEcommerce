@@ -1,5 +1,10 @@
 package com.api.crud.controllers;
 
+import org.springframework.web.server.ResponseStatusException;
+
+import jakarta.validation.constraints.*;
+import jakarta.validation.Valid;
+
 import com.api.crud.DTO.RoleDTO;
 import com.api.crud.services.RoleService;
 import org.slf4j.Logger;
@@ -36,7 +41,7 @@ public class RoleController {
     }
 
     @GetMapping(path = "/getRoleById/{id}")
-    public ResponseEntity<RoleDTO> getRoleById(@PathVariable Long id) {
+    public ResponseEntity<RoleDTO> getRoleById(@PathVariable @Positive Long id) {
         logger.info("Starting to find role with id {}", id);
         Optional<RoleDTO> roleDTO = roleService.getRoleById(id);
         ResponseEntity<RoleDTO> response;
@@ -52,7 +57,7 @@ public class RoleController {
     }
 
     @GetMapping(path = "/getRoleByName/{roleName}")
-    public ResponseEntity<RoleDTO> getRoleByName(@PathVariable String roleName) {
+    public ResponseEntity<RoleDTO> getRoleByName(@PathVariable @NotBlank @Size(min = 2, max = 20) String roleName) {
         logger.info("Starting to find role with name {}", roleName);
         Optional<RoleDTO> roleDTO = roleService.getRoleByName(roleName);
         ResponseEntity<RoleDTO> response;
@@ -68,7 +73,7 @@ public class RoleController {
     }
 
     @PostMapping(path = "/SaveRole")
-    public ResponseEntity<String> saveRole(@RequestBody RoleDTO roleDto) {
+    public ResponseEntity<String> saveRole(@Valid @RequestBody RoleDTO roleDto) {
         logger.info("Starting to save role: {}", roleDto.getNameRole());
         ResponseEntity<String> response;
         try {
@@ -83,6 +88,10 @@ public class RoleController {
         } catch (DataIntegrityViolationException e) {
             logger.error("DataIntegrityViolationException occurred while saving role '{}': {}", roleDto.getNameRole(), e.getMessage());
             response = ResponseEntity.status(HttpStatus.CONFLICT).body("Duplicate role name detected");
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
             logger.error("Unexpected error occurred while saving role '{}': {}", roleDto.getNameRole(), e.getMessage());
             response = ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -92,7 +101,7 @@ public class RoleController {
     }
 
     @DeleteMapping(path = "/deleteRoleById/{id}")
-    public ResponseEntity<String> deleteRoleById(@PathVariable Long id) {
+    public ResponseEntity<String> deleteRoleById(@PathVariable @Positive Long id) {
         logger.info("Starting to delete role with id {}", id);
         boolean result = roleService.deleteRoleById(id);
         ResponseEntity<String> response;

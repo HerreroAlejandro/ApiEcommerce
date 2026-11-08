@@ -1,4 +1,6 @@
 package com.api.crud.controllers;
+
+import jakarta.validation.constraints.*;
 import com.api.crud.DTO.*;
 import com.api.crud.models.enums.*;
 import com.api.crud.services.OrderService;
@@ -19,7 +21,7 @@ public class AdminOrderController {
 
     @GetMapping("/getOrders")
     public ResponseEntity<Page<OrderAdminListDTO>> getOrders(
-            @RequestParam(required = false) String email,
+            @RequestParam(required = false) @Email @Size(max = 254) String email,
             @RequestParam(required = false) OrderStatus status,
             @RequestParam(required = false) PaymentStatus paymentStatus,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
@@ -29,27 +31,27 @@ public class AdminOrderController {
     }
 
     @GetMapping("/{orderId}")
-    public ResponseEntity<OrderAdminDetailDTO> getOrderById(@PathVariable Long orderId) {
+    public ResponseEntity<OrderAdminDetailDTO> getOrderById(@PathVariable @Positive Long orderId) {
         return ResponseEntity.ok(orderService.getAdminOrder(orderId));
     }
 
     @PatchMapping("/{orderId}/status")
-    public ResponseEntity<Void> updateOrderStatus(Authentication authentication, @PathVariable Long orderId,
+    public ResponseEntity<Void> updateOrderStatus(Authentication authentication, @PathVariable @Positive Long orderId,
             @Valid @RequestBody OrderStatusUpdateRequestDTO dto) {
         orderService.updateOrderStatus(authentication.getName(), orderId, dto.getStatus(), dto.getReason());
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{orderId}/payment-status")
-    public ResponseEntity<Void> updatePaymentStatus(Authentication authentication, @PathVariable Long orderId,
+    public ResponseEntity<Void> updatePaymentStatus(Authentication authentication, @PathVariable @Positive Long orderId,
             @Valid @RequestBody PaymentStatusUpdateRequestDTO dto) {
         orderService.updatePaymentStatus(authentication.getName(), orderId, dto.getStatus(), dto.getReason());
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{orderId}/cancel")
-    public ResponseEntity<Void> cancelOrder(Authentication authentication, @PathVariable Long orderId,
-            @Valid @RequestBody OrderCancelRequestDTO dto) {
+    public ResponseEntity<Void> cancelOrder(Authentication authentication, @PathVariable @Positive Long orderId,
+            @Valid @RequestBody ChangeReasonRequestDTO dto) {
         orderService.cancelAdminOrder(authentication.getName(), orderId, dto.getReason());
         return ResponseEntity.noContent().build();
     }

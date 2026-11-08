@@ -1,5 +1,8 @@
 package com.api.crud.controllers;
 
+import jakarta.validation.constraints.*;
+import jakarta.validation.Valid;
+
 import com.api.crud.DTO.*;
 import com.api.crud.models.enums.ProductType;
 import com.api.crud.services.ProductService;
@@ -26,11 +29,11 @@ public class ProductController {
 
     @GetMapping(path = "/ShowProducts")
     public ResponseEntity<Page<ProductCatalogDTO>> showProducts(
-            @RequestParam(required = false) String name,
-            @RequestParam(required = false) String category,
+            @RequestParam(required = false) @Size(max = 30) String name,
+            @RequestParam(required = false) @Size(max = 50) String category,
             @RequestParam(required = false) ProductType type,
-            @RequestParam(required = false) BigDecimal minPrice,
-            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) @DecimalMin("0.0") @Digits(integer = 8, fraction = 2) BigDecimal minPrice,
+            @RequestParam(required = false) @DecimalMin("0.0") @Digits(integer = 8, fraction = 2) BigDecimal maxPrice,
             @RequestParam(required = false) Boolean inStock,
             Pageable pageable) {
 
@@ -49,7 +52,7 @@ public class ProductController {
     }
 
     @GetMapping(path = "/GetProductById/{id}")
-    public ResponseEntity<ProductDetailDTO> getProductDetailById(@PathVariable Long id) {
+    public ResponseEntity<ProductDetailDTO> getProductDetailById(@PathVariable @Positive Long id) {
         logger.info("received request to find product with id {}", id);
 
         ResponseEntity<ProductDetailDTO> response;

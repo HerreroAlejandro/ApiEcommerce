@@ -1,5 +1,6 @@
 package com.api.crud.DTO;
 
+import com.api.crud.models.enums.AccountStatus;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -23,18 +24,18 @@ public class UserDetailAdminResponseDTO {
     private String phone;
 
     @Getter @Setter
-    private boolean active;
+    private AccountStatus status;
 
     @Getter @Setter
     private List<String> roles;
 
-    public UserDetailAdminResponseDTO(long id, String firstName, String lastName, String email, String phone, boolean active, List<String> roles) {
+    public UserDetailAdminResponseDTO(long id, String firstName, String lastName, String email, String phone, AccountStatus status, List<String> roles) {
         this.id = id;
         this.firstName = firstName;
         this.lastName = lastName;
         this.email = email;
         this.phone = phone;
-        this.active = active;
+        this.status = status;
         this.roles = roles;
     }
 

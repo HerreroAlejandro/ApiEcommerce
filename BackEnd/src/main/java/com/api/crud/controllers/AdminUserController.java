@@ -1,5 +1,14 @@
 package com.api.crud.controllers;
 
+import jakarta.validation.constraints.*;
+
+import com.api.crud.services.AccountStatusService;
+import com.api.crud.DTO.ChangeReasonRequestDTO;
+import com.api.crud.DTO.AccountStatusAuditResponseDTO;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.security.core.Authentication;
+import jakarta.validation.Valid;
+
 import com.api.crud.DTO.PasswordResetDTO;
 import com.api.crud.DTO.UserDetailAdminResponseDTO;
 import com.api.crud.DTO.UserListAdminResponseDTO;
@@ -49,10 +58,10 @@ public class AdminUserController {
 
     @GetMapping(path = "/ShowAll")
     public ResponseEntity<Page<UserListAdminResponseDTO>> getUserAdmin(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "id,asc") String sort,
-            @RequestParam(required = false) String role) {
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size,
+            @RequestParam(defaultValue = "id,asc") @Pattern(regexp = "[A-Za-z][A-Za-z0-9]*(,(?i:asc|desc))?", message = "Ordenamiento invalido") String sort,
+            @RequestParam(required = false) @Size(max = 20) String role) {
 
         logger.info(
                 "Starting to fetch users - page: {}, size: {}, sort: {}, role: {}",
@@ -79,7 +88,7 @@ public class AdminUserController {
     }
 
     @GetMapping(path = "/getUserById/{id}")
-    public ResponseEntity<UserDetailAdminResponseDTO> getUserById(@PathVariable Long id) {
+    public ResponseEntity<UserDetailAdminResponseDTO> getUserById(@PathVariable @Positive Long id) {
         logger.info("Starting to fetch user with id: {}", id);
         Optional<UserDetailAdminResponseDTO> user = userService.getUserById(id);
         ResponseEntity<UserDetailAdminResponseDTO> response;
@@ -95,7 +104,7 @@ public class AdminUserController {
     }
 
     @GetMapping(path = "/getUserByName")
-    public ResponseEntity<List<UserListAdminResponseDTO>> getUserByName(@RequestParam String firstName, @RequestParam String lastName) {
+    public ResponseEntity<List<UserListAdminResponseDTO>> getUserByName(@RequestParam @NotBlank @Size(min = 2, max = 25) String firstName, @RequestParam @NotBlank @Size(min = 2, max = 25) String lastName) {
         logger.info("Received request to fetch users with name: {} {}", firstName, lastName);
 
         List<UserListAdminResponseDTO> users = userService.getUserByName(firstName, lastName);
@@ -112,7 +121,7 @@ public class AdminUserController {
     }
 
     @GetMapping(path = "/getUserByEmail/{email}")
-    public ResponseEntity<UserDetailAdminResponseDTO> getUserByEmail(@PathVariable String email) {
+    public ResponseEntity<UserDetailAdminResponseDTO> getUserByEmail(@PathVariable @NotBlank @Email @Size(max = 254) String email) {
         logger.info("Starting to fetch user with email: {}", email);
 
         Optional<UserDetailAdminResponseDTO> user = userService.getUserByEmail(email);
@@ -130,7 +139,7 @@ public class AdminUserController {
     }
 
     @PatchMapping("/{id}/password")
-    public ResponseEntity<String> resetPasswordByAdmin(@PathVariable Long id, @RequestBody PasswordResetDTO dto) {
+    public ResponseEntity<String> resetPasswordByAdmin(@PathVariable @Positive Long id, @Valid @RequestBody PasswordResetDTO dto) {
         logger.info("Received request to reset password for user with ID: {}", id);
 
         try {
@@ -146,53 +155,33 @@ public class AdminUserController {
         }
     }
 
-    @PatchMapping("/users/{id}/deactivate")
-    public ResponseEntity<String> deactivateUserByAdmin(@PathVariable Long id) {
-        logger.info("Received request to deactivate user with ID: {}", id);
+    @Autowired
+    private AccountStatusService accountStatusService;
 
-        try {
-            userService.deactivateUserByAdmin(id);
-            logger.info("User with ID {} was deactivated successfully.", id);
+    @PatchMapping("/users/{id}/block")
+    public ResponseEntity<Void> blockUser(Authentication authentication,
+            @PathVariable @Positive Long id, @Valid @RequestBody ChangeReasonRequestDTO dto) {
+        accountStatusService.block(authentication.getName(), id, dto.getReason());
+        return ResponseEntity.noContent().build();
+    }
 
-            return ResponseEntity.ok("User with ID " + id + " was deactivated successfully");
-
-        } catch (RuntimeException ex) {
-            logger.error("Error deactivating user with ID {}: {}", id, ex.getMessage());
-
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
-        }
+    @PatchMapping("/users/{id}/unblock")
+    public ResponseEntity<Void> unblockUser(Authentication authentication,
+            @PathVariable @Positive Long id, @Valid @RequestBody ChangeReasonRequestDTO dto) {
+        accountStatusService.unblock(authentication.getName(), id, dto.getReason());
+        return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/users/{id}/activate")
-    public ResponseEntity<String> activateUserByAdmin(@PathVariable Long id) {
-        logger.info("Received request to activate user with ID: {}", id);
-
-        try {
-            userService.activateUserByAdmin(id);
-            logger.info("User with ID {} was activated successfully.", id);
-
-            return ResponseEntity.ok("User with ID " + id + " was activated successfully");
-
-        } catch (RuntimeException ex) {
-            logger.error("Error activating user with ID {}: {}", id, ex.getMessage());
-
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
-        }
+    public ResponseEntity<Void> activateUserByAdmin(Authentication authentication,
+            @PathVariable @Positive Long id, @Valid @RequestBody ChangeReasonRequestDTO dto) {
+        accountStatusService.activate(authentication.getName(), id, dto.getReason());
+        return ResponseEntity.noContent().build();
     }
 
-    @DeleteMapping(path = "/DeleteUserById/{id}")
-    public ResponseEntity<Void> deleteUser(@PathVariable("id") Long id) {
-        logger.info("Received request to delete user with ID: {}", id);
-        ResponseEntity<Void> response;
-        boolean deleted = userService.deleteUserById(id);
-        if (deleted) {
-            logger.info("User with ID: {} deleted successfully.", id);
-            response = ResponseEntity.status(HttpStatus.NO_CONTENT).build();
-        } else {
-            logger.info("User with ID: {} not found for deletion.", id);
-            response = ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
-        return response;
+    @GetMapping("/users/{id}/status-history")
+    public ResponseEntity<Page<AccountStatusAuditResponseDTO>> getStatusHistory(@PathVariable @Positive Long id,
+            @PageableDefault(size = 10) Pageable pageable) {
+        return ResponseEntity.ok(accountStatusService.getHistory(id, pageable));
     }
-
 }

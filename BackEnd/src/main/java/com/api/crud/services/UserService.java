@@ -1,12 +1,12 @@
 package com.api.crud.services;
 
 import com.api.crud.DTO.*;
+import com.api.crud.validation.InputRules;
 import com.api.crud.config.JWTUtil;
-import com.api.crud.models.entity.AccountRecoveryToken;
+import com.api.crud.models.enums.AccountStatus;
 import com.api.crud.models.entity.PasswordResetToken;
 import com.api.crud.models.entity.Role;
 import com.api.crud.models.entity.UserModel;
-import com.api.crud.repositories.AccountRecoveryTokenDao;
 import com.api.crud.repositories.PasswordResetTokenDao;
 import com.api.crud.repositories.RoleDao;
 import com.api.crud.repositories.UserDao;
@@ -36,9 +36,6 @@ public class UserService {
     private RoleDao roleDao;
 
     @Autowired
-    private RoleService roleService;
-
-    @Autowired
     private JWTUtil jwtUtil;
 
     @Autowired
@@ -46,9 +43,6 @@ public class UserService {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private AccountRecoveryTokenDao accountRecoveryTokenDao;
 
     @Autowired
     private EmailService emailService;
@@ -70,9 +64,9 @@ public class UserService {
 
         UserModel user = userModel.get();
 
-        if (!user.isActive()) {
+        if (user.getStatus() != AccountStatus.ACTIVE) {
             logger.debug("Login failed: User {} is deactivated", loginRequestDTO.getEmail());
-            throw new IllegalArgumentException("User account is deactivated");
+            throw new IllegalArgumentException("User account is not active");
         }
 
         if (!passwordEncoder.matches(loginRequestDTO.getPassword(), user.getPassword())) {
@@ -82,7 +76,7 @@ public class UserService {
 
         List<String> roles = getRolesForEmail(user.getEmail());
         logger.info("User {} logged in successfully with roles {}", loginRequestDTO.getEmail(), roles);
-        return jwtUtil.generateToken(user.getEmail(), roles);
+        return jwtUtil.generateToken(user.getEmail(), roles, user.getAuthVersion());
     }
 
     private List<String> getRolesForEmail(String email) {
@@ -118,7 +112,7 @@ public class UserService {
                     return new IllegalArgumentException("El rol CLIENT no existe en la base de datos");
                 });
         userModel.getRoles().add(role);
-        userModel.setActive(true);
+        userModel.setStatus(AccountStatus.ACTIVE);
 
         if (userModel.getOrders() == null) {
             userModel.setOrders(new ArrayList<>());
@@ -181,39 +175,13 @@ public class UserService {
         return modelMapper.map(updatedUser, UserResponseDTO.class);
     }
 
+    @Autowired
+    private AccountStatusService accountStatusService;
+
     public void deactivateMyAccount() {
-
-        Authentication authentication =
-                SecurityContextHolder.getContext().getAuthentication();
-
-        String email = authentication.getName();
-
-        UserModel user = userDao.getUserByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-
-        user.setActive(false);
-
-        userDao.update(user);
+        accountStatusService.deactivateMyAccount(SecurityContextHolder.getContext().getAuthentication().getName());
     }
-
-    public void deactivateUserByAdmin(Long id) {
-
-        UserModel user = userDao.getUserById(id)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-
-        user.setActive(false);
-        userDao.update(user);
-    }
-
-    public void activateUserByAdmin(Long id) {
-        UserModel user = userDao.getUserById(id)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-
-        user.setActive(true);
-
-        userDao.update(user);
-    }
-
+    @Transactional
     public void changePassword(String email, PasswordChangeRequestDTO dto) {
 
         UserModel user = userDao.getUserByEmail(email).orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
@@ -228,6 +196,7 @@ public class UserService {
         }
 
         user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
+        user.setAuthVersion(Math.incrementExact(user.getAuthVersion()));
 
         userDao.update(user);
     }
@@ -250,6 +219,7 @@ public class UserService {
     }
 
     public Page<UserListAdminResponseDTO> getUserAdmin(Pageable pageable, String role) {
+        InputRules.page(pageable);
 
         logger.info("Processing admin user listing - page: {}, size: {}, role: {}", pageable.getPageNumber(), pageable.getPageSize(), role);
 
@@ -276,6 +246,7 @@ public class UserService {
         return userAdminDetailResponseDTO;
     }
 
+    @Transactional
     public void resetPasswordByAdmin(Long id, PasswordResetDTO dto) {
 
         UserModel user = userDao.getUserById(id)
@@ -286,88 +257,18 @@ public class UserService {
         }
 
         user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
+        user.setAuthVersion(Math.incrementExact(user.getAuthVersion()));
 
         userDao.update(user);
-    }
-
-    public boolean deleteUserById(long id) {
-        logger.info("Starting to process attempting to delete user with ID: {}", id);
-        boolean result = userDao.deleteUserById(id);
-
-        if (result) {
-            logger.info("User with ID {} deleted successfully", id);
-        } else {
-            logger.debug("User with ID {} not found or deletion failed", id);
-        }
-
-        return result;
     }
 
     public void requestAccountRecovery(String email) {
-
-        logger.info("Starting account recovery request for email: {}", email);
-
-        Optional<UserModel> optionalUser = userDao.getUserByEmail(email);
-
-        if (optionalUser.isEmpty()) {
-            logger.debug("No user found for account recovery request");
-            return;
-        }
-
-        UserModel user = optionalUser.get();
-
-        if (user.isActive()) {
-            logger.debug("Account recovery requested for an active user");
-            return;
-        }
-
-        accountRecoveryTokenDao.invalidateTokensByUser(user);
-
-        String token = UUID.randomUUID().toString();
-
-        AccountRecoveryToken recoveryToken = new AccountRecoveryToken();
-        recoveryToken.setToken(token);
-        recoveryToken.setUser(user);
-        recoveryToken.setCreatedAt(LocalDateTime.now());
-        recoveryToken.setExpirationDate(LocalDateTime.now().plusMinutes(30));
-        recoveryToken.setUsed(false);
-
-        accountRecoveryTokenDao.save(recoveryToken);
-
-        String subject = "Account recovery";
-        String body = "Use the following token to reactivate your account: " + token;
-
-        emailService.sendEmail(email, subject, body);
-
-        logger.info("Account recovery token generated successfully");
+        accountStatusService.requestRecovery(email);
     }
 
     public void activateAccountWithRecoveryToken(String token) {
-
-        logger.info("Starting account activation with recovery token");
-
-        AccountRecoveryToken recoveryToken = accountRecoveryTokenDao.getByToken(token)
-                .orElseThrow(() -> new RuntimeException("Token de recuperación inválido"));
-
-        if (recoveryToken.isUsed()) {
-            throw new RuntimeException("El token de recuperación ya fue utilizado");
-        }
-
-        if (recoveryToken.getExpirationDate().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("El token de recuperación ha expirado");
-        }
-
-        UserModel user = recoveryToken.getUser();
-
-        user.setActive(true);
-        recoveryToken.setUsed(true);
-
-        userDao.update(user);
-        accountRecoveryTokenDao.update(recoveryToken);
-
-        logger.info("Account activated successfully with recovery token");
+        accountStatusService.activateWithRecoveryToken(token);
     }
-
     public void requestPasswordReset(String email) {
 
         logger.info("Starting password reset request for email: {}", email);
@@ -423,6 +324,7 @@ public class UserService {
         UserModel user = resetToken.getUser();
 
         user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
+        user.setAuthVersion(Math.incrementExact(user.getAuthVersion()));
         resetToken.setUsed(true);
 
         userDao.update(user);

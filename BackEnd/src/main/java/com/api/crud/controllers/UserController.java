@@ -1,5 +1,8 @@
 package com.api.crud.controllers;
 
+import jakarta.validation.constraints.*;
+import jakarta.validation.Valid;
+
 import com.api.crud.DTO.*;
 import com.api.crud.config.JWTUtil;
 import com.api.crud.services.UserService;
@@ -31,7 +34,7 @@ public class UserController {
     private static final Logger logger = LoggerFactory.getLogger(UserController.class);
 
     @PostMapping(path = "/register")
-    public ResponseEntity<String> register(@RequestBody UserRegisterDTO userRegisterDTO) {
+    public ResponseEntity<String> register(@Valid @RequestBody UserRegisterDTO userRegisterDTO) {
         ResponseEntity<String> response;
         try {
             if (userService.getUserByEmail(userRegisterDTO.getEmail()).isPresent()) {
@@ -53,7 +56,7 @@ public class UserController {
     }
 
     @PostMapping(path = "/login")
-    public ResponseEntity<String> login(@RequestBody LoginRequestDTO loginRequestDTO) {
+    public ResponseEntity<String> login(@Valid @RequestBody LoginRequestDTO loginRequestDTO) {
         logger.info("Received request to login user with email: {}", loginRequestDTO.getEmail());
 
         String token = null;
@@ -90,7 +93,7 @@ public class UserController {
     }
 
     @PatchMapping("/updateMyProfile")
-    public ResponseEntity<UserResponseDTO> updateMyProfile(@RequestBody UserUpdateRequestDTO dto) {
+    public ResponseEntity<UserResponseDTO> updateMyProfile(@Valid @RequestBody UserUpdateRequestDTO dto) {
 
         ResponseEntity<UserResponseDTO> response;
 
@@ -105,7 +108,7 @@ public class UserController {
     }
 
     @PatchMapping("/changePassword")
-    public ResponseEntity<String> changePassword(@RequestBody PasswordChangeRequestDTO dto) {
+    public ResponseEntity<String> changePassword(@Valid @RequestBody PasswordChangeRequestDTO dto) {
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String email = authentication.getName();
@@ -144,7 +147,7 @@ public class UserController {
     }
 
     @PostMapping("/account-recovery")
-    public ResponseEntity<String> requestAccountRecovery(@RequestBody AccountRecoveryRequestDTO dto) {
+    public ResponseEntity<String> requestAccountRecovery(@Valid @RequestBody AccountRecoveryRequestDTO dto) {
         logger.info("Received account recovery request");
 
         try {
@@ -160,7 +163,7 @@ public class UserController {
     }
 
     @PatchMapping("/account-recovery/activate")
-    public ResponseEntity<String> activateAccountWithRecoveryToken(@RequestParam String token) {
+    public ResponseEntity<String> activateAccountWithRecoveryToken(@RequestParam @NotBlank @Size(max = 128) String token) {
         logger.info("Received account activation request with recovery token");
 
         try {
@@ -177,7 +180,7 @@ public class UserController {
     }
 
     @PostMapping("/password-recovery")
-    public ResponseEntity<String> requestPasswordReset(@RequestBody AccountRecoveryRequestDTO dto) {
+    public ResponseEntity<String> requestPasswordReset(@Valid @RequestBody AccountRecoveryRequestDTO dto) {
         logger.info("Received password reset request");
 
         try {
@@ -193,7 +196,7 @@ public class UserController {
     }
 
     @PatchMapping("/password-recovery/reset")
-    public ResponseEntity<String> resetPasswordByToken(@RequestParam String token, @RequestBody PasswordResetDTO dto) {
+    public ResponseEntity<String> resetPasswordByToken(@RequestParam @NotBlank @Size(max = 128) String token, @Valid @RequestBody PasswordResetDTO dto) {
 
         logger.info("Received password reset request using recovery token");
 

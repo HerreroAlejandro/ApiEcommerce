@@ -30,5 +30,4 @@ public interface UserDao {
 
     public UserModel updateUserById(UserModel Request, Long id);
 
-    boolean deleteUserById(long id);
 }

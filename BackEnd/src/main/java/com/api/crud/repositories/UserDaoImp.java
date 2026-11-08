@@ -134,12 +134,13 @@ public class UserDaoImp implements UserDao {
                 pageable.getPageNumber(), pageable.getPageSize(), role
         );
 
-        Sort.Order order = pageable.getSort().iterator().next();
+        Sort.Order order = pageable.getSort().isSorted()
+                ? pageable.getSort().iterator().next() : Sort.Order.asc("id");
 
         String property = order.getProperty();
         String direction = order.isDescending() ? "DESC" : "ASC";
 
-        Set<String> allowedProperties = Set.of("id", "firstName", "lastName", "email", "phone", "active");
+        Set<String> allowedProperties = Set.of("id", "firstName", "lastName", "email", "phone", "status");
 
         if (!allowedProperties.contains(property)) {
             throw new IllegalArgumentException("Invalid sort property: " + property);
@@ -230,22 +231,6 @@ public class UserDaoImp implements UserDao {
             logger.warn("Querying User with ID {} wasn't found for update", id);
         }
         return user;
-    }
-
-    @Override
-    public boolean deleteUserById(long id) {
-        logger.debug("Executing query Attempting to delete user with ID: {}", id);
-        boolean response = false;
-        try {
-            UserModel user = entityManager.find(UserModel.class, id);
-            if (user != null) {
-                entityManager.remove(user);
-                response = true;
-            }
-        } catch (Exception e) {
-            logger.error("Error while querying delete user with ID {}: {}", id, e.getMessage(), e);
-        }
-        return response;
     }
 
 }

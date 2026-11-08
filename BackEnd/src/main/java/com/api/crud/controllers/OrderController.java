@@ -1,4 +1,6 @@
 package com.api.crud.controllers;
+
+import jakarta.validation.constraints.*;
 import com.api.crud.DTO.*;
 import com.api.crud.models.enums.*;
 import com.api.crud.services.OrderService;
@@ -31,13 +33,13 @@ public class OrderController {
     }
 
     @GetMapping("/{orderId}")
-    public ResponseEntity<OrderDetailDTO> getOrderById(Authentication authentication, @PathVariable Long orderId) {
+    public ResponseEntity<OrderDetailDTO> getOrderById(Authentication authentication, @PathVariable @Positive Long orderId) {
         return ResponseEntity.ok(orderService.getMyOrder(authentication.getName(), orderId));
     }
 
     @PatchMapping("/{orderId}/cancel")
-    public ResponseEntity<Void> cancelOrder(Authentication authentication, @PathVariable Long orderId,
-            @Valid @RequestBody OrderCancelRequestDTO dto) {
+    public ResponseEntity<Void> cancelOrder(Authentication authentication, @PathVariable @Positive Long orderId,
+            @Valid @RequestBody ChangeReasonRequestDTO dto) {
         orderService.cancelMyOrder(authentication.getName(), orderId, dto.getReason());
         return ResponseEntity.noContent().build();
     }

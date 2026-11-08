@@ -61,19 +61,39 @@ public class CartDaoImp implements CartDao{
     }
 
     @Override
-    public List<Cart> getCarts() {
-        logger.debug("Executing query to fetch Carts");
-        List<Cart> carts;
-        try {
-            String jpql = "SELECT c FROM Cart c";
-            carts = entityManager.createQuery(jpql, Cart.class).getResultList();
-        } catch (Exception e) {
-            logger.error("Error while querying Carts: {}", e.getMessage());
-            carts = Collections.emptyList();
+    public org.springframework.data.domain.Page<com.api.crud.DTO.CartAdminListDTO> getCarts(
+            com.api.crud.DTO.CartAdminFilterDTO filter, org.springframework.data.domain.Pageable pageable) {
+        String totalFilter = "(SELECT COALESCE(SUM(t.productCartItem.priceProduct * t.amountCartItem), 0) FROM CartItem t WHERE t.cart = c)";
+        StringBuilder where = new StringBuilder(" WHERE 1=1");
+        java.util.Map<String, Object> params = new java.util.HashMap<>();
+        if (filter.getActive() != null) { where.append(" AND c.active = :active"); params.put("active", filter.getActive()); }
+        if (filter.getMinTotal() != null) { where.append(" AND ").append(totalFilter).append(" >= :minTotal"); params.put("minTotal", filter.getMinTotal()); }
+        if (filter.getMaxTotal() != null) { where.append(" AND ").append(totalFilter).append(" <= :maxTotal"); params.put("maxTotal", filter.getMaxTotal()); }
+        if (filter.getProductId() != null) {
+            where.append(" AND EXISTS (SELECT f.idCartItem FROM CartItem f WHERE f.cart = c AND f.productCartItem.idProduct = :productId AND f.amountCartItem >= :quantity)");
+            params.put("productId", filter.getProductId());
+            params.put("quantity", filter.getMinProductQuantity() == null ? 1 : filter.getMinProductQuantity());
         }
-        return carts;
+        java.util.Map<String, String> allowed = java.util.Map.of(
+                "idCart", "c.idCart", "userId", "c.userCart.id", "active", "c.active",
+                "creationDate", "c.creationDate", "itemCount", "COUNT(i)",
+                "total", "COALESCE(SUM(p.priceProduct * i.amountCartItem), 0)");
+        java.util.List<String> sorting = new java.util.ArrayList<>();
+        for (org.springframework.data.domain.Sort.Order sort : pageable.getSort()) {
+            String expression = allowed.get(sort.getProperty());
+            if (expression == null) throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "Campo de ordenamiento invalido");
+            sorting.add(expression + " " + sort.getDirection().name());
+        }
+        sorting.add("c.idCart DESC");
+        String select = "SELECT new com.api.crud.DTO.CartAdminListDTO(c.idCart, c.userCart.id, c.active, c.creationDate, COUNT(i), COALESCE(SUM(p.priceProduct * i.amountCartItem), 0)) FROM Cart c LEFT JOIN c.itemsCart i LEFT JOIN i.productCartItem p";
+        var query = entityManager.createQuery(select + where +
+                " GROUP BY c.idCart, c.userCart.id, c.active, c.creationDate ORDER BY " + String.join(", ", sorting), com.api.crud.DTO.CartAdminListDTO.class);
+        var count = entityManager.createQuery("SELECT COUNT(c) FROM Cart c" + where, Long.class);
+        params.forEach((key, value) -> { query.setParameter(key, value); count.setParameter(key, value); });
+        return new org.springframework.data.domain.PageImpl<>(query.setFirstResult(Math.toIntExact(pageable.getOffset()))
+                .setMaxResults(pageable.getPageSize()).getResultList(), pageable, count.getSingleResult());
     }
-
     @Override
     public Optional<Cart> getCartByUserEmail(String email) {
         String jpql = "SELECT c FROM Cart c WHERE c.userCart.email = :email ORDER BY c.creationDate DESC";
@@ -154,19 +174,6 @@ public class CartDaoImp implements CartDao{
     }
 
     // 🔹 Nuevo método: Carritos con más de N ítems
-    @Override
-    public List<Cart> getCartsWithMoreThanNItems(int minItems) {
-        String jpql = "SELECT c FROM Cart c WHERE SIZE(c.itemsCart) > :minItems";
-        try {
-            return entityManager.createQuery(jpql, Cart.class)
-                    .setParameter("minItems", minItems)
-                    .getResultList();
-        } catch (Exception e) {
-            logger.error("Error obteniendo carritos con más de {} items: {}", minItems, e.getMessage());
-            return Collections.emptyList();
-        }
-    }
-
     @Override
     public BigDecimal calculateCartTotal(Long cartId) {
         String jpql = "SELECT SUM(c.productCartItem.priceProduct * c.amountCartItem) FROM CartItem c WHERE c.cart.idCart = :cartId";

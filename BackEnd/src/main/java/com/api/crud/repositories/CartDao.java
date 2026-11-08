@@ -10,7 +10,8 @@ import java.util.Optional;
 
 public interface CartDao {
 
-    List<Cart> getCarts();
+    org.springframework.data.domain.Page<com.api.crud.DTO.CartAdminListDTO> getCarts(
+            com.api.crud.DTO.CartAdminFilterDTO filter, org.springframework.data.domain.Pageable pageable);
 
     void saveCart(Cart cart);
 
@@ -28,7 +29,6 @@ public interface CartDao {
 
     List<Cart> getCartsByDateRange(LocalDate start, LocalDate end);
 
-    List<Cart> getCartsWithMoreThanNItems(int minItems);
 
     BigDecimal calculateCartTotal(Long cartId);
 

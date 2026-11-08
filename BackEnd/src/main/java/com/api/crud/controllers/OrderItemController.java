@@ -1,4 +1,7 @@
 package com.api.crud.controllers;
+
+import jakarta.validation.constraints.*;
+import jakarta.validation.Valid;
 import com.api.crud.DTO.OrderItemResponseDTO;
 import com.api.crud.services.OrderItemService;
 import org.springframework.http.ResponseEntity;
@@ -14,13 +17,13 @@ public class OrderItemController {
 
     @GetMapping("/{itemId}")
     public ResponseEntity<OrderItemResponseDTO> getOrderItemById(Authentication authentication,
-            @PathVariable Long itemId) {
+            @PathVariable @Positive Long itemId) {
         return ResponseEntity.ok(service.getMyItem(authentication.getName(), itemId));
     }
 
     @GetMapping("/order/{orderId}")
     public ResponseEntity<List<OrderItemResponseDTO>> getItemsByOrderId(Authentication authentication,
-            @PathVariable Long orderId) {
+            @PathVariable @Positive Long orderId) {
         return ResponseEntity.ok(service.getMyItems(authentication.getName(), orderId));
     }
 }

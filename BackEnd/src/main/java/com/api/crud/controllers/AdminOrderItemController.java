@@ -1,4 +1,7 @@
 package com.api.crud.controllers;
+
+import jakarta.validation.constraints.*;
+import jakarta.validation.Valid;
 import com.api.crud.DTO.OrderItemResponseDTO;
 import com.api.crud.DTO.OrderItemAdminDetailDTO;
 import com.api.crud.services.OrderItemService;
@@ -13,12 +16,12 @@ public class AdminOrderItemController {
     public AdminOrderItemController(OrderItemService service) { this.service = service; }
 
     @GetMapping("/{itemId}")
-    public ResponseEntity<OrderItemAdminDetailDTO> getOrderItemById(@PathVariable Long itemId) {
+    public ResponseEntity<OrderItemAdminDetailDTO> getOrderItemById(@PathVariable @Positive Long itemId) {
         return ResponseEntity.ok(service.getAdminItem(itemId));
     }
 
     @GetMapping("/order/{orderId}")
-    public ResponseEntity<List<OrderItemResponseDTO>> getItemsByOrderId(@PathVariable Long orderId) {
+    public ResponseEntity<List<OrderItemResponseDTO>> getItemsByOrderId(@PathVariable @Positive Long orderId) {
         return ResponseEntity.ok(service.getAdminItems(orderId));
     }
 }

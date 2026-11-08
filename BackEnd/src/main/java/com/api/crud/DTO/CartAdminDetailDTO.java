@@ -1,4 +1,8 @@
 package com.api.crud.DTO;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
 @Getter @Setter
@@ -6,8 +10,8 @@ public class CartAdminDetailDTO {
     private Long idCart;
     private Long userId;
     private boolean active;
-    private java.time.LocalDate creationDate;
+    private LocalDate creationDate;
     private int itemCount;
-    private java.math.BigDecimal total;
-    private java.util.List<CartItemAdminListDTO> itemsCart;
+    private BigDecimal total;
+    private List<CartItemAdminListDTO> itemsCart;
 }

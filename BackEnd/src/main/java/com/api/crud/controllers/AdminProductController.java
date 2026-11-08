@@ -1,5 +1,9 @@
 package com.api.crud.controllers;
 
+import org.springframework.web.server.ResponseStatusException;
+
+import jakarta.validation.constraints.*;
+
 import com.api.crud.DTO.*;
 import com.api.crud.models.enums.ProductType;
 import com.api.crud.services.ProductService;
@@ -43,6 +47,10 @@ public class AdminProductController {
 
             response = ResponseEntity.status(HttpStatus.CONFLICT).body("Duplicate product name detected");
 
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
             logger.error("Unexpected error occurred while saving product '{}': {}", productSaveDTO.getNameProduct(), e.getMessage());
 
@@ -53,11 +61,11 @@ public class AdminProductController {
 
     @GetMapping(path = "/AdminShowProducts")
     public ResponseEntity<Page<ProductAdminCatalogDTO>> adminShowProducts(
-            @RequestParam(required = false) String name,
-            @RequestParam(required = false) String category,
+            @RequestParam(required = false) @Size(max = 30) String name,
+            @RequestParam(required = false) @Size(max = 50) String category,
             @RequestParam(required = false) ProductType type,
-            @RequestParam(required = false) BigDecimal minPrice,
-            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) @DecimalMin("0.0") @Digits(integer = 8, fraction = 2) BigDecimal minPrice,
+            @RequestParam(required = false) @DecimalMin("0.0") @Digits(integer = 8, fraction = 2) BigDecimal maxPrice,
             @RequestParam(required = false) Boolean active,
             @RequestParam(required = false) Boolean inStock,
             Pageable pageable) {
@@ -78,7 +86,7 @@ public class AdminProductController {
 
     @GetMapping("/AdminGetProductById/{id}")
     public ResponseEntity<ProductAdminDetailDTO> getProductAdminDetailById(
-            @PathVariable Long id) {
+            @PathVariable @Positive Long id) {
 
         logger.info("Received request to find product for admin with id {}", id);
 
@@ -98,7 +106,7 @@ public class AdminProductController {
     }
 
         @DeleteMapping(path = "/DeleteProduct/{id}")
-        public ResponseEntity<Void> deleteProduct(@PathVariable("id") Long id){
+        public ResponseEntity<Void> deleteProduct(@PathVariable("id") @Positive Long id){
         logger.info("received request to delete product with id {}", id);
         ResponseEntity<Void> response;
         boolean deleted = productService.deleteProduct(id);
@@ -113,7 +121,7 @@ public class AdminProductController {
         }
 
     @PutMapping("/UpdateStock/{idProduct}")
-    public ResponseEntity<String> updateProductStock(@PathVariable Long idProduct, @Valid @RequestBody ProductStockUpdateDTO stockDTO) {
+    public ResponseEntity<String> updateProductStock(@PathVariable @Positive Long idProduct, @Valid @RequestBody ProductStockUpdateDTO stockDTO) {
         logger.info("Received request to update stock for product ID {}", idProduct);
 
         ResponseEntity<String> response;
@@ -131,7 +139,7 @@ public class AdminProductController {
     }
 
     @PutMapping("/UpdatePrice/{idProduct}")
-    public ResponseEntity<String> updateProductPrice(@PathVariable Long idProduct, @Valid @RequestBody ProductPriceUpdateDTO priceDTO) {
+    public ResponseEntity<String> updateProductPrice(@PathVariable @Positive Long idProduct, @Valid @RequestBody ProductPriceUpdateDTO priceDTO) {
         logger.info("Received request to update price for product ID {}", idProduct);
 
         ResponseEntity<String> response;
@@ -149,7 +157,7 @@ public class AdminProductController {
     }
 
     @PutMapping("/AdjustPrice/{idProduct}")
-    public ResponseEntity<String> adjustProductPrice(@PathVariable Long idProduct,
+    public ResponseEntity<String> adjustProductPrice(@PathVariable @Positive Long idProduct,
                                                      @Valid @RequestBody ProductPriceAdjustmentDTO adjustmentDTO) {
 
         logger.info("Received request to adjust price for product ID {} by {}%", idProduct, adjustmentDTO.getPercentage());
@@ -171,7 +179,7 @@ public class AdminProductController {
     }
 
     @PutMapping("/AdjustStock/{idProduct}")
-    public ResponseEntity<String> adjustProductStock(@PathVariable Long idProduct,
+    public ResponseEntity<String> adjustProductStock(@PathVariable @Positive Long idProduct,
                                                      @Valid @RequestBody ProductStockAdjustmentDTO adjustmentDTO) {
         ResponseEntity<String> response;
 
@@ -186,7 +194,7 @@ public class AdminProductController {
     }
 
     @PutMapping("/Disable/{id}")
-    public ResponseEntity<String> disableProduct(@PathVariable Long id) {
+    public ResponseEntity<String> disableProduct(@PathVariable @Positive Long id) {
         logger.info("Received request to disable product with id {}", id);
 
         boolean disabled = productService.disableProduct(id);
@@ -200,7 +208,7 @@ public class AdminProductController {
     }
 
     @PutMapping("/Enable/{id}")
-    public ResponseEntity<String> enableProduct(@PathVariable Long id) {
+    public ResponseEntity<String> enableProduct(@PathVariable @Positive Long id) {
         logger.info("Received request to enable product with id {}", id);
 
         ResponseEntity<String> response;
@@ -220,7 +228,7 @@ public class AdminProductController {
     }
 
     @PatchMapping("/UpdateInfo/{idProduct}")
-    public ResponseEntity<String> updateProductInfo(@PathVariable Long idProduct, @Valid @RequestBody ProductUpdateDTO productDTO) {
+    public ResponseEntity<String> updateProductInfo(@PathVariable @Positive Long idProduct, @Valid @RequestBody ProductUpdateDTO productDTO) {
 
         logger.info("Received request to update product information for product ID {}", idProduct);
 
