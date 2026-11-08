@@ -1,80 +1,58 @@
 package com.api.crud.config;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
 
 @Component
 public class JWTUtil {
+    private final SecretKey signingKey;
+    private final JwtParser parser;
 
-    private static final Logger logger = LoggerFactory.getLogger(JWTUtil.class);
-
-    public static final String JWT_KEY = "andintheendtheloveyoutakeisequaltotheloveyoumake";
-
-
-    public String generateToken(String username, List<String> roles) {
-        return Jwts.builder()
-                .setSubject(username)
-                .claim("roles", roles)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 30 * 60 * 1000))
-                .signWith(SignatureAlgorithm.HS256, JWT_KEY)
-                .compact();
+    public JWTUtil(@Value("${JWT_ECO}") String secret) {
+        if (secret == null || secret.isBlank() || secret.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalArgumentException("JWT_ECO debe contener una clave de al menos 32 bytes");
+        }
+        signingKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        parser = Jwts.parserBuilder().setSigningKey(signingKey).build();
     }
 
-    public String extractUsername(String token) {
-        return Jwts.parser()
-                .setSigningKey(JWT_KEY)
-                .parseClaimsJws(token)
-                .getBody()
-                .getSubject();
+    public String generateToken(String username, List<String> roles, long authVersion) {
+        return Jwts.builder().setSubject(username).claim("roles", roles)
+                .claim("authVersion", authVersion).setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + 30 * 60 * 1000L))
+                .signWith(signingKey, SignatureAlgorithm.HS256).compact();
     }
 
-    public boolean isTokenExpired(String token) {
-
-        return getExpirationDate(token).before(new Date());
-    }
-
-    private Date getExpirationDate(String token) {
-        return Jwts.parser()
-                .setSigningKey(JWT_KEY)
-                .parseClaimsJws(token)
-                .getBody()
-                .getExpiration();
-    }
+    public String extractUsername(String token) { return claims(token).getSubject(); }
+    public Long extractAuthVersion(String token) { return claims(token).get("authVersion", Long.class); }
+    public boolean isTokenExpired(String token) { return claims(token).getExpiration().before(new Date()); }
 
     public boolean validateToken(String token) {
-        boolean isValid = false;
         try {
-            Jwts.parserBuilder()
-                    .setSigningKey(JWT_KEY)
-                    .build()
-                    .parseClaimsJws(token);
-            isValid = true;
-        } catch (Exception e) {
-            isValid = false;
-            logger.info("Error de validación del token: " + e.getMessage());
+            claims(token);
+            return true;
+        } catch (JwtException | IllegalArgumentException exception) {
+            return false;
         }
-        logger.info("Token válido: " + isValid);
-        return isValid;
     }
 
     public List<String> extractRoles(String token) {
-        Claims claims = extractAllClaims(token);
-
-        return claims.get("roles", List.class);
+        List<?> roles = claims(token).get("roles", List.class);
+        if (roles == null || roles.stream().anyMatch(role -> !(role instanceof String))) {
+            throw new JwtException("Roles invalidos en el token");
+        }
+        return roles.stream().map(String.class::cast).toList();
     }
 
-    private Claims extractAllClaims(String token) {
-        return Jwts.parser()
-                .setSigningKey(JWT_KEY)
-                .parseClaimsJws(token)
-                .getBody();
-    }
-
+    private Claims claims(String token) { return parser.parseClaimsJws(token).getBody(); }
 }

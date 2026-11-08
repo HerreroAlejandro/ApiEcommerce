@@ -1,7 +1,9 @@
 package com.api.crud.config;
 
+import com.api.crud.models.enums.AccountStatus;
 import com.api.crud.models.entity.UserModel;
 import com.api.crud.repositories.UserDao;
+import io.jsonwebtoken.JwtException;
 import org.springframework.web.filter.OncePerRequestFilter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -11,53 +13,40 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import java.io.IOException;
-import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 public class JWTFilter extends OncePerRequestFilter {
-
     private final JWTUtil jwtUtil;
-
-    private UserDao userDao;
-
+    private final UserDao userDao;
     public JWTFilter(JWTUtil jwtUtil, UserDao userDao) {
-        this.jwtUtil = jwtUtil;
-        this.userDao = userDao;
+        this.jwtUtil = jwtUtil; this.userDao = userDao;
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        String token = getTokenFromRequest(request);
-        if (token != null && jwtUtil.validateToken(token)) {
-            String email = jwtUtil.extractUsername(token);
-
-            Optional<UserModel> optionalUser = userDao.getUserByEmail(email);
-
-            if(optionalUser.isPresent() && optionalUser.get().isActive()) {
-                List<String> roles = jwtUtil.extractRoles(token);
-
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(email, null, roles.stream()
-                                .map(SimpleGrantedAuthority::new)
-                                .collect(Collectors.toList()));
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-            } else {
-                // Si usuario no existe o está inactivo
+        String header = request.getHeader("Authorization");
+        if (header != null && header.startsWith("Bearer ")) {
+            SecurityContextHolder.clearContext();
+            try {
+                authenticate(header.substring(7));
+            } catch (JwtException | IllegalArgumentException exception) {
                 SecurityContextHolder.clearContext();
             }
         }
-        filterChain.doFilter(request, response);
+        chain.doFilter(request, response);
     }
 
-    private String getTokenFromRequest(HttpServletRequest request) {
-        String token = null;
-        String bearerToken = request.getHeader("Authorization");
-
-        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
-            token = bearerToken.substring(7);
-        }
-        return token;
+    private void authenticate(String token) {
+        if (!jwtUtil.validateToken(token)) return;
+        String email = jwtUtil.extractUsername(token);
+        if (email == null || email.isBlank()) return;
+        Optional<UserModel> user = userDao.getUserByEmail(email);
+        Long version = jwtUtil.extractAuthVersion(token);
+        if (user.isEmpty() || user.get().getStatus() != AccountStatus.ACTIVE
+                || version == null || version != user.get().getAuthVersion()) return;
+        var authorities = jwtUtil.extractRoles(token).stream().map(SimpleGrantedAuthority::new).toList();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(email, null, authorities));
     }
 }
