@@ -1,5 +1,7 @@
 package com.api.crud.config;
 
+import com.api.crud.models.enums.AccountStatus;
+
 import com.api.crud.models.entity.Role;
 import com.api.crud.models.entity.UserModel;
 import com.api.crud.repositories.RoleDao;
@@ -55,7 +57,7 @@ public class AdminInitializer {
             admin.setEmail(adminEmail);
             admin.setPhone(null);
             admin.setPassword(passwordEncoder.encode(adminPassword));
-            admin.setActive(true);
+            admin.setStatus(AccountStatus.ACTIVE);
 
             admin.getRoles().add(adminRole);
 
