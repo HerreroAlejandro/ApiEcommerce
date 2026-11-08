@@ -1,8 +1,8 @@
-package com.api.crud.repositories;
+package com.api.crud.repositories.impl;
 
-import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.PasswordResetToken;
 import com.api.crud.models.entity.UserModel;
+import com.api.crud.repositories.PasswordResetTokenDao;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.NoResultException;
@@ -14,7 +14,7 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 @Repository
-public class PasswordResetTokenDaoImpl implements PasswordResetTokenDao {
+public class PasswordResetTokenDaoImp implements PasswordResetTokenDao {
 
     @PersistenceContext
     private EntityManager entityManager;

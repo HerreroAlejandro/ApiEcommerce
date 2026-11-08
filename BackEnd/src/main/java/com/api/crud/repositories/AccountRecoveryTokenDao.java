@@ -1,6 +1,5 @@
 package com.api.crud.repositories;
 
-import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.AccountRecoveryToken;
 import com.api.crud.models.entity.UserModel;
 

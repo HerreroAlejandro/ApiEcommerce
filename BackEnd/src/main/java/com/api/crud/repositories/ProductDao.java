@@ -1,6 +1,5 @@
 package com.api.crud.repositories;
 
-import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.Product;
 import com.api.crud.models.enums.ProductType;
 
@@ -53,13 +52,4 @@ public interface ProductDao {
     Optional<Product> getProductById(Long idProduct);
 
     boolean deleteProduct(Long idProduct);
-    /*
-        List<Product> getProductsByName(String nameProduct, Pageable pageable);
-
-        long countProductsByName(String nameProduct);
-
-        List<Product> getProductsByNameAdmin(String nameProduct, Boolean active, Pageable pageable);
-
-        long countProductsByNameAdmin(String nameProduct, Boolean active);
-    */
 }

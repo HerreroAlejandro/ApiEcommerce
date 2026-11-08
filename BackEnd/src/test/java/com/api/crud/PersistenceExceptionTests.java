@@ -5,8 +5,8 @@ import static org.mockito.Mockito.*;
 
 import com.api.crud.models.entity.Role;
 import com.api.crud.models.entity.UserModel;
-import com.api.crud.repositories.RoleDaoImp;
-import com.api.crud.repositories.UserDaoImp;
+import com.api.crud.repositories.impl.RoleDaoImp;
+import com.api.crud.repositories.impl.UserDaoImp;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceException;

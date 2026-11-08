@@ -1,8 +1,8 @@
-package com.api.crud.repositories;
+package com.api.crud.repositories.impl;
 
-import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.AccountRecoveryToken;
 import com.api.crud.models.entity.UserModel;
+import com.api.crud.repositories.AccountRecoveryTokenDao;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.NoResultException;
@@ -14,7 +14,7 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 @Repository
-public class AccountRecoveryTokenDaoImpl implements AccountRecoveryTokenDao {
+public class AccountRecoveryTokenDaoImp implements AccountRecoveryTokenDao {
 
     @PersistenceContext
     private EntityManager entityManager;

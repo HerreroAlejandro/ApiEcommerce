@@ -50,6 +50,11 @@ Available roles:
 
 ## Architecture
 
+DAO interfaces live in `com.api.crud.repositories`; their implementations live in
+`com.api.crud.repositories.impl` and use the `DaoImp` suffix. Services depend on
+the interfaces, while `@Repository` and persistence operations stay in the
+implementation classes.
+
 Java source uses four-space indentation, UTF-8, grouped imports and one blank
 line between members. Fields and injected dependencies precede constructors and
 methods; local variables stay near their use. Lombok getters/setters are declared

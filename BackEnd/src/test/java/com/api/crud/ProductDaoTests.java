@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import com.api.crud.models.entity.ProductPhysical;
-import com.api.crud.repositories.ProductDaoImp;
+import com.api.crud.repositories.impl.ProductDaoImp;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceException;

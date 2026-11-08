@@ -1,10 +1,11 @@
-package com.api.crud.repositories;
+package com.api.crud.repositories.impl;
 
 import com.api.crud.DTO.CartAdminFilterDTO;
 import com.api.crud.DTO.CartAdminListDTO;
 import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.Cart;
 import com.api.crud.models.entity.UserModel;
+import com.api.crud.repositories.CartDao;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
@@ -15,8 +16,8 @@ import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Sort.Order;
 import org.springframework.stereotype.Repository;
 

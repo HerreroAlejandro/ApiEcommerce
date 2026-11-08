@@ -1,134 +1,33 @@
 package com.api.crud.repositories;
 
-import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.*;
 import com.api.crud.models.enums.*;
 
-import jakarta.persistence.*;
-
 import org.springframework.data.domain.*;
-import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.*;
 
-@Repository
-public class OrderWorkflowDao {
+public interface OrderWorkflowDao {
 
-    @PersistenceContext
-    private EntityManager entityManager;
+    void lockUser(Long id);
 
-    public void lockUser(Long id) {
-        if (entityManager.find(UserModel.class, id, LockModeType.PESSIMISTIC_WRITE) == null) {
-            throw new ResourceNotFoundException("Usuario no encontrado");
-        }
-    }
+    Optional<Cart> lockCart(Long userId);
 
-    public Optional<Cart> lockCart(Long userId) {
-        List<Cart> carts =
-                entityManager
-                        .createQuery(
-                                "SELECT DISTINCT c FROM Cart c LEFT JOIN FETCH c.itemsCart WHERE c.userCart.id = :userId",
-                                Cart.class)
-                        .setParameter("userId", userId)
-                        .setLockMode(LockModeType.PESSIMISTIC_WRITE)
-                        .getResultList();
-        return carts.stream().findFirst();
-    }
+    Product lockProduct(Long id);
 
-    public Product lockProduct(Long id) {
-        Product product = entityManager.find(Product.class, id);
-        if (product == null) throw new BusinessConflictException("Producto no disponible");
-        entityManager.refresh(product, LockModeType.PESSIMISTIC_WRITE);
-        return product;
-    }
+    Order lockOrder(Long id);
 
-    public Order lockOrder(Long id) {
-        Order order = entityManager.find(Order.class, id, LockModeType.PESSIMISTIC_WRITE);
-        if (order == null) throw new ResourceNotFoundException("Orden no encontrada");
-        entityManager.refresh(order, LockModeType.PESSIMISTIC_WRITE);
-        return order;
-    }
+    void saveAudit(OrderChangeAudit audit);
 
-    public void saveAudit(OrderChangeAudit audit) {
-        entityManager.persist(audit);
-    }
+    void flush();
 
-    public void flush() {
-        entityManager.flush();
-    }
-
-    public Page<Order> search(
+    Page<Order> search(
             Long userId,
             String email,
             OrderStatus status,
             PaymentStatus payment,
             LocalDateTime start,
             LocalDateTime end,
-            Pageable pageable) {
-        if (pageable.getPageSize() > 100
-                || pageable.getOffset() > Integer.MAX_VALUE
-                || (start != null && end != null && start.isAfter(end))) {
-            throw new InvalidRequestException("Paginacion o fechas invalidas");
-        }
-        Map<String, Object> params = new HashMap<>();
-        StringBuilder where = new StringBuilder(" WHERE 1=1");
-        if (userId != null) {
-            where.append(" AND o.userOrder.id = :userId");
-            params.put("userId", userId);
-        }
-        if (email != null && !email.isBlank()) {
-            where.append(" AND o.userOrder.email = :email");
-            params.put("email", email);
-        }
-        if (status != null) {
-            where.append(" AND o.orderStatus = :status");
-            params.put("status", status);
-        }
-        if (payment != null) {
-            where.append(" AND o.paymentStatus = :payment");
-            params.put("payment", payment);
-        }
-        if (start != null) {
-            where.append(" AND o.purchaseDateOrder >= :start");
-            params.put("start", start);
-        }
-        if (end != null) {
-            where.append(" AND o.purchaseDateOrder <= :end");
-            params.put("end", end);
-        }
-        Set<String> allowed =
-                Set.of(
-                        "idOrder",
-                        "purchaseDateOrder",
-                        "totalOrder",
-                        "orderStatus",
-                        "paymentStatus");
-        List<String> sorting = new ArrayList<>();
-        for (Sort.Order sort : pageable.getSort()) {
-            if (!allowed.contains(sort.getProperty())) {
-                throw new InvalidRequestException("Campo de ordenamiento invalido");
-            }
-            sorting.add("o." + sort.getProperty() + " " + sort.getDirection().name());
-        }
-        if (sorting.isEmpty()) sorting.add("o.purchaseDateOrder DESC");
-        sorting.add("o.idOrder DESC");
-        TypedQuery<Order> query =
-                entityManager.createQuery(
-                        "SELECT o FROM Order o" + where + " ORDER BY " + String.join(", ", sorting),
-                        Order.class);
-        TypedQuery<Long> count =
-                entityManager.createQuery("SELECT COUNT(o) FROM Order o" + where, Long.class);
-        params.forEach(
-                (key, value) -> {
-                    query.setParameter(key, value);
-                    count.setParameter(key, value);
-                });
-        return new PageImpl<>(
-                query.setFirstResult(Math.toIntExact(pageable.getOffset()))
-                        .setMaxResults(pageable.getPageSize())
-                        .getResultList(),
-                pageable,
-                count.getSingleResult());
-    }
+            Pageable pageable);
 }

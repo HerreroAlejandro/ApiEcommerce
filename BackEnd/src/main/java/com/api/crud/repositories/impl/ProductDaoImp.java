@@ -1,8 +1,8 @@
-package com.api.crud.repositories;
+package com.api.crud.repositories.impl;
 
-import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.Product;
 import com.api.crud.models.enums.ProductType;
+import com.api.crud.repositories.ProductDao;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.NoResultException;
@@ -460,86 +460,6 @@ public class ProductDaoImp implements ProductDao {
         return response;
     }
 
-    /*
-        @Override
-        public List<Product> getProductsByName(String nameProduct, Pageable pageable) {
-            logger.debug("Executing query to find active products by name: {}", nameProduct);
-
-            String jpql = """
-                SELECT p
-                FROM Product p
-                WHERE p.active = true
-                AND LOWER(p.nameProduct) LIKE LOWER(:nameProduct)
-                ORDER BY p.idProduct ASC
-                """;
-
-            TypedQuery<Product> query = entityManager.createQuery(jpql, Product.class);
-
-            query.setParameter("nameProduct", "%" + nameProduct.trim() + "%");
-            query.setFirstResult((int) pageable.getOffset());
-            query.setMaxResults(pageable.getPageSize());
-
-            return query.getResultList();
-        }
-
-        @Override
-        public long countProductsByName(String nameProduct) {
-            logger.debug("Executing query to count active products by name: {}", nameProduct);
-
-            String jpql = """
-                SELECT COUNT(p)
-                FROM Product p
-                WHERE p.active = true
-                AND LOWER(p.nameProduct) LIKE LOWER(:nameProduct)
-                """;
-
-            return entityManager
-                    .createQuery(jpql, Long.class)
-                    .setParameter("nameProduct", "%" + nameProduct.trim() + "%")
-                    .getSingleResult();
-        }
-
-        @Override
-        public List<Product> getProductsByNameAdmin(String nameProduct, Boolean active, Pageable pageable) {
-
-            logger.debug("Executing query to find products by name for admin: {} - active: {}", nameProduct, active);
-
-            String jpql = """
-                SELECT p
-                FROM Product p
-                WHERE LOWER(p.nameProduct) LIKE LOWER(:nameProduct)
-                AND (:active IS NULL OR p.active = :active)
-                ORDER BY p.idProduct ASC
-                """;
-
-            TypedQuery<Product> query = entityManager.createQuery(jpql, Product.class);
-
-            query.setParameter("nameProduct", "%" + nameProduct.trim() + "%");
-            query.setParameter("active", active);
-            query.setFirstResult((int) pageable.getOffset());
-            query.setMaxResults(pageable.getPageSize());
-
-            return query.getResultList();
-        }
-
-        @Override
-        public long countProductsByNameAdmin(String nameProduct, Boolean active) {
-
-            logger.debug("Executing query to count products by name for admin: {} - active: {}", nameProduct, active);
-
-            String jpql = """
-                SELECT COUNT(p)
-                FROM Product p
-                WHERE LOWER(p.nameProduct) LIKE LOWER(:nameProduct)
-                AND (:active IS NULL OR p.active = :active)
-                """;
-
-            return entityManager.createQuery(jpql, Long.class)
-                    .setParameter("nameProduct", "%" + nameProduct.trim() + "%")
-                    .setParameter("active", active)
-                    .getSingleResult();
-        }
-    */
     @Override
     public boolean deleteProduct(Long idProduct) {
         logger.debug("Executing query Attempting to delete product with ID: {}", idProduct);
