@@ -54,6 +54,7 @@ com\api\crud\services\ProductService.class
 com\api\crud\DTO\CartItemDTO.class
 com\api\crud\services\EmailService.class
 com\api\crud\repositories\CartItemDao.class
+com\api\crud\exceptions\ExceptionProblems$1.class
 com\api\crud\repositories\OrderItemDaoImp.class
 com\api\crud\controllers\RoleController.class
 com\api\crud\DTO\ChangeReasonRequestDTO.class
@@ -62,7 +63,6 @@ com\api\crud\models\entity\PasswordResetToken.class
 com\api\crud\models\enums\OrderStatus.class
 com\api\crud\controllers\AdminProductController.class
 com\api\crud\DTO\PasswordResetDTO.class
-com\api\crud\controllers\CartConflictHandler.class
 com\api\crud\repositories\OrderItemDao.class
 com\api\crud\services\OrderItemService.class
 com\api\crud\repositories\CartDaoImp.class

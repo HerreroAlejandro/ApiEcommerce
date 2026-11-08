@@ -1,13 +1,12 @@
 package com.api.crud.repositories;
 
+import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.*;
 
 import jakarta.persistence.*;
 
 import org.springframework.data.domain.*;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Repository;
-import org.springframework.web.server.ResponseStatusException;
 
 @Repository
 public class AccountStatusDao {
@@ -17,8 +16,7 @@ public class AccountStatusDao {
 
     public UserModel lockUser(Long id) {
         UserModel user = entityManager.find(UserModel.class, id, LockModeType.PESSIMISTIC_WRITE);
-        if (user == null)
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado");
+        if (user == null) throw new ResourceNotFoundException("Usuario no encontrado");
         entityManager.refresh(user, LockModeType.PESSIMISTIC_WRITE);
         return user;
     }
@@ -33,8 +31,7 @@ public class AccountStatusDao {
 
     public Page<AccountStatusAudit> getHistory(Long userId, Pageable pageable) {
         if (pageable.getPageSize() > 100 || pageable.getOffset() > Integer.MAX_VALUE) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "Paginacion fuera del limite");
+            throw new InvalidRequestException("Paginacion fuera del limite");
         }
         var query =
                 entityManager

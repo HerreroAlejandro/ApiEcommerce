@@ -1,0 +1,11 @@
+package com.api.crud.exceptions;
+
+public enum ErrorCode {
+    INVALID_REQUEST,
+    RESOURCE_NOT_FOUND,
+    BUSINESS_CONFLICT,
+    INSUFFICIENT_STOCK,
+    UNAUTHENTICATED,
+    FORBIDDEN,
+    EXTERNAL_SERVICE_UNAVAILABLE
+}

@@ -5,6 +5,7 @@ import com.api.crud.DTO.AdminCartItemQuantityRequestDTO;
 import com.api.crud.DTO.CartItemAdminDetailDTO;
 import com.api.crud.DTO.CartItemAdminListDTO;
 import com.api.crud.DTO.ChangeReasonRequestDTO;
+import com.api.crud.exceptions.ResourceNotFoundException;
 import com.api.crud.services.CartItemService;
 
 import jakarta.validation.Valid;
@@ -92,7 +93,7 @@ public class AdminCartItemController {
         return cartItemService
                 .getCartItemById(cartItemId)
                 .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseThrow(() -> new ResourceNotFoundException());
     }
 
     @GetMapping("/getItemsByCartId/{cartId}")

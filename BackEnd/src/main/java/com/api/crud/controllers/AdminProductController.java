@@ -1,6 +1,7 @@
 package com.api.crud.controllers;
 
 import com.api.crud.DTO.*;
+import com.api.crud.exceptions.ResourceNotFoundException;
 import com.api.crud.models.enums.ProductType;
 import com.api.crud.services.ProductService;
 
@@ -10,13 +11,11 @@ import jakarta.validation.constraints.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -32,35 +31,8 @@ public class AdminProductController {
 
     @PostMapping(path = "/SaveProduct")
     public ResponseEntity<String> saveProduct(@Valid @RequestBody ProductSaveDTO productSaveDTO) {
-        logger.info("Received request to save product {}", productSaveDTO.getNameProduct());
-        ResponseEntity<String> response;
-        try {
-            productService.saveProduct(productSaveDTO);
-            response =
-                    ResponseEntity.status(HttpStatus.CREATED).body("Product created successfully");
-            logger.info("Product '{}' created successfully.", productSaveDTO.getNameProduct());
-        } catch (DataIntegrityViolationException e) {
-            logger.error(
-                    "DataIntegrityViolationException occurred while saving product '{}': {}",
-                    productSaveDTO.getNameProduct(),
-                    e.getMessage());
-            response =
-                    ResponseEntity.status(HttpStatus.CONFLICT)
-                            .body("Duplicate product name detected");
-        } catch (IllegalArgumentException e) {
-            throw e;
-        } catch (ResponseStatusException e) {
-            throw e;
-        } catch (Exception e) {
-            logger.error(
-                    "Unexpected error occurred while saving product '{}': {}",
-                    productSaveDTO.getNameProduct(),
-                    e.getMessage());
-            response =
-                    ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                            .body("Failed to create product: " + e.getMessage());
-        }
-        return response;
+        productService.saveProduct(productSaveDTO);
+        return ResponseEntity.status(HttpStatus.CREATED).body("Product created successfully");
     }
 
     @GetMapping(path = "/AdminShowProducts")
@@ -106,7 +78,7 @@ public class AdminProductController {
             response = ResponseEntity.ok(product.get());
         } else {
             logger.info("Product with ID {} not found.", id);
-            response = ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            throw new ResourceNotFoundException();
         }
         return response;
     }
@@ -121,7 +93,7 @@ public class AdminProductController {
             response = ResponseEntity.status(HttpStatus.NO_CONTENT).build();
         } else {
             logger.info("The product with id {} cannot be deleted", id);
-            response = ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            throw new ResourceNotFoundException();
         }
         return response;
     }
@@ -141,9 +113,7 @@ public class AdminProductController {
             response = ResponseEntity.ok("Stock updated successfully");
         } else {
             logger.info("Product ID {} not found or is not a physical product", idProduct);
-            response =
-                    ResponseEntity.status(HttpStatus.NOT_FOUND)
-                            .body("Product not found or is not a physical product");
+            throw new ResourceNotFoundException();
         }
         return response;
     }
@@ -163,7 +133,7 @@ public class AdminProductController {
             response = ResponseEntity.ok("Price updated successfully");
         } else {
             logger.info("Product ID {} not found, price not updated", idProduct);
-            response = ResponseEntity.status(HttpStatus.NOT_FOUND).body("Product not found");
+            throw new ResourceNotFoundException();
         }
         return response;
     }
@@ -184,7 +154,7 @@ public class AdminProductController {
             response = ResponseEntity.ok("Product price adjusted successfully");
         } else {
             logger.info("Product ID {} not found, price not adjusted", idProduct);
-            response = ResponseEntity.status(HttpStatus.NOT_FOUND).body("Product not found");
+            throw new ResourceNotFoundException();
         }
         return response;
     }
@@ -198,9 +168,7 @@ public class AdminProductController {
         if (updated) {
             response = ResponseEntity.ok("Product stock adjusted successfully");
         } else {
-            response =
-                    ResponseEntity.status(HttpStatus.NOT_FOUND)
-                            .body("Product not found or is not a physical product");
+            throw new ResourceNotFoundException();
         }
         return response;
     }
@@ -214,8 +182,7 @@ public class AdminProductController {
             return ResponseEntity.ok("Product disabled successfully");
         } else {
             logger.warn("Product with id {} not found or could not be disabled", id);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Product not found or could not be disabled");
+            throw new ResourceNotFoundException();
         }
     }
 
@@ -229,9 +196,7 @@ public class AdminProductController {
             response = ResponseEntity.ok("Product enabled successfully");
         } else {
             logger.info("Product with id {} not found or could not be enabled", id);
-            response =
-                    ResponseEntity.status(HttpStatus.NOT_FOUND)
-                            .body("Product not found or could not be enabled");
+            throw new ResourceNotFoundException();
         }
         return response;
     }
@@ -248,9 +213,7 @@ public class AdminProductController {
             response = ResponseEntity.ok("Product information updated successfully");
         } else {
             logger.info("Product ID {} not found or could not be updated", idProduct);
-            response =
-                    ResponseEntity.status(HttpStatus.NOT_FOUND)
-                            .body("Product not found or could not be updated");
+            throw new ResourceNotFoundException();
         }
         return response;
     }

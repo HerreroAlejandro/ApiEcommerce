@@ -1,5 +1,6 @@
 package com.api.crud.repositories;
 
+import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.Role;
 
 import org.springframework.data.jpa.repository.Query;

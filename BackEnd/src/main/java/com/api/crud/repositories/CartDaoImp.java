@@ -2,6 +2,7 @@ package com.api.crud.repositories;
 
 import com.api.crud.DTO.CartAdminFilterDTO;
 import com.api.crud.DTO.CartAdminListDTO;
+import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.Cart;
 import com.api.crud.models.entity.UserModel;
 
@@ -17,14 +18,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort.Order;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Repository;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,7 +42,7 @@ public class CartDaoImp implements CartDao {
         UserModel user =
                 entityManager.find(UserModel.class, userId, LockModeType.PESSIMISTIC_WRITE);
         if (user == null) {
-            throw new IllegalArgumentException("Usuario no encontrado");
+            throw new ResourceNotFoundException("Usuario no encontrado");
         }
         Cart cart =
                 getCartByUserId(userId)
@@ -57,22 +55,17 @@ public class CartDaoImp implements CartDao {
                                     return created;
                                 });
         if (!cart.isActive()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Carrito deshabilitado");
+            throw new BusinessConflictException("Carrito deshabilitado");
         }
         return cart;
     }
 
     @Override
     public void saveCart(Cart cart) {
-        try {
-            if (cart.getIdCart() == null) {
-                entityManager.persist(cart);
-            } else {
-                entityManager.merge(cart);
-            }
-        } catch (Exception e) {
-            logger.error("Error guardando el carrito en la base de datos: ", e);
-            throw new RuntimeException("No se pudo guardar el carrito en la base de datos");
+        if (cart.getIdCart() == null) {
+            entityManager.persist(cart);
+        } else {
+            entityManager.merge(cart);
         }
     }
 
@@ -120,8 +113,7 @@ public class CartDaoImp implements CartDao {
         for (Order sort : pageable.getSort()) {
             String expression = allowed.get(sort.getProperty());
             if (expression == null)
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, "Campo de ordenamiento invalido");
+                throw new InvalidRequestException("Campo de ordenamiento invalido");
             sorting.add(expression + " " + sort.getDirection().name());
         }
         sorting.add("c.idCart DESC");
@@ -219,16 +211,11 @@ public class CartDaoImp implements CartDao {
     @Override
     public List<Cart> getCartsByDateRange(LocalDate start, LocalDate end) {
         String jpql = "SELECT c FROM Cart c WHERE c.creationDate BETWEEN :start AND :end";
-        try {
-            return entityManager
-                    .createQuery(jpql, Cart.class)
-                    .setParameter("start", start)
-                    .setParameter("end", end)
-                    .getResultList();
-        } catch (Exception e) {
-            logger.error("Error obteniendo carritos por rango de fechas: {}", e.getMessage());
-            return Collections.emptyList();
-        }
+        return entityManager
+                .createQuery(jpql, Cart.class)
+                .setParameter("start", start)
+                .setParameter("end", end)
+                .getResultList();
     }
 
     // 🔹 Nuevo método: Carritos con más de N ítems

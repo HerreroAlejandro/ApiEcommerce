@@ -5,7 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.api.crud.controllers.AdminCartItemController;
-import com.api.crud.controllers.CartConflictHandler;
+import com.api.crud.exceptions.*;
 import com.api.crud.services.CartItemService;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -30,7 +30,7 @@ class AdminCartItemControllerTests {
         service = mock(CartItemService.class);
         mvc =
                 MockMvcBuilders.standaloneSetup(new AdminCartItemController(service))
-                        .setControllerAdvice(new CartConflictHandler())
+                        .setControllerAdvice(new GlobalExceptionHandler())
                         .build();
     }
 

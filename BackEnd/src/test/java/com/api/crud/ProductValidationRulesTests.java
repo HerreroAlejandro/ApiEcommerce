@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import com.api.crud.DTO.*;
+import com.api.crud.exceptions.*;
+import com.api.crud.models.entity.ProductDigital;
 import com.api.crud.models.entity.ProductPhysical;
 import com.api.crud.repositories.ProductDao;
 import com.api.crud.services.ProductService;
@@ -46,14 +48,14 @@ class ProductValidationRulesTests {
     @Test
     void roundedZeroOrPriceBeyondStorageLimitIsRejectedBeforeMutation() {
         assertThrows(
-                IllegalArgumentException.class,
+                InvalidRequestException.class,
                 () ->
                         service.adjustProductPrice(
                                 1L, new ProductPriceAdjustmentDTO(new BigDecimal("-99.99"))));
         assertEquals(new BigDecimal("1.99"), product.getPriceProduct());
         product.setPriceProduct(new BigDecimal("99999999.99"));
         assertThrows(
-                IllegalArgumentException.class,
+                InvalidRequestException.class,
                 () ->
                         service.adjustProductPrice(
                                 1L, new ProductPriceAdjustmentDTO(BigDecimal.ONE)));
@@ -65,18 +67,18 @@ class ProductValidationRulesTests {
         ProductStockAdjustmentDTO dto = new ProductStockAdjustmentDTO();
         dto.setAdjustment(1);
         product.setStockProduct(Integer.MAX_VALUE);
-        assertThrows(IllegalArgumentException.class, () -> service.adjustProductStock(1L, dto));
+        assertThrows(InvalidRequestException.class, () -> service.adjustProductStock(1L, dto));
         assertEquals(Integer.MAX_VALUE, product.getStockProduct());
         product.setStockProduct(1);
         dto.setAdjustment(-2);
-        assertThrows(IllegalArgumentException.class, () -> service.adjustProductStock(1L, dto));
+        assertThrows(InvalidRequestException.class, () -> service.adjustProductStock(1L, dto));
         assertEquals(1, product.getStockProduct());
     }
 
     @Test
     void invertedCatalogPricesAndOversizedPagesNeverReachDao() {
         assertThrows(
-                IllegalArgumentException.class,
+                InvalidRequestException.class,
                 () ->
                         service.showProducts(
                                 null,
@@ -87,10 +89,22 @@ class ProductValidationRulesTests {
                                 null,
                                 PageRequest.of(0, 10)));
         assertThrows(
-                IllegalArgumentException.class,
+                InvalidRequestException.class,
                 () ->
                         service.adminShowProducts(
                                 null, null, null, null, null, null, null, PageRequest.of(0, 101)));
         verifyNoInteractions(products);
+    }
+
+    @Test
+    void digitalProductStockChangesAreBusinessConflicts() {
+        when(products.getProductById(1L)).thenReturn(Optional.of(new ProductDigital()));
+        ProductStockUpdateDTO update = new ProductStockUpdateDTO();
+        update.setNewStockProduct(2);
+        ProductStockAdjustmentDTO adjustment = new ProductStockAdjustmentDTO();
+        adjustment.setAdjustment(1);
+        assertThrows(BusinessConflictException.class, () -> service.updateProductStock(1L, update));
+        assertThrows(
+                BusinessConflictException.class, () -> service.adjustProductStock(1L, adjustment));
     }
 }

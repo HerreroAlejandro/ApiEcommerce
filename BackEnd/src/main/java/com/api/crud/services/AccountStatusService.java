@@ -1,16 +1,15 @@
 package com.api.crud.services;
 
 import com.api.crud.DTO.AccountStatusAuditResponseDTO;
+import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.*;
 import com.api.crud.models.enums.AccountStatus;
 import com.api.crud.repositories.*;
 
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.*;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -43,24 +42,20 @@ public class AccountStatusService {
 
     private UserModel actor(String email) {
         UserModel actor =
-                users.getUserByEmail(email)
-                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-        if (actor.getStatus() != AccountStatus.ACTIVE)
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+                users.getUserByEmail(email).orElseThrow(() -> new UnauthenticatedException());
+        if (actor.getStatus() != AccountStatus.ACTIVE) throw new UnauthenticatedException();
         return actor;
     }
 
     private UserModel admin(String email) {
         UserModel actor = actor(email);
-        if (!actor.getRoleNames().contains("ADMIN"))
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        if (!actor.getRoleNames().contains("ADMIN")) throw new ForbiddenOperationException();
         return actor;
     }
 
     private String reason(String reason) {
         if (reason == null || reason.isBlank() || reason.length() > 500) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "Debe indicar un motivo de hasta 500 caracteres");
+            throw new InvalidRequestException("Debe indicar un motivo de hasta 500 caracteres");
         }
         return reason.trim();
     }
@@ -87,7 +82,7 @@ public class AccountStatusService {
         UserModel actor = actor(email);
         UserModel user = statuses.lockUser(actor.getId());
         if (user.getStatus() != AccountStatus.ACTIVE)
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cuenta no activa");
+            throw new BusinessConflictException("Cuenta no activa");
         change(
                 user,
                 user.getId(),
@@ -101,8 +96,7 @@ public class AccountStatusService {
         String motive = reason(reason);
         UserModel actor = admin(email);
         if (actor.getId() == userId)
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT, "No puede bloquear su propia cuenta");
+            throw new BusinessConflictException("No puede bloquear su propia cuenta");
         UserModel user = statuses.lockUser(userId);
         if (user.getStatus() == AccountStatus.BLOCKED) return;
         change(user, actor.getId(), AccountStatus.BLOCKED, motive, "ADMIN_BLOCK");
@@ -124,8 +118,7 @@ public class AccountStatusService {
         UserModel actor = admin(email);
         UserModel user = statuses.lockUser(userId);
         if (user.getStatus() != expected) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT, "Estado de cuenta incompatible con esta operacion");
+            throw new BusinessConflictException("Estado de cuenta incompatible con esta operacion");
         }
         change(user, actor.getId(), AccountStatus.ACTIVE, motive, source);
     }
@@ -148,8 +141,7 @@ public class AccountStatusService {
                 emailAddress,
                 "Account recovery",
                 "Use the following token to reactivate your account: " + token.getToken())) {
-            throw new ResponseStatusException(
-                    HttpStatus.SERVICE_UNAVAILABLE, "No se pudo enviar el correo de recuperacion");
+            throw new ExternalServiceException("No se pudo enviar el correo de recuperacion");
         }
     }
 
@@ -159,16 +151,14 @@ public class AccountStatusService {
                 tokens.getByToken(value)
                         .orElseThrow(
                                 () ->
-                                        new ResponseStatusException(
-                                                HttpStatus.BAD_REQUEST,
+                                        new InvalidRequestException(
                                                 "Token de recuperacion invalido"));
         UserModel user = statuses.lockUser(token.getUser().getId());
         statuses.lockToken(token);
         if (user.getStatus() != AccountStatus.DEACTIVATED
                 || token.isUsed()
                 || !token.getExpirationDate().isAfter(LocalDateTime.now())) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "La cuenta o el token no permiten la recuperacion");
+            throw new InvalidRequestException("La cuenta o el token no permiten la recuperacion");
         }
         token.setUsed(true);
         tokens.update(token);
@@ -183,10 +173,7 @@ public class AccountStatusService {
     @Transactional(readOnly = true)
     public Page<AccountStatusAuditResponseDTO> getHistory(Long userId, Pageable pageable) {
         users.getUserById(userId)
-                .orElseThrow(
-                        () ->
-                                new ResponseStatusException(
-                                        HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
         return statuses.getHistory(userId, pageable)
                 .map(audit -> mapper.map(audit, AccountStatusAuditResponseDTO.class));
     }

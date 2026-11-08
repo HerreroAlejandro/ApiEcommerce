@@ -1,6 +1,7 @@
 package com.api.crud.repositories;
 
 import com.api.crud.DTO.UserUpdateRequestDTO;
+import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.UserModel;
 
 import org.springframework.data.domain.Page;

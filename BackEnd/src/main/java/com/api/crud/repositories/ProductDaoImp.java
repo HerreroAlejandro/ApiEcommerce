@@ -1,5 +1,6 @@
 package com.api.crud.repositories;
 
+import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.Product;
 import com.api.crud.models.enums.ProductType;
 
@@ -31,17 +32,9 @@ public class ProductDaoImp implements ProductDao {
     @Override
     public void saveProduct(Product product) {
         logger.debug("Executing query Registering new product: {}", product.getNameProduct());
-        try {
-            entityManager.persist(product);
-            entityManager.flush();
-            logger.debug("Query Product with ID {} was successfully saved", product.getIdProduct());
-        } catch (Exception e) {
-            logger.error(
-                    "Error query saving Product with ID {}: {}",
-                    product.getIdProduct(),
-                    e.getMessage());
-            throw e;
-        }
+        entityManager.persist(product);
+        entityManager.flush();
+        logger.debug("Query Product with ID {} was successfully saved", product.getIdProduct());
     }
 
     @Override
@@ -551,18 +544,10 @@ public class ProductDaoImp implements ProductDao {
     public boolean deleteProduct(Long idProduct) {
         logger.debug("Executing query Attempting to delete product with ID: {}", idProduct);
         boolean response = false;
-        try {
-            Product product = entityManager.find(Product.class, idProduct);
-            if (product != null) {
-                entityManager.remove(product);
-                response = true;
-            }
-        } catch (Exception e) {
-            logger.error(
-                    "Error while querying delete product with ID {}: {}",
-                    idProduct,
-                    e.getMessage(),
-                    e);
+        Product product = entityManager.find(Product.class, idProduct);
+        if (product != null) {
+            entityManager.remove(product);
+            response = true;
         }
         return response;
     }

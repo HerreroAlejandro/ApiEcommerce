@@ -2,15 +2,14 @@ package com.api.crud.services;
 
 import com.api.crud.DTO.OrderItemAdminDetailDTO;
 import com.api.crud.DTO.OrderItemResponseDTO;
+import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.Order;
 import com.api.crud.models.entity.OrderItem;
 import com.api.crud.repositories.*;
 
 import org.modelmapper.ModelMapper;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -36,12 +35,12 @@ public class OrderItemService {
 
     private long userId(String email) {
         return users.getUserByEmail(email)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED))
+                .orElseThrow(() -> new UnauthenticatedException())
                 .getId();
     }
 
-    private ResponseStatusException notFound() {
-        return new ResponseStatusException(HttpStatus.NOT_FOUND, "Orden o item no encontrado");
+    private ApplicationException notFound() {
+        return new ResourceNotFoundException("Orden o item no encontrado");
     }
 
     private OrderItem item(Long id) {

@@ -9,10 +9,7 @@ import lombok.Setter;
 
 public class OrderStatusUpdateRequestDTO {
 
-    @NotNull
-    @Getter
-    @Setter
-    private OrderStatus status;
+    @NotNull @Getter @Setter private OrderStatus status;
 
     @NotBlank
     @Size(max = 500)

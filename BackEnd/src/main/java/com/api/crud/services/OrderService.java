@@ -1,16 +1,15 @@
 package com.api.crud.services;
 
 import com.api.crud.DTO.*;
+import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.*;
 import com.api.crud.models.enums.*;
 import com.api.crud.repositories.*;
 
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.*;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -37,28 +36,23 @@ public class OrderService {
     }
 
     private UserModel user(String email) {
-        return userDao.getUserByEmail(email)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        return userDao.getUserByEmail(email).orElseThrow(() -> new UnauthenticatedException());
     }
 
     private Order owned(String email, Long id) {
         long userId = user(email).getId();
         return orderDao.getOrderById(id)
                 .filter(order -> order.getUserOrder().getId() == userId)
-                .orElseThrow(
-                        () ->
-                                new ResponseStatusException(
-                                        HttpStatus.NOT_FOUND, "Orden no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Orden no encontrada"));
     }
 
-    private ResponseStatusException conflict(String message) {
-        return new ResponseStatusException(HttpStatus.CONFLICT, message);
+    private ApplicationException conflict(String message) {
+        return new BusinessConflictException(message);
     }
 
     private String reason(String reason) {
         if (reason == null || reason.isBlank() || reason.length() > 500) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "Debe indicar un motivo de hasta 500 caracteres");
+            throw new InvalidRequestException("Debe indicar un motivo de hasta 500 caracteres");
         }
         return reason.trim();
     }
@@ -87,10 +81,7 @@ public class OrderService {
     public OrderAdminDetailDTO getAdminOrder(Long id) {
         Order order =
                 orderDao.getOrderById(id)
-                        .orElseThrow(
-                                () ->
-                                        new ResponseStatusException(
-                                                HttpStatus.NOT_FOUND, "Orden no encontrada"));
+                        .orElseThrow(() -> new ResourceNotFoundException("Orden no encontrada"));
         return mapper.map(order, OrderAdminDetailDTO.class);
     }
 
@@ -142,7 +133,8 @@ public class OrderService {
             if (amount <= 0 || !product.isActive())
                 throw conflict("Producto o cantidad no disponible");
             if (product instanceof ProductPhysical physical) {
-                if (physical.getStockProduct() < amount) throw conflict("Stock insuficiente");
+                if (physical.getStockProduct() < amount)
+                    throw new InsufficientStockException("Stock insuficiente");
                 physical.setStockProduct(physical.getStockProduct() - amount);
             }
             OrderItem line = new OrderItem(order, product, amount, product.getPriceProduct());
@@ -170,7 +162,7 @@ public class OrderService {
         owned(email, id);
         Order order = workflow.lockOrder(id);
         if (order.getUserOrder().getId() != actor.getId()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Orden no encontrada");
+            throw new ResourceNotFoundException("Orden no encontrada");
         }
         if (order.getOrderStatus() == OrderStatus.CANCELED) return;
         if (order.getOrderStatus() != OrderStatus.PENDING
@@ -219,8 +211,7 @@ public class OrderService {
     @Transactional
     public void updateOrderStatus(String email, Long id, OrderStatus status, String reason) {
         String motive = reason(reason);
-        if (status == null)
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado requerido");
+        if (status == null) throw new InvalidRequestException("Estado requerido");
         UserModel actor = user(email);
         Order order = workflow.lockOrder(id);
         if (status == OrderStatus.CANCELED) {
@@ -250,8 +241,7 @@ public class OrderService {
     @Transactional
     public void updatePaymentStatus(String email, Long id, PaymentStatus status, String reason) {
         String motive = reason(reason);
-        if (status == null)
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado requerido");
+        if (status == null) throw new InvalidRequestException("Estado requerido");
         UserModel actor = user(email);
         Order order = workflow.lockOrder(id);
         PaymentStatus previous = order.getPaymentStatus();

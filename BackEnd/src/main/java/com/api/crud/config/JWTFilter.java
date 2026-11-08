@@ -1,5 +1,6 @@
 package com.api.crud.config;
 
+import com.api.crud.exceptions.SecurityProblemHandler;
 import com.api.crud.models.entity.UserModel;
 import com.api.crud.models.enums.AccountStatus;
 import com.api.crud.repositories.UserDao;
@@ -11,6 +12,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import org.springframework.dao.DataAccessException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -41,6 +43,11 @@ public class JWTFilter extends OncePerRequestFilter {
                 authenticate(header.substring(7));
             } catch (JwtException | IllegalArgumentException exception) {
                 SecurityContextHolder.clearContext();
+            } catch (DataAccessException exception) {
+                SecurityContextHolder.clearContext();
+                logger.error("No se pudo verificar la sesion", exception);
+                new SecurityProblemHandler().unavailable(request, response, exception);
+                return;
             }
         }
         chain.doFilter(request, response);

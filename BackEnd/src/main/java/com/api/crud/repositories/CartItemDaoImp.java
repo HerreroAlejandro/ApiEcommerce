@@ -1,5 +1,6 @@
 package com.api.crud.repositories;
 
+import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.CartItem;
 
 import jakarta.persistence.EntityManager;
@@ -64,7 +65,7 @@ public class CartItemDaoImp implements CartItemDao {
         if (cartItem != null) {
             entityManager.remove(cartItem);
         } else {
-            throw new IllegalArgumentException("El item del carrito no existe.");
+            throw new ResourceNotFoundException("El item del carrito no existe.");
         }
     }
 }

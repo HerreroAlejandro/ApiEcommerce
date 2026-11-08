@@ -2,6 +2,7 @@ package com.api.crud.services;
 
 import com.api.crud.DTO.*;
 import com.api.crud.config.JWTUtil;
+import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.PasswordResetToken;
 import com.api.crud.models.entity.Role;
 import com.api.crud.models.entity.UserModel;
@@ -57,44 +58,27 @@ public class UserService {
     private AccountStatusService accountStatusService;
 
     public String login(LoginRequestDTO loginRequestDTO) {
-        logger.info("Attempting Service login for user: {}", loginRequestDTO.getEmail());
-        Optional<UserModel> userModel = userDao.getUserByEmail(loginRequestDTO.getEmail());
-        if (userModel.isEmpty()) {
-            logger.debug("Login failed: User {} not found", loginRequestDTO.getEmail());
-            throw new IllegalArgumentException("User not found");
-        }
-        UserModel user = userModel.get();
-        if (user.getStatus() != AccountStatus.ACTIVE) {
-            logger.debug("Login failed: User {} is deactivated", loginRequestDTO.getEmail());
-            throw new IllegalArgumentException("User account is not active");
-        }
+        UserModel user =
+                userDao.getUserByEmail(loginRequestDTO.getEmail())
+                        .orElseThrow(
+                                () ->
+                                        new UnauthenticatedException(
+                                                "Email o contraseña incorrectos"));
         if (!passwordEncoder.matches(loginRequestDTO.getPassword(), user.getPassword())) {
-            logger.debug("Login failed: Incorrect password for {}", loginRequestDTO.getEmail());
-            throw new IllegalArgumentException("Wrong password");
+            throw new UnauthenticatedException("Email o contraseña incorrectos");
         }
-        List<String> roles = getRolesForEmail(user.getEmail());
-        logger.info(
-                "User {} logged in successfully with roles {}", loginRequestDTO.getEmail(), roles);
-        return jwtUtil.generateToken(user.getEmail(), roles, user.getAuthVersion());
+        if (user.getStatus() != AccountStatus.ACTIVE) {
+            throw new ForbiddenOperationException("La cuenta no esta activa");
+        }
+        return jwtUtil.generateToken(
+                user.getEmail(), user.getRoleNames().stream().toList(), user.getAuthVersion());
     }
 
-    private List<String> getRolesForEmail(String email) {
-        logger.info("Starting to process fetching roles for user with email: {}", email);
-        Optional<UserModel> response = userDao.getUserByEmail(email);
-        if (response.isPresent()) {
-            List<String> roles =
-                    response.get().getRoles().stream()
-                            .map(Role::getNameRole)
-                            .collect(Collectors.toList());
-            logger.info("Roles found for user {}: {}", email, roles);
-            return roles;
-        } else {
-            logger.debug("User with email {} not found", email);
-            throw new RuntimeException("User not found");
-        }
-    }
-
+    @Transactional
     public void register(UserRegisterDTO userRegisterDTO) {
+        if (userDao.getUserByEmail(userRegisterDTO.getEmail()).isPresent()) {
+            throw new BusinessConflictException("Ya existe una cuenta con ese email");
+        }
         logger.info("Starting to process register users in service");
         UserModel userModel = modelMapper.map(userRegisterDTO, UserModel.class);
         userModel.setPassword(passwordEncoder.encode(userModel.getPassword()));
@@ -106,7 +90,7 @@ public class UserService {
                         .orElseThrow(
                                 () -> {
                                     logger.debug("Registration failed: Role CLIENT does not exist");
-                                    return new IllegalArgumentException(
+                                    return new IllegalStateException(
                                             "El rol CLIENT no existe en la base de datos");
                                 });
         userModel.getRoles().add(role);
@@ -116,6 +100,14 @@ public class UserService {
         }
         userDao.register(userModel);
         logger.info("User {} registered successfully", userRegisterDTO.getEmail());
+        if (!emailService.sendEmail(
+                userModel.getEmail(),
+                "Registration Confirmation",
+                "Hello "
+                        + userModel.getFirstName()
+                        + ",\n\nYour account has been created successfully.\n\nGreetings!")) {
+            throw new ExternalServiceException("No se pudo enviar el correo de confirmacion");
+        }
     }
 
     public List<UserListAdminResponseDTO> getUserByName(String firstName, String lastName) {
@@ -172,12 +164,12 @@ public class UserService {
     public void changePassword(String email, PasswordChangeRequestDTO dto) {
         UserModel user =
                 userDao.getUserByEmail(email)
-                        .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                        .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
         if (!passwordEncoder.matches(dto.getCurrentPassword(), user.getPassword())) {
-            throw new RuntimeException("Contraseña actual incorrecta");
+            throw new InvalidRequestException("Contraseña actual incorrecta");
         }
         if (!dto.getNewPassword().equals(dto.getConfirmPassword())) {
-            throw new RuntimeException("La nueva contraseña y su confirmación no coinciden");
+            throw new InvalidRequestException("La nueva contraseña y su confirmación no coinciden");
         }
         user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
         user.setAuthVersion(Math.incrementExact(user.getAuthVersion()));
@@ -228,9 +220,9 @@ public class UserService {
     public void resetPasswordByAdmin(Long id, PasswordResetDTO dto) {
         UserModel user =
                 userDao.getUserById(id)
-                        .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                        .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
         if (!dto.getNewPassword().equals(dto.getConfirmPassword())) {
-            throw new RuntimeException("La nueva contraseña y su confirmación no coinciden");
+            throw new InvalidRequestException("La nueva contraseña y su confirmación no coinciden");
         }
         user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
         user.setAuthVersion(Math.incrementExact(user.getAuthVersion()));
@@ -245,6 +237,7 @@ public class UserService {
         accountStatusService.activateWithRecoveryToken(token);
     }
 
+    @Transactional
     public void requestPasswordReset(String email) {
         logger.info("Starting password reset request for email: {}", email);
         Optional<UserModel> optionalUser = userDao.getUserByEmail(email);
@@ -264,7 +257,9 @@ public class UserService {
         passwordResetTokenDao.save(resetToken);
         String subject = "Password reset";
         String body = "Use the following token to reset your password: " + token;
-        emailService.sendEmail(email, subject, body);
+        if (!emailService.sendEmail(email, subject, body)) {
+            throw new ExternalServiceException("No se pudo enviar el correo de recuperacion");
+        }
         logger.info("Password reset token generated successfully");
     }
 
@@ -273,15 +268,18 @@ public class UserService {
         PasswordResetToken resetToken =
                 passwordResetTokenDao
                         .getByToken(token)
-                        .orElseThrow(() -> new RuntimeException("Token de recuperación inválido"));
+                        .orElseThrow(
+                                () ->
+                                        new InvalidRequestException(
+                                                "Token de recuperación inválido"));
         if (resetToken.isUsed()) {
-            throw new RuntimeException("El token de recuperación ya fue utilizado");
+            throw new InvalidRequestException("El token de recuperación ya fue utilizado");
         }
         if (resetToken.getExpirationDate().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("El token de recuperación ha expirado");
+            throw new InvalidRequestException("El token de recuperación ha expirado");
         }
         if (!dto.getNewPassword().equals(dto.getConfirmPassword())) {
-            throw new RuntimeException("La nueva contraseña y su confirmación no coinciden");
+            throw new InvalidRequestException("La nueva contraseña y su confirmación no coinciden");
         }
         UserModel user = resetToken.getUser();
         user.setPassword(passwordEncoder.encode(dto.getNewPassword()));

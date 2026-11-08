@@ -35,9 +35,7 @@ public class UserRegisterDTO {
 
     @Getter
     @Setter
-    @NotBlank
-    @PasswordValue
-    private String password;
+    @NotBlank @PasswordValue private String password;
 
     public UserRegisterDTO(
             String firstName, String lastName, String email, String phone, String password) {

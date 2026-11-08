@@ -2,6 +2,7 @@ package com.api.crud.services;
 
 import com.api.crud.DTO.CartItemAdminDetailDTO;
 import com.api.crud.DTO.CartItemAdminListDTO;
+import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.Cart;
 import com.api.crud.models.entity.CartChangeAudit;
 import com.api.crud.models.entity.CartItem;
@@ -20,9 +21,7 @@ import org.modelmapper.ModelMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -53,8 +52,7 @@ public class CartItemService {
 
     private String validReason(String reason) {
         if (reason == null || reason.isBlank() || reason.length() > 500) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "Debe indicar un motivo de hasta 500 caracteres");
+            throw new InvalidRequestException("Debe indicar un motivo de hasta 500 caracteres");
         }
         return reason.trim();
     }
@@ -84,12 +82,9 @@ public class CartItemService {
         CartItem item =
                 cartItemDao
                         .getCartItemById(itemId)
-                        .orElseThrow(
-                                () ->
-                                        new ResponseStatusException(
-                                                HttpStatus.NOT_FOUND, "Item no encontrado"));
+                        .orElseThrow(() -> new ResourceNotFoundException("Item no encontrado"));
         if (!item.getCart().isActive()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Carrito inactivo");
+            throw new BusinessConflictException("Carrito inactivo");
         }
         return item;
     }
@@ -100,10 +95,7 @@ public class CartItemService {
         UserModel actor = authenticatedUser(email);
         Cart cart =
                 cartDao.getCartById(cartId)
-                        .orElseThrow(
-                                () ->
-                                        new ResponseStatusException(
-                                                HttpStatus.NOT_FOUND, "Carrito no encontrado"));
+                        .orElseThrow(() -> new ResourceNotFoundException("Carrito no encontrado"));
         if (cart.isActive() != active) {
             audit(actor, cart, null, active ? "ENABLE" : "DISABLE", 0, 0, motive);
             cart.setActive(active);
@@ -116,10 +108,7 @@ public class CartItemService {
         UserModel actor = authenticatedUser(email);
         Cart cart =
                 cartDao.getCartById(cartId)
-                        .orElseThrow(
-                                () ->
-                                        new ResponseStatusException(
-                                                HttpStatus.NOT_FOUND, "Carrito no encontrado"));
+                        .orElseThrow(() -> new ResourceNotFoundException("Carrito no encontrado"));
         for (CartItem item : cart.getItemsCart()) {
             audit(
                     actor,
@@ -139,10 +128,7 @@ public class CartItemService {
         String motive = validReason(reason);
         UserModel actor = authenticatedUser(email);
         userDao.getUserById(userId)
-                .orElseThrow(
-                        () ->
-                                new ResponseStatusException(
-                                        HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
         positive(amount);
         Cart cart = cartDao.getOrCreateActiveCart(userId);
         int previous =
@@ -214,12 +200,9 @@ public class CartItemService {
         UserModel actor = authenticatedUser(email);
         Cart cart =
                 cartDao.getCartById(cartId)
-                        .orElseThrow(
-                                () ->
-                                        new ResponseStatusException(
-                                                HttpStatus.NOT_FOUND, "Carrito no encontrado"));
+                        .orElseThrow(() -> new ResourceNotFoundException("Carrito no encontrado"));
         if (!cart.isActive()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Carrito inactivo");
+            throw new BusinessConflictException("Carrito inactivo");
         }
         if (cart.getItemsCart().isEmpty()) {
             audit(actor, cart, null, "CLEAR", 0, 0, motive);
@@ -238,8 +221,7 @@ public class CartItemService {
     }
 
     private UserModel authenticatedUser(String email) {
-        return userDao.getUserByEmail(email)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        return userDao.getUserByEmail(email).orElseThrow(() -> new UnauthenticatedException());
     }
 
     private CartItem ownedItem(String email, Long itemId) {
@@ -247,31 +229,27 @@ public class CartItemService {
         CartItem item =
                 cartItemDao
                         .getCartItemById(itemId)
-                        .orElseThrow(
-                                () ->
-                                        new ResponseStatusException(
-                                                HttpStatus.NOT_FOUND, "Item no encontrado"));
+                        .orElseThrow(() -> new ResourceNotFoundException("Item no encontrado"));
         if (item.getCart().getUserCart().getId() != user.getId() || !item.getCart().isActive()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Item no encontrado");
+            throw new ResourceNotFoundException("Item no encontrado");
         }
         return item;
     }
 
     private void positive(int amount) {
         if (amount <= 0 || amount > 99999999) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "La cantidad debe estar entre 1 y 99999999");
+            throw new InvalidRequestException("La cantidad debe estar entre 1 y 99999999");
         }
     }
 
     private void available(Product product, long amount) {
         if (!product.isActive()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Producto desactivado");
+            throw new BusinessConflictException("Producto desactivado");
         }
         if (amount > 99999999
                 || (product instanceof ProductPhysical physical
                         && amount > physical.getStockProduct())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cantidad no disponible");
+            throw new InsufficientStockException("Cantidad no disponible");
         }
     }
 
@@ -323,10 +301,7 @@ public class CartItemService {
         Product product =
                 productDao
                         .getProductById(productId)
-                        .orElseThrow(
-                                () ->
-                                        new ResponseStatusException(
-                                                HttpStatus.NOT_FOUND, "Producto no encontrado"));
+                        .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
         Optional<CartItem> existingCartItem =
                 cartItemDao.getByCartAndProductId(cart.getIdCart(), productId);
         long resultingAmount =
@@ -355,10 +330,7 @@ public class CartItemService {
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<CartItemAdminListDTO> getItemsByCartId(Long cartId) {
         cartDao.getCartById(cartId)
-                .orElseThrow(
-                        () ->
-                                new ResponseStatusException(
-                                        HttpStatus.NOT_FOUND, "Carrito no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Carrito no encontrado"));
         return cartItemDao.getItemsByCartId(cartId).stream()
                 .map(item -> modelMapper.map(item, CartItemAdminListDTO.class))
                 .toList();

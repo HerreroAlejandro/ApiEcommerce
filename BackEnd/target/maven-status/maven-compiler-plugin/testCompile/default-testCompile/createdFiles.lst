@@ -1,1 +1,4 @@
+com\api\crud\PersistenceExceptionTests.class
+com\api\crud\OrderSecurityTests$Config.class
+com\api\crud\OrderSecurityTests.class
 com\api\crud\CrudApplicationTests.class

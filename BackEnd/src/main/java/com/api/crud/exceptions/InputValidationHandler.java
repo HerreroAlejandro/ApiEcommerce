@@ -1,11 +1,13 @@
-package com.api.crud.controllers;
+package com.api.crud.exceptions;
 
 import jakarta.validation.ConstraintViolationException;
 
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
@@ -14,12 +16,14 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+@Order(0)
 @RestControllerAdvice
 public class InputValidationHandler {
 
     private ProblemDetail invalid(String detail, Map<String, String> errors) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
         problem.setTitle("Datos de entrada invalidos");
+        problem.setProperty("code", "INVALID_REQUEST");
         if (!errors.isEmpty()) problem.setProperty("errors", errors);
         return problem;
     }
@@ -88,10 +92,10 @@ public class InputValidationHandler {
         return invalid("JSON invalido: revise los tipos, enums y campos enviados", Map.of());
     }
 
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ProblemDetail invalidRule(IllegalArgumentException exception) {
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ProblemDetail missingParameter(MissingServletRequestParameterException exception) {
         return invalid(
-                exception.getMessage() == null ? "Datos invalidos" : exception.getMessage(),
-                Map.of());
+                "Falta un parametro obligatorio",
+                Map.of(exception.getParameterName(), "Campo obligatorio"));
     }
 }

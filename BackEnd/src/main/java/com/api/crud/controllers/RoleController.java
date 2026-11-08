@@ -1,6 +1,7 @@
 package com.api.crud.controllers;
 
 import com.api.crud.DTO.RoleDTO;
+import com.api.crud.exceptions.ResourceNotFoundException;
 import com.api.crud.services.RoleService;
 
 import jakarta.validation.Valid;
@@ -9,11 +10,9 @@ import jakarta.validation.constraints.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Collections;
 import java.util.List;
@@ -33,7 +32,7 @@ public class RoleController {
         List<RoleDTO> roles = roleService.getRoles();
         ResponseEntity<List<RoleDTO>> response;
         if (roles.isEmpty()) {
-            response = ResponseEntity.status(HttpStatus.NOT_FOUND).body(Collections.emptyList());
+            response = ResponseEntity.ok(Collections.emptyList());
         } else {
             logger.info("Roles fetched successfully. Total roles found: {}", roles.size());
             response = ResponseEntity.ok(roles);
@@ -51,7 +50,7 @@ public class RoleController {
             response = ResponseEntity.ok(roleDTO.get());
         } else {
             logger.debug("Role with id {} not found", id);
-            response = ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+            throw new ResourceNotFoundException();
         }
         return response;
     }
@@ -67,48 +66,15 @@ public class RoleController {
             response = ResponseEntity.ok(roleDTO.get());
         } else {
             logger.debug("Role {} not found", roleName);
-            response = ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+            throw new ResourceNotFoundException();
         }
         return response;
     }
 
     @PostMapping(path = "/SaveRole")
     public ResponseEntity<String> saveRole(@Valid @RequestBody RoleDTO roleDto) {
-        logger.info("Starting to save role: {}", roleDto.getNameRole());
-        ResponseEntity<String> response;
-        try {
-            if (roleService.getRoleByName(roleDto.getNameRole()).isPresent()) {
-                logger.warn("The Role '{}' already exists.", roleDto.getNameRole());
-                response =
-                        ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                                .body("The Role already exists");
-            } else {
-                roleService.saveRole(roleDto);
-                response =
-                        ResponseEntity.status(HttpStatus.CREATED).body("Role created successfully");
-                logger.info("Role {} created successfully.", roleDto.getNameRole());
-            }
-        } catch (DataIntegrityViolationException e) {
-            logger.error(
-                    "DataIntegrityViolationException occurred while saving role '{}': {}",
-                    roleDto.getNameRole(),
-                    e.getMessage());
-            response =
-                    ResponseEntity.status(HttpStatus.CONFLICT).body("Duplicate role name detected");
-        } catch (IllegalArgumentException e) {
-            throw e;
-        } catch (ResponseStatusException e) {
-            throw e;
-        } catch (Exception e) {
-            logger.error(
-                    "Unexpected error occurred while saving role '{}': {}",
-                    roleDto.getNameRole(),
-                    e.getMessage());
-            response =
-                    ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                            .body("Failed to create role: " + e.getMessage());
-        }
-        return response;
+        roleService.saveRole(roleDto);
+        return ResponseEntity.status(HttpStatus.CREATED).body("Role created successfully");
     }
 
     @DeleteMapping(path = "/deleteRoleById/{id}")
@@ -121,9 +87,7 @@ public class RoleController {
             response = ResponseEntity.ok("Role with ID " + id + " deleted successfully");
         } else {
             logger.info("Role with ID {} not found or deletion failed", id);
-            response =
-                    ResponseEntity.status(HttpStatus.NOT_FOUND)
-                            .body("Role with ID " + id + " not found or deletion failed");
+            throw new ResourceNotFoundException();
         }
         return response;
     }

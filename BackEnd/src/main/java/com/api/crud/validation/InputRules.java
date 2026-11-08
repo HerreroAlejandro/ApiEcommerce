@@ -1,5 +1,7 @@
 package com.api.crud.validation;
 
+import com.api.crud.exceptions.*;
+
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
@@ -10,7 +12,7 @@ public final class InputRules {
 
     public static void page(Pageable page) {
         if (page.getPageSize() > 100 || page.getOffset() > Integer.MAX_VALUE) {
-            throw new IllegalArgumentException(
+            throw new InvalidRequestException(
                     "La pagina debe tener entre 1 y 100 elementos y un desplazamiento valido");
         }
     }
@@ -20,7 +22,7 @@ public final class InputRules {
                 || (max != null
                         && (max.signum() < 0 || max.compareTo(new BigDecimal("99999999.99")) > 0))
                 || (min != null && max != null && min.compareTo(max) > 0)) {
-            throw new IllegalArgumentException("Rango de precios invalido");
+            throw new InvalidRequestException("Rango de precios invalido");
         }
     }
 
@@ -28,7 +30,7 @@ public final class InputRules {
         if (price == null
                 || price.signum() <= 0
                 || price.compareTo(new BigDecimal("99999999.99")) > 0) {
-            throw new IllegalArgumentException(
+            throw new InvalidRequestException(
                     "El precio debe ser mayor a cero y no superar 99999999.99");
         }
     }

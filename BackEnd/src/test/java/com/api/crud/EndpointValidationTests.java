@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.api.crud.controllers.*;
+import com.api.crud.exceptions.*;
 import com.api.crud.services.*;
 
 import org.hamcrest.Matchers;

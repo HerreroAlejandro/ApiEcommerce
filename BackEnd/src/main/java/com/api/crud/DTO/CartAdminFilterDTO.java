@@ -25,13 +25,7 @@ public class CartAdminFilterDTO {
     @Setter
     private Boolean active;
 
-    @Positive
-    @Getter
-    @Setter
-    private Long productId;
+    @Positive @Getter @Setter private Long productId;
 
-    @Positive
-    @Getter
-    @Setter
-    private Integer minProductQuantity;
+    @Positive @Getter @Setter private Integer minProductQuantity;
 }

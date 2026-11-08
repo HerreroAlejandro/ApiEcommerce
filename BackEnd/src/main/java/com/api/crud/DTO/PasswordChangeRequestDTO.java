@@ -17,19 +17,9 @@ public class PasswordChangeRequestDTO {
     @PasswordValue(min = 1, message = "La contraseña actual no puede superar 72 bytes UTF-8")
     private String currentPassword;
 
-    @NotNull
-    @Getter
-    @Setter
-    @NotBlank
-    @PasswordValue
-    private String newPassword;
+    @NotNull @Getter @Setter @NotBlank @PasswordValue private String newPassword;
 
-    @NotNull
-    @Getter
-    @Setter
-    @NotBlank
-    @PasswordValue
-    private String confirmPassword;
+    @NotNull @Getter @Setter @NotBlank @PasswordValue private String confirmPassword;
 
     public PasswordChangeRequestDTO(
             String currentPassword, String newPassword, String confirmPassword) {

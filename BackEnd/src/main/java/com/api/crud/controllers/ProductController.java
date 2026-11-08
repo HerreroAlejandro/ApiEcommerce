@@ -1,6 +1,7 @@
 package com.api.crud.controllers;
 
 import com.api.crud.DTO.*;
+import com.api.crud.exceptions.ResourceNotFoundException;
 import com.api.crud.models.enums.ProductType;
 import com.api.crud.services.ProductService;
 
@@ -11,7 +12,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -67,7 +67,7 @@ public class ProductController {
             response = ResponseEntity.ok(product.get());
         } else {
             logger.info("Product with ID: {} not found.", id);
-            response = ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            throw new ResourceNotFoundException();
         }
         return response;
     }

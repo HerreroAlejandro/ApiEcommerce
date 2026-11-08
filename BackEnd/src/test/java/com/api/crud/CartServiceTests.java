@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 import com.api.crud.DTO.CartAdminFilterDTO;
 import com.api.crud.DTO.CartAdminListDTO;
 import com.api.crud.config.ModelMapperConfig;
+import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.*;
 import com.api.crud.repositories.*;
 import com.api.crud.services.CartService;
@@ -15,7 +16,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -82,14 +82,13 @@ class CartServiceTests {
         filter.setMinTotal(new BigDecimal("100"));
         filter.setMaxTotal(new BigDecimal("50"));
         var page = PageRequest.of(0, 10);
-        assertThrows(ResponseStatusException.class, () -> service.getCarts(filter, page));
+        assertThrows(ApplicationException.class, () -> service.getCarts(filter, page));
         filter.setMaxTotal(null);
         filter.setMinProductQuantity(2);
-        assertThrows(ResponseStatusException.class, () -> service.getCarts(filter, page));
+        assertThrows(ApplicationException.class, () -> service.getCarts(filter, page));
         filter.setProductId(8L);
         assertThrows(
-                ResponseStatusException.class,
-                () -> service.getCarts(filter, PageRequest.of(0, 101)));
+                ApplicationException.class, () -> service.getCarts(filter, PageRequest.of(0, 101)));
         verifyNoInteractions(carts);
     }
 

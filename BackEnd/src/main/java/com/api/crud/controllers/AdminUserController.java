@@ -6,6 +6,7 @@ import com.api.crud.DTO.PasswordResetDTO;
 import com.api.crud.DTO.UserDetailAdminResponseDTO;
 import com.api.crud.DTO.UserListAdminResponseDTO;
 import com.api.crud.DTO.UserResponseDTO;
+import com.api.crud.exceptions.ResourceNotFoundException;
 import com.api.crud.services.AccountStatusService;
 import com.api.crud.services.UserService;
 
@@ -20,7 +21,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -48,7 +48,7 @@ public class AdminUserController {
         ResponseEntity<List<UserResponseDTO>> response;
         if (users.isEmpty()) {
             logger.info("No users found");
-            response = ResponseEntity.status(HttpStatus.NOT_FOUND).body(Collections.emptyList());
+            response = ResponseEntity.ok(Collections.emptyList());
         } else {
             logger.info("Successfully found {} users.", users.size());
             response = ResponseEntity.ok(users);
@@ -81,7 +81,7 @@ public class AdminUserController {
         Page<UserListAdminResponseDTO> users = userService.getUserAdmin(pageable, role);
         if (users.isEmpty()) {
             logger.info("No users found with the specified criteria.");
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Page.empty());
+            return ResponseEntity.ok(Page.empty());
         }
         logger.info("Successfully fetched {} users.", users.getTotalElements());
         return ResponseEntity.ok(users);
@@ -97,7 +97,7 @@ public class AdminUserController {
             response = ResponseEntity.ok(user.get());
         } else {
             logger.info("User with ID: {} not found.", id);
-            response = ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            throw new ResourceNotFoundException();
         }
         return response;
     }
@@ -114,7 +114,7 @@ public class AdminUserController {
             response = ResponseEntity.ok(users);
         } else {
             logger.info("No users found with name: {} {}.", firstName, lastName);
-            response = ResponseEntity.status(HttpStatus.NOT_FOUND).body(Collections.emptyList());
+            response = ResponseEntity.ok(Collections.emptyList());
         }
         return response;
     }
@@ -127,7 +127,7 @@ public class AdminUserController {
         ResponseEntity<UserDetailAdminResponseDTO> response;
         if (user.isEmpty()) {
             logger.info("User with email: {} not found.", email);
-            response = ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            throw new ResourceNotFoundException();
         } else {
             logger.info("User with email: {} found successfully.", email);
             response = ResponseEntity.ok(user.get());
@@ -139,14 +139,9 @@ public class AdminUserController {
     public ResponseEntity<String> resetPasswordByAdmin(
             @PathVariable @Positive Long id, @Valid @RequestBody PasswordResetDTO dto) {
         logger.info("Received request to reset password for user with ID: {}", id);
-        try {
-            userService.resetPasswordByAdmin(id, dto);
-            logger.info("Password reset successfully for user with ID: {}", id);
-            return ResponseEntity.ok("Password reset successfully");
-        } catch (RuntimeException ex) {
-            logger.error("Error resetting password for user with ID {}: {}", id, ex.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
-        }
+        userService.resetPasswordByAdmin(id, dto);
+        logger.info("Password reset successfully for user with ID: {}", id);
+        return ResponseEntity.ok("Password reset successfully");
     }
 
     @PatchMapping("/users/{id}/block")

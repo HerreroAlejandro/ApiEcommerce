@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import com.api.crud.config.ModelMapperConfig;
+import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.*;
 import com.api.crud.repositories.*;
 import com.api.crud.services.CartItemService;
@@ -12,7 +13,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -78,7 +78,7 @@ class CartItemServiceTests {
         verify(audits).save(capture.capture());
         assertEquals("DISABLE", capture.getValue().getAction());
         assertThrows(
-                ResponseStatusException.class,
+                ApplicationException.class,
                 () -> service.increaseMyItemAmount("client@example.com", 1L, 1));
         service.changeAdminCartState("client@example.com", 12L, true, "Revision finalizada");
         assertTrue(item.getCart().isActive());
@@ -115,16 +115,16 @@ class CartItemServiceTests {
     @Test
     void adminRejectsInvalidReasonOrStockWithoutRecordingChange() {
         assertThrows(
-                ResponseStatusException.class,
+                ApplicationException.class,
                 () -> service.updateAdminItemAmount("client@example.com", 1L, 3, " "));
         assertEquals(
                 409,
-                assertThrows(
-                                ResponseStatusException.class,
-                                () ->
-                                        service.increaseAdminItemAmount(
-                                                "client@example.com", 1L, 4, "Asistencia"))
-                        .getStatusCode()
+                ExceptionProblems.status(
+                                assertThrows(
+                                        ApplicationException.class,
+                                        () ->
+                                                service.increaseAdminItemAmount(
+                                                        "client@example.com", 1L, 4, "Asistencia")))
                         .value());
         assertEquals(2, item.getAmountCartItem());
         verifyNoInteractions(audits);
@@ -160,8 +160,10 @@ class CartItemServiceTests {
         when(carts.getCartById(12L)).thenReturn(Optional.empty());
         assertEquals(
                 404,
-                assertThrows(ResponseStatusException.class, () -> service.getItemsByCartId(12L))
-                        .getStatusCode()
+                ExceptionProblems.status(
+                                assertThrows(
+                                        ApplicationException.class,
+                                        () -> service.getItemsByCartId(12L)))
                         .value());
         when(carts.getCartById(12L)).thenReturn(Optional.of(item.getCart()));
         when(items.getItemsByCartId(12L)).thenReturn(List.of());
@@ -192,20 +194,21 @@ class CartItemServiceTests {
         item.getCart().setUserCart(other);
         assertEquals(
                 404,
-                assertThrows(
-                                ResponseStatusException.class,
-                                () -> service.updateMyItemAmount("client@example.com", 1L, 3))
-                        .getStatusCode()
+                ExceptionProblems.status(
+                                assertThrows(
+                                        ApplicationException.class,
+                                        () ->
+                                                service.updateMyItemAmount(
+                                                        "client@example.com", 1L, 3)))
                         .value());
         assertThrows(
-                ResponseStatusException.class,
+                ApplicationException.class,
                 () -> service.increaseMyItemAmount("client@example.com", 1L, 1));
         assertThrows(
-                ResponseStatusException.class,
+                ApplicationException.class,
                 () -> service.decreaseMyItemAmount("client@example.com", 1L, 1));
         assertThrows(
-                ResponseStatusException.class,
-                () -> service.removeMyItem("client@example.com", 1L));
+                ApplicationException.class, () -> service.removeMyItem("client@example.com", 1L));
         assertEquals(2, item.getAmountCartItem());
         verify(items, never()).removeCartItem(anyLong());
     }
@@ -213,18 +216,16 @@ class CartItemServiceTests {
     @Test
     void rejectsInvalidAmountsUnavailableStockAndInactiveProducts() {
         assertThrows(
-                ResponseStatusException.class,
-                () -> service.addMyItem("client@example.com", 4L, 0));
+                ApplicationException.class, () -> service.addMyItem("client@example.com", 4L, 0));
         assertThrows(
-                ResponseStatusException.class,
+                ApplicationException.class,
                 () -> service.updateMyItemAmount("client@example.com", 1L, -1));
         assertThrows(
-                ResponseStatusException.class,
+                ApplicationException.class,
                 () -> service.increaseMyItemAmount("client@example.com", 1L, 4));
         item.getProductCartItem().setActive(false);
         assertThrows(
-                ResponseStatusException.class,
-                () -> service.addMyItem("client@example.com", 4L, 1));
+                ApplicationException.class, () -> service.addMyItem("client@example.com", 4L, 1));
         verify(items, never()).saveCartItem(any());
     }
 
@@ -236,8 +237,7 @@ class CartItemServiceTests {
         assertEquals(new BigDecimal("600.00"), item.getSubtotal());
         verify(carts).getOrCreateActiveCart(7L);
         assertThrows(
-                ResponseStatusException.class,
-                () -> service.addMyItem("client@example.com", 4L, 2));
+                ApplicationException.class, () -> service.addMyItem("client@example.com", 4L, 2));
         assertEquals(4, item.getAmountCartItem());
     }
 

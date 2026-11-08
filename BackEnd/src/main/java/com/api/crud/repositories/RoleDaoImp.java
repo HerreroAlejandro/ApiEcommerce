@@ -1,5 +1,6 @@
 package com.api.crud.repositories;
 
+import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.Role;
 
 import jakarta.persistence.EntityManager;
@@ -11,7 +12,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,7 +36,7 @@ public class RoleDaoImp implements RoleDao {
                             .setParameter("roleName", roleName)
                             .getSingleResult();
         } catch (NoResultException e) {
-            logger.error("Error while querying searching role: {}", e.getMessage());
+            logger.debug("No role found: {}", e.getMessage());
         }
         return Optional.ofNullable(role);
     }
@@ -45,38 +45,23 @@ public class RoleDaoImp implements RoleDao {
     public Optional<Role> getRoleById(Long id) {
         logger.debug("Executing query to find role with ID: {}", id);
         Optional<Role> response;
-        try {
-            Role role = entityManager.find(Role.class, id);
-            response = Optional.ofNullable(role);
-        } catch (Exception e) {
-            logger.error("Error while querying role with ID {}: {}", id, e.getMessage());
-            response = Optional.empty();
-        }
+        Role role = entityManager.find(Role.class, id);
+        response = Optional.ofNullable(role);
         return response;
     }
 
     @Override
     public void saveRole(Role role) {
-        try {
-            entityManager.persist(role);
-            logger.debug("Query Role with ID {} was successfully saved", role.getIdRole());
-        } catch (Exception e) {
-            logger.error(
-                    "Error query saving Role with ID {}: {}", role.getIdRole(), e.getMessage());
-        }
+        entityManager.persist(role);
+        logger.debug("Query Role with ID {} was successfully saved", role.getIdRole());
     }
 
     @Override
     public List<Role> getRoles() {
         List<Role> response;
-        try {
-            List<Role> roles = entityManager.createQuery("FROM Role", Role.class).getResultList();
-            logger.debug(" query Successfully retrieved {} roles from the database", roles.size());
-            response = roles;
-        } catch (Exception e) {
-            logger.error("Error query retrieving roles from the database: {}", e.getMessage());
-            response = Collections.emptyList();
-        }
+        List<Role> roles = entityManager.createQuery("FROM Role", Role.class).getResultList();
+        logger.debug(" query Successfully retrieved {} roles from the database", roles.size());
+        response = roles;
         return response;
     }
 
@@ -84,14 +69,10 @@ public class RoleDaoImp implements RoleDao {
     public boolean deleteRoleById(Long id) {
         logger.debug("Executing query Attempting to delete role with ID: {}", id);
         boolean response = false;
-        try {
-            Role role = entityManager.find(Role.class, id);
-            if (role != null) {
-                entityManager.remove(role);
-                response = true;
-            }
-        } catch (Exception e) {
-            logger.error("Error while querying delete role with ID {}: {}", id, e.getMessage(), e);
+        Role role = entityManager.find(Role.class, id);
+        if (role != null) {
+            entityManager.remove(role);
+            response = true;
         }
         return response;
     }

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import com.api.crud.config.ModelMapperConfig;
+import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.*;
 import com.api.crud.models.enums.*;
 import com.api.crud.repositories.*;
@@ -12,7 +13,6 @@ import com.api.crud.services.OrderService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -94,18 +94,16 @@ class OrderServiceTests {
         product.setStockProduct(1);
         assertEquals(
                 409,
-                assertThrows(
-                                ResponseStatusException.class,
-                                () -> service.createMyOrder("client@example.com"))
-                        .getStatusCode()
+                ExceptionProblems.status(
+                                assertThrows(
+                                        ApplicationException.class,
+                                        () -> service.createMyOrder("client@example.com")))
                         .value());
         cart.setActive(false);
-        assertThrows(
-                ResponseStatusException.class, () -> service.createMyOrder("client@example.com"));
+        assertThrows(ApplicationException.class, () -> service.createMyOrder("client@example.com"));
         cart.setActive(true);
         cart.getItemsCart().clear();
-        assertThrows(
-                ResponseStatusException.class, () -> service.createMyOrder("client@example.com"));
+        assertThrows(ApplicationException.class, () -> service.createMyOrder("client@example.com"));
         verify(orders, never()).saveOrder(any());
     }
 
@@ -116,13 +114,13 @@ class OrderServiceTests {
         order.setUserOrder(other);
         assertEquals(
                 404,
-                assertThrows(
-                                ResponseStatusException.class,
-                                () -> service.getMyOrder("client@example.com", 10L))
-                        .getStatusCode()
+                ExceptionProblems.status(
+                                assertThrows(
+                                        ApplicationException.class,
+                                        () -> service.getMyOrder("client@example.com", 10L)))
                         .value());
         assertThrows(
-                ResponseStatusException.class,
+                ApplicationException.class,
                 () -> service.cancelMyOrder("client@example.com", 10L, "Error"));
         verify(workflow, never()).lockOrder(anyLong());
     }
@@ -149,10 +147,10 @@ class OrderServiceTests {
     void paidOrdersRequireAdministrativeRefundBeforeCanceling() {
         order.setPaymentStatus(PaymentStatus.PAID);
         assertThrows(
-                ResponseStatusException.class,
+                ApplicationException.class,
                 () -> service.cancelMyOrder("client@example.com", 10L, "Error"));
         assertThrows(
-                ResponseStatusException.class,
+                ApplicationException.class,
                 () -> service.cancelAdminOrder("client@example.com", 10L, "Error"));
         service.updatePaymentStatus(
                 "client@example.com", 10L, PaymentStatus.REFUNDED, "Reembolso manual confirmado");
@@ -163,7 +161,7 @@ class OrderServiceTests {
     @Test
     void transitionsRequirePaymentAndPreventReversal() {
         assertThrows(
-                ResponseStatusException.class,
+                ApplicationException.class,
                 () ->
                         service.updateOrderStatus(
                                 "client@example.com", 10L, OrderStatus.CONFIRMED, "Confirmacion"));
@@ -171,10 +169,10 @@ class OrderServiceTests {
         service.updateOrderStatus("client@example.com", 10L, OrderStatus.CONFIRMED, "Confirmacion");
         service.updateOrderStatus("client@example.com", 10L, OrderStatus.SHIPPED, "Envio");
         assertThrows(
-                ResponseStatusException.class,
+                ApplicationException.class,
                 () -> service.cancelAdminOrder("client@example.com", 10L, "Cancelar"));
         assertThrows(
-                ResponseStatusException.class,
+                ApplicationException.class,
                 () ->
                         service.updateOrderStatus(
                                 "client@example.com", 10L, OrderStatus.PENDING, "Volver"));

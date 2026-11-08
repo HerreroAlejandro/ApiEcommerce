@@ -1,8 +1,8 @@
 package com.api.crud.repositories;
 
 import com.api.crud.DTO.UserUpdateRequestDTO;
+import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.UserModel;
-import com.api.crud.services.EmailService;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.NoResultException;
@@ -12,14 +12,12 @@ import jakarta.transaction.Transactional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -33,60 +31,26 @@ public class UserDaoImp implements UserDao {
     @PersistenceContext
     private EntityManager entityManager;
 
-    @Autowired
-    private EmailService emailService;
-
     @Transactional
     public void register(UserModel user) {
-        logger.debug("Executing query Registering new user: {}", user.getEmail());
-        try {
-            entityManager.merge(user);
-            String subject = "Registration Confirmation";
-            String body =
-                    "Hello "
-                            + user.getFirstName()
-                            + ",\n\nYour account has been created successfully.\n\nGreetings!";
-            boolean emailSent = emailService.sendEmail(user.getEmail(), subject, body);
-            if (!emailSent) {
-                logger.error(
-                        "Failed to send confirmation email to {}, rolling back registration",
-                        user.getEmail());
-                throw new RuntimeException(
-                        "Failed to send confirmation email, User not registered.");
-            }
-        } catch (Exception e) {
-            logger.error(
-                    "Error occurred while registering user {}: {}",
-                    user.getEmail(),
-                    e.getMessage(),
-                    e);
-            throw new RuntimeException("Failed to send confirmation email, User not registered.");
-        }
+        entityManager.persist(user);
+        entityManager.flush();
     }
 
     @Override
     public List<UserModel> getUserByName(String firstName, String lastName) {
         logger.debug("Executing query searching for users with name: {} {}", firstName, lastName);
         List<UserModel> users;
-        try {
-            users =
-                    entityManager
-                            .createQuery(
-                                    "SELECT u FROM UserModel u "
-                                            + "WHERE u.firstName = :firstName "
-                                            + "AND u.lastName = :lastName",
-                                    UserModel.class)
-                            .setParameter("firstName", firstName)
-                            .setParameter("lastName", lastName)
-                            .getResultList();
-        } catch (Exception e) {
-            logger.error(
-                    "Unexpected error while querying users with name {} {}: {}",
-                    firstName,
-                    lastName,
-                    e.getMessage());
-            users = Collections.emptyList();
-        }
+        users =
+                entityManager
+                        .createQuery(
+                                "SELECT u FROM UserModel u "
+                                        + "WHERE u.firstName = :firstName "
+                                        + "AND u.lastName = :lastName",
+                                UserModel.class)
+                        .setParameter("firstName", firstName)
+                        .setParameter("lastName", lastName)
+                        .getResultList();
         return users;
     }
 
@@ -106,12 +70,6 @@ public class UserDaoImp implements UserDao {
         } catch (NoResultException e) {
             logger.warn("No user found with email: {}", email);
             response = Optional.empty();
-        } catch (Exception e) {
-            logger.error(
-                    "Unexpected error while querying user with email {}: {}",
-                    email,
-                    e.getMessage());
-            response = Optional.empty();
         }
         return response;
     }
@@ -127,7 +85,7 @@ public class UserDaoImp implements UserDao {
             entityManager.merge(user);
             return user;
         } else {
-            throw new RuntimeException("User with email " + email + " not found.");
+            throw new ResourceNotFoundException("User with email " + email + " not found.");
         }
     }
 
@@ -135,13 +93,8 @@ public class UserDaoImp implements UserDao {
     public List<UserModel> getUsers() {
         logger.debug("Executing query to fetch user");
         List<UserModel> users;
-        try {
-            String query = "FROM UserModel u";
-            users = entityManager.createQuery(query, UserModel.class).getResultList();
-        } catch (Exception e) {
-            logger.error("Error while querying user: {}", e.getMessage());
-            users = Collections.emptyList();
-        }
+        String query = "FROM UserModel u";
+        users = entityManager.createQuery(query, UserModel.class).getResultList();
         return users;
     }
 
@@ -161,7 +114,7 @@ public class UserDaoImp implements UserDao {
         Set<String> allowedProperties =
                 Set.of("id", "firstName", "lastName", "email", "phone", "status");
         if (!allowedProperties.contains(property)) {
-            throw new IllegalArgumentException("Invalid sort property: " + property);
+            throw new InvalidRequestException("Invalid sort property: " + property);
         }
         boolean filterByRole = role != null && !role.isBlank();
         String query;
@@ -178,36 +131,31 @@ public class UserDaoImp implements UserDao {
         } else {
             query = "FROM UserModel u " + "ORDER BY u." + property + " " + direction;
         }
-        try {
-            TypedQuery<UserModel> userQuery = entityManager.createQuery(query, UserModel.class);
-            if (filterByRole) {
-                userQuery.setParameter("role", role);
-            }
-            List<UserModel> users =
-                    userQuery
-                            .setFirstResult(pageable.getPageNumber() * pageable.getPageSize())
-                            .setMaxResults(pageable.getPageSize())
-                            .getResultList();
-            String countQuery;
-            if (filterByRole) {
-                countQuery =
-                        "SELECT COUNT(DISTINCT u) "
-                                + "FROM UserModel u "
-                                + "JOIN u.roles r "
-                                + "WHERE r.nameRole = :role";
-            } else {
-                countQuery = "SELECT COUNT(u) " + "FROM UserModel u";
-            }
-            TypedQuery<Long> totalQuery = entityManager.createQuery(countQuery, Long.class);
-            if (filterByRole) {
-                totalQuery.setParameter("role", role);
-            }
-            Long total = totalQuery.getSingleResult();
-            return new PageImpl<>(users, pageable, total);
-        } catch (Exception e) {
-            logger.error("Error while querying fetching paginated users: {}", e.getMessage(), e);
-            return Page.empty(pageable);
+        TypedQuery<UserModel> userQuery = entityManager.createQuery(query, UserModel.class);
+        if (filterByRole) {
+            userQuery.setParameter("role", role);
         }
+        List<UserModel> users =
+                userQuery
+                        .setFirstResult(pageable.getPageNumber() * pageable.getPageSize())
+                        .setMaxResults(pageable.getPageSize())
+                        .getResultList();
+        String countQuery;
+        if (filterByRole) {
+            countQuery =
+                    "SELECT COUNT(DISTINCT u) "
+                            + "FROM UserModel u "
+                            + "JOIN u.roles r "
+                            + "WHERE r.nameRole = :role";
+        } else {
+            countQuery = "SELECT COUNT(u) " + "FROM UserModel u";
+        }
+        TypedQuery<Long> totalQuery = entityManager.createQuery(countQuery, Long.class);
+        if (filterByRole) {
+            totalQuery.setParameter("role", role);
+        }
+        Long total = totalQuery.getSingleResult();
+        return new PageImpl<>(users, pageable, total);
     }
 
     @Override
@@ -220,13 +168,8 @@ public class UserDaoImp implements UserDao {
     public Optional<UserModel> getUserById(Long id) {
         logger.debug("Executing query to find user with ID: {}", id);
         Optional<UserModel> response;
-        try {
-            UserModel user = entityManager.find(UserModel.class, id);
-            response = Optional.ofNullable(user);
-        } catch (Exception e) {
-            logger.error("Error while querying user with ID {}: {}", id, e.getMessage());
-            response = Optional.empty();
-        }
+        UserModel user = entityManager.find(UserModel.class, id);
+        response = Optional.ofNullable(user);
         return response;
     }
 

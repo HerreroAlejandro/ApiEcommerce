@@ -12,15 +12,11 @@ public class PasswordResetDTO {
 
     @Getter
     @Setter
-    @NotBlank
-    @PasswordValue
-    private String newPassword;
+    @NotBlank @PasswordValue private String newPassword;
 
     @Getter
     @Setter
-    @NotBlank
-    @PasswordValue
-    private String confirmPassword;
+    @NotBlank @PasswordValue private String confirmPassword;
 
     public PasswordResetDTO(String newPassword, String confirmPassword) {
         this.newPassword = newPassword;

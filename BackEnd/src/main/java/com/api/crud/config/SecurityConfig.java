@@ -1,5 +1,6 @@
 package com.api.crud.config;
 
+import com.api.crud.exceptions.SecurityProblemHandler;
 import com.api.crud.repositories.UserDao;
 
 import org.springframework.context.annotation.Bean;
@@ -27,7 +28,12 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        SecurityProblemHandler problems = new SecurityProblemHandler();
         http.csrf(AbstractHttpConfigurer::disable)
+                .exceptionHandling(
+                        errors ->
+                                errors.authenticationEntryPoint(problems)
+                                        .accessDeniedHandler(problems))
                 .authorizeHttpRequests(
                         authorizeRequests ->
                                 authorizeRequests

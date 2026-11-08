@@ -1,14 +1,13 @@
 package com.api.crud.repositories;
 
+import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.*;
 import com.api.crud.models.enums.*;
 
 import jakarta.persistence.*;
 
 import org.springframework.data.domain.*;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Repository;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -21,7 +20,7 @@ public class OrderWorkflowDao {
 
     public void lockUser(Long id) {
         if (entityManager.find(UserModel.class, id, LockModeType.PESSIMISTIC_WRITE) == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado");
+            throw new ResourceNotFoundException("Usuario no encontrado");
         }
     }
 
@@ -39,16 +38,14 @@ public class OrderWorkflowDao {
 
     public Product lockProduct(Long id) {
         Product product = entityManager.find(Product.class, id);
-        if (product == null)
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Producto no disponible");
+        if (product == null) throw new BusinessConflictException("Producto no disponible");
         entityManager.refresh(product, LockModeType.PESSIMISTIC_WRITE);
         return product;
     }
 
     public Order lockOrder(Long id) {
         Order order = entityManager.find(Order.class, id, LockModeType.PESSIMISTIC_WRITE);
-        if (order == null)
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Orden no encontrada");
+        if (order == null) throw new ResourceNotFoundException("Orden no encontrada");
         entityManager.refresh(order, LockModeType.PESSIMISTIC_WRITE);
         return order;
     }
@@ -72,8 +69,7 @@ public class OrderWorkflowDao {
         if (pageable.getPageSize() > 100
                 || pageable.getOffset() > Integer.MAX_VALUE
                 || (start != null && end != null && start.isAfter(end))) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "Paginacion o fechas invalidas");
+            throw new InvalidRequestException("Paginacion o fechas invalidas");
         }
         Map<String, Object> params = new HashMap<>();
         StringBuilder where = new StringBuilder(" WHERE 1=1");
@@ -111,8 +107,7 @@ public class OrderWorkflowDao {
         List<String> sorting = new ArrayList<>();
         for (Sort.Order sort : pageable.getSort()) {
             if (!allowed.contains(sort.getProperty())) {
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, "Campo de ordenamiento invalido");
+                throw new InvalidRequestException("Campo de ordenamiento invalido");
             }
             sorting.add("o." + sort.getProperty() + " " + sort.getDirection().name());
         }

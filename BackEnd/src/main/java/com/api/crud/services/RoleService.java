@@ -1,6 +1,7 @@
 package com.api.crud.services;
 
 import com.api.crud.DTO.RoleDTO;
+import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.Role;
 import com.api.crud.repositories.RoleDao;
 
@@ -59,6 +60,9 @@ public class RoleService {
     }
 
     public void saveRole(RoleDTO roleDTO) {
+        if (roleDao.getRoleByName(roleDTO.getNameRole()).isPresent()) {
+            throw new BusinessConflictException("Ya existe un rol con ese nombre");
+        }
         logger.info("Starting to save new role: {} in services", roleDTO.getNameRole());
         Role role = modelMapper.map(roleDTO, Role.class);
         roleDao.saveRole(role);

@@ -7,17 +7,9 @@ import lombok.Setter;
 
 public class AdminCartItemAddRequestDTO {
 
-    @NotNull
-    @Positive
-    @Getter
-    @Setter
-    private Long userId;
+    @NotNull @Positive @Getter @Setter private Long userId;
 
-    @NotNull
-    @Positive
-    @Getter
-    @Setter
-    private Long productId;
+    @NotNull @Positive @Getter @Setter private Long productId;
 
     @NotNull
     @Positive

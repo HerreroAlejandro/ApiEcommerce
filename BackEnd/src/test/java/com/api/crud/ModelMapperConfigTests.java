@@ -31,7 +31,6 @@ class ModelMapperConfigTests {
         product.setPriceProduct(new BigDecimal("150.00"));
         CartItem item = new CartItem(3L, cart, product, 2);
         cart.setItemsCart(List.of(item));
-
         MyCartResponseDTO mine = mapper.map(cart, MyCartResponseDTO.class);
         CartAdminDetailDTO admin = mapper.map(cart, CartAdminDetailDTO.class);
         assertEquals(40L, mine.getItemsCart().get(0).getProductId());
@@ -42,7 +41,6 @@ class ModelMapperConfigTests {
         assertEquals(1, admin.getItemCount());
         assertEquals(mine.getTotal(), admin.getTotal());
         assertEquals(40L, admin.getItemsCart().get(0).getProductId());
-
         product.setPriceProduct(new BigDecimal("200.00"));
         assertEquals(
                 new BigDecimal("400.00"), mapper.map(cart, MyCartResponseDTO.class).getTotal());
@@ -69,7 +67,6 @@ class ModelMapperConfigTests {
         OrderItem item = new OrderItem(order, product, 2, new BigDecimal("100.00"));
         item.setProductName("Nombre comprado");
         order.setItemsOrder(List.of(item));
-
         OrderDetailDTO mine = mapper.map(order, OrderDetailDTO.class);
         OrderAdminDetailDTO admin = mapper.map(order, OrderAdminDetailDTO.class);
         assertEquals("Nombre comprado", mine.getItemsOrder().get(0).getProductName());

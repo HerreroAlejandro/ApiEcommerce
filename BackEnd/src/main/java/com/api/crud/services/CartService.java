@@ -4,6 +4,7 @@ import com.api.crud.DTO.CartAdminDetailDTO;
 import com.api.crud.DTO.CartAdminFilterDTO;
 import com.api.crud.DTO.CartAdminListDTO;
 import com.api.crud.DTO.MyCartResponseDTO;
+import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.Cart;
 import com.api.crud.models.entity.CartItem;
 import com.api.crud.models.entity.UserModel;
@@ -18,10 +19,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -57,7 +56,7 @@ public class CartService {
     private Optional<Cart> getMyCart(String email) {
         UserModel user =
                 userDao.getUserByEmail(email)
-                        .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+                        .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
         return cartDao.getActiveCartByUserId(user.getId());
     }
 
@@ -81,16 +80,13 @@ public class CartService {
         if (filter.getMinTotal() != null
                 && filter.getMaxTotal() != null
                 && filter.getMinTotal().compareTo(filter.getMaxTotal()) > 0) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "El importe minimo supera al maximo");
+            throw new InvalidRequestException("El importe minimo supera al maximo");
         }
         if (filter.getMinProductQuantity() != null && filter.getProductId() == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "Debe indicar productId al filtrar por cantidad");
+            throw new InvalidRequestException("Debe indicar productId al filtrar por cantidad");
         }
         if (pageable.getPageSize() > 100 || pageable.getOffset() > Integer.MAX_VALUE) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "Paginacion fuera del limite");
+            throw new InvalidRequestException("Paginacion fuera del limite");
         }
         return cartDao.getCarts(filter, pageable);
     }
@@ -115,7 +111,7 @@ public class CartService {
     @Transactional(readOnly = true)
     public List<CartAdminListDTO> getCartsByDateRange(LocalDate start, LocalDate end) {
         if (start.isAfter(end)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rango de fechas invalido");
+            throw new InvalidRequestException("Rango de fechas invalido");
         }
         return cartDao.getCartsByDateRange(start, end).stream()
                 .map(cart -> modelMapper.map(cart, CartAdminListDTO.class))

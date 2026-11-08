@@ -4,6 +4,7 @@ import com.api.crud.DTO.CartAdminDetailDTO;
 import com.api.crud.DTO.CartAdminFilterDTO;
 import com.api.crud.DTO.CartAdminListDTO;
 import com.api.crud.DTO.ChangeReasonRequestDTO;
+import com.api.crud.exceptions.ResourceNotFoundException;
 import com.api.crud.services.CartItemService;
 import com.api.crud.services.CartService;
 
@@ -17,7 +18,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -77,7 +77,7 @@ public class AdminCartController {
         return cartService
                 .getCartById(id)
                 .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+                .orElseThrow(ResourceNotFoundException::new);
     }
 
     @GetMapping(path = "/getCartByUserId/{userId}")
@@ -85,7 +85,7 @@ public class AdminCartController {
         return cartService
                 .getCartByUserId(userId)
                 .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+                .orElseThrow(ResourceNotFoundException::new);
     }
 
     // 1) Buscar carrito por email de usuario
@@ -103,7 +103,7 @@ public class AdminCartController {
                 .orElseGet(
                         () -> {
                             logger.warn("No cart found for user {}", email);
-                            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+                            throw new ResourceNotFoundException();
                         });
     }
 

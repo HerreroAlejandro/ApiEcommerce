@@ -164,7 +164,7 @@ class OrderSecurityTests {
     void clientCannotReadAdminOrdersAndAnonymousCannotReadOwnOrders() throws Exception {
         mvc.perform(get("/admin/orders").header("Authorization", "Bearer client"))
                 .andExpect(status().isForbidden());
-        mvc.perform(get("/orders")).andExpect(status().isForbidden());
+        mvc.perform(get("/orders")).andExpect(status().isUnauthorized());
         verifyNoInteractions(context.getBean(OrderService.class));
     }
 
@@ -189,7 +189,7 @@ class OrderSecurityTests {
 
     @Test
     void orderItemReadsRequireAuthenticationAndAdminReadsRequireStaff() throws Exception {
-        mvc.perform(get("/order-items/1")).andExpect(status().isForbidden());
+        mvc.perform(get("/order-items/1")).andExpect(status().isUnauthorized());
         mvc.perform(get("/order-items/1").header("Authorization", "Bearer client"))
                 .andExpect(status().isOk());
         verify(context.getBean(OrderItemService.class)).getMyItem("actor@example.com", 1L);
@@ -232,10 +232,10 @@ class OrderSecurityTests {
         user.setStatus(AccountStatus.BLOCKED);
         when(dao.getUserByEmail("actor@example.com")).thenReturn(Optional.of(user));
         mvc.perform(get("/orders").header("Authorization", "Bearer client"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
         user.setStatus(AccountStatus.DEACTIVATED);
         mvc.perform(get("/orders").header("Authorization", "Bearer client"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
         verifyNoInteractions(context.getBean(OrderService.class));
     }
 
@@ -246,5 +246,33 @@ class OrderSecurityTests {
                                 .param("increment", "2")
                                 .header("Authorization", "Bearer admin"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void authenticationAndAuthorizationUseTheSameProblemFormat() throws Exception {
+        mvc.perform(get("/orders"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"))
+                .andExpect(jsonPath("$.instance").value("/orders"));
+        mvc.perform(get("/admin/orders").header("Authorization", "Bearer client"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        when(context.getBean(JWTUtil.class).validateToken("invalid")).thenReturn(false);
+        mvc.perform(get("/orders").header("Authorization", "Bearer invalid"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+    }
+
+    @Test
+    void databaseFailureDuringAuthenticationIsNotReportedAsInvalidCredentials() throws Exception {
+        when(context.getBean(UserDao.class).getUserByEmail("actor@example.com"))
+                .thenThrow(
+                        new org.springframework.dao.DataAccessResourceFailureException(
+                                "SQL secret"));
+        mvc.perform(get("/orders").header("Authorization", "Bearer client"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("SERVICE_UNAVAILABLE"));
+        verifyNoInteractions(context.getBean(OrderService.class));
     }
 }

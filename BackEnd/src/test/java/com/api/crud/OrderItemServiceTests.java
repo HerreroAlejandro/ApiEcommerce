@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import com.api.crud.config.ModelMapperConfig;
+import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.*;
 import com.api.crud.models.entity.Order;
 import com.api.crud.models.enums.*;
@@ -12,7 +13,6 @@ import com.api.crud.services.OrderItemService;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -71,13 +71,13 @@ class OrderItemServiceTests {
         order.setUserOrder(other);
         assertEquals(
                 404,
-                assertThrows(
-                                ResponseStatusException.class,
-                                () -> service.getMyItem("client@example.com", 1L))
-                        .getStatusCode()
+                ExceptionProblems.status(
+                                assertThrows(
+                                        ApplicationException.class,
+                                        () -> service.getMyItem("client@example.com", 1L)))
                         .value());
         assertThrows(
-                ResponseStatusException.class, () -> service.getMyItems("client@example.com", 10L));
+                ApplicationException.class, () -> service.getMyItems("client@example.com", 10L));
         verify(items, never()).getItemsByOrderId(anyLong());
     }
 
@@ -100,10 +100,12 @@ class OrderItemServiceTests {
         when(orders.getOrderById(10L)).thenReturn(Optional.empty());
         assertEquals(
                 404,
-                assertThrows(ResponseStatusException.class, () -> service.getAdminItems(10L))
-                        .getStatusCode()
+                ExceptionProblems.status(
+                                assertThrows(
+                                        ApplicationException.class,
+                                        () -> service.getAdminItems(10L)))
                         .value());
         when(items.getOrderItemById(1L)).thenReturn(Optional.empty());
-        assertThrows(ResponseStatusException.class, () -> service.getAdminItem(1L));
+        assertThrows(ApplicationException.class, () -> service.getAdminItem(1L));
     }
 }

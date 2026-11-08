@@ -3,6 +3,7 @@ package com.api.crud;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.*;
 import com.api.crud.models.enums.AccountStatus;
 import com.api.crud.repositories.*;
@@ -12,7 +13,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.modelmapper.ModelMapper;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -95,8 +95,7 @@ class AccountStatusServiceTests {
         target.setStatus(AccountStatus.DEACTIVATED);
         recoveryToken();
         service.block("admin@example.com", 7L, "Bloqueo");
-        assertThrows(
-                ResponseStatusException.class, () -> service.activateWithRecoveryToken("token"));
+        assertThrows(ApplicationException.class, () -> service.activateWithRecoveryToken("token"));
         assertEquals(AccountStatus.BLOCKED, target.getStatus());
         verify(tokens, never()).update(any());
     }
@@ -106,10 +105,12 @@ class AccountStatusServiceTests {
         target.setStatus(AccountStatus.BLOCKED);
         assertEquals(
                 409,
-                assertThrows(
-                                ResponseStatusException.class,
-                                () -> service.activate("admin@example.com", 7L, "Reactivar"))
-                        .getStatusCode()
+                ExceptionProblems.status(
+                                assertThrows(
+                                        ApplicationException.class,
+                                        () ->
+                                                service.activate(
+                                                        "admin@example.com", 7L, "Reactivar")))
                         .value());
         service.unblock("admin@example.com", 7L, "Revision aprobada");
         assertEquals(AccountStatus.ACTIVE, target.getStatus());
@@ -122,8 +123,7 @@ class AccountStatusServiceTests {
         service.activateWithRecoveryToken("token");
         assertEquals(AccountStatus.ACTIVE, target.getStatus());
         assertTrue(token.isUsed());
-        assertThrows(
-                ResponseStatusException.class, () -> service.activateWithRecoveryToken("token"));
+        assertThrows(ApplicationException.class, () -> service.activateWithRecoveryToken("token"));
         verify(statuses, times(1)).save(any());
     }
 
@@ -132,12 +132,10 @@ class AccountStatusServiceTests {
         target.setStatus(AccountStatus.DEACTIVATED);
         AccountRecoveryToken token = recoveryToken();
         token.setExpirationDate(LocalDateTime.now().minusMinutes(1));
-        assertThrows(
-                ResponseStatusException.class, () -> service.activateWithRecoveryToken("token"));
+        assertThrows(ApplicationException.class, () -> service.activateWithRecoveryToken("token"));
         token.setExpirationDate(LocalDateTime.now().plusMinutes(1));
         token.setUsed(true);
-        assertThrows(
-                ResponseStatusException.class, () -> service.activateWithRecoveryToken("token"));
+        assertThrows(ApplicationException.class, () -> service.activateWithRecoveryToken("token"));
         assertEquals(AccountStatus.DEACTIVATED, target.getStatus());
         verify(statuses, never()).save(any());
     }
@@ -146,20 +144,19 @@ class AccountStatusServiceTests {
     void staffWithoutAdminCannotChangeStatusAndSelfBlockIsRejected() {
         assertEquals(
                 403,
-                assertThrows(
-                                ResponseStatusException.class,
-                                () -> service.block("client@example.com", 7L, "Motivo"))
-                        .getStatusCode()
+                ExceptionProblems.status(
+                                assertThrows(
+                                        ApplicationException.class,
+                                        () -> service.block("client@example.com", 7L, "Motivo")))
                         .value());
         assertEquals(
                 409,
-                assertThrows(
-                                ResponseStatusException.class,
-                                () -> service.block("admin@example.com", 1L, "Motivo"))
-                        .getStatusCode()
+                ExceptionProblems.status(
+                                assertThrows(
+                                        ApplicationException.class,
+                                        () -> service.block("admin@example.com", 1L, "Motivo")))
                         .value());
-        assertThrows(
-                ResponseStatusException.class, () -> service.block("admin@example.com", 7L, " "));
+        assertThrows(ApplicationException.class, () -> service.block("admin@example.com", 7L, " "));
         verify(statuses, never()).save(any());
     }
 

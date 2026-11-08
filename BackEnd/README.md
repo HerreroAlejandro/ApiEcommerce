@@ -321,3 +321,30 @@ catalog data. New orders track stockDeducted so cancellation restores stock only
 when checkout deducted it. Existing orders default to false because the previous
 implementation did not deduct stock; review this value if stock was changed manually.
 Verify schema, rollback and concurrent checkout against MySQL before deployment.
+
+## Error responses
+
+Exception classes and HTTP handlers live in `com.api.crud.exceptions`.
+Services throw domain exceptions; repositories propagate persistence failures
+instead of returning empty results or reporting a successful write. An absent
+optional row is still a normal query result. Controllers delegate error responses
+to the advice classes; JWT filter errors use the same JSON format.
+
+Errors use `application/problem+json` with `type`, `title`, `status`, `detail`,
+`instance` and a stable `code`. Validation errors also include an `errors`
+object keyed by field or parameter. Internal exception messages, SQL and stack
+traces are not returned to clients.
+
+| Status | Meaning | Example code |
+| --- | --- | --- |
+| 400 | Invalid input or recovery token | INVALID_REQUEST |
+| 401 | Missing/invalid session or credentials | UNAUTHENTICATED |
+| 403 | Authenticated account lacks permission | FORBIDDEN |
+| 404 | Requested resource does not exist or is not owned by the client | RESOURCE_NOT_FOUND |
+| 409 | Business, integrity or concurrency conflict | BUSINESS_CONFLICT, INSUFFICIENT_STOCK, DATA_CONFLICT, CONCURRENT_MODIFICATION |
+| 500 | Unexpected internal failure | INTERNAL_ERROR |
+| 503 | Persistence or external service is unavailable | SERVICE_UNAVAILABLE, EXTERNAL_SERVICE_UNAVAILABLE |
+
+Collection searches with no matches return 200 and an empty collection/page.
+Password reset and account recovery requests retain their generic success message
+when the email does not identify an eligible account.

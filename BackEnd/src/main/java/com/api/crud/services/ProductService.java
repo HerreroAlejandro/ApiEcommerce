@@ -1,6 +1,7 @@
 package com.api.crud.services;
 
 import com.api.crud.DTO.*;
+import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.Product;
 import com.api.crud.models.entity.ProductDigital;
 import com.api.crud.models.entity.ProductPhysical;
@@ -41,23 +42,23 @@ public class ProductService {
         switch (productSaveDTO.getType()) {
             case DIGITAL:
                 if (!StringUtils.hasText(productSaveDTO.getDownloadLink())) {
-                    throw new IllegalArgumentException("Digital product must have a download link");
+                    throw new InvalidRequestException("Digital product must have a download link");
                 }
                 if (productSaveDTO.getStockProduct() != null) {
-                    throw new IllegalArgumentException("Digital product cannot have stock");
+                    throw new InvalidRequestException("Digital product cannot have stock");
                 }
                 product = modelMapper.map(productSaveDTO, ProductDigital.class);
                 break;
             case PHYSICAL:
                 if (StringUtils.hasText(productSaveDTO.getDownloadLink())
                         || StringUtils.hasText(productSaveDTO.getLicense())) {
-                    throw new IllegalArgumentException(
+                    throw new InvalidRequestException(
                             "Physical product cannot have digital product fields");
                 }
                 product = modelMapper.map(productSaveDTO, ProductPhysical.class);
                 break;
             default:
-                throw new IllegalArgumentException(
+                throw new InvalidRequestException(
                         "Invalid product type: " + productSaveDTO.getType());
         }
         product.setActive(true);
@@ -163,7 +164,7 @@ public class ProductService {
             return false;
         }
         if (!(product.get() instanceof ProductPhysical)) {
-            return false;
+            throw new BusinessConflictException("Los productos digitales no manejan stock");
         }
         ProductPhysical physicalProduct = (ProductPhysical) product.get();
         physicalProduct.setStockProduct(stockDTO.getNewStockProduct());
@@ -217,12 +218,14 @@ public class ProductService {
                 int adjustment = adjustmentDTO.getAdjustment();
                 long newStock = (long) currentStock + adjustment;
                 if (newStock < 0 || newStock > Integer.MAX_VALUE) {
-                    throw new IllegalArgumentException("El ajuste produce un stock fuera de rango");
+                    throw new InvalidRequestException("El ajuste produce un stock fuera de rango");
                 }
                 if (newStock >= 0) {
                     physicalProduct.setStockProduct((int) newStock);
                     updated = true;
                 }
+            } else {
+                throw new BusinessConflictException("Los productos digitales no manejan stock");
             }
         }
         return updated;
@@ -269,13 +272,13 @@ public class ProductService {
                             || productDTO.getDownloadLink() != null
                             || productDTO.getLicense() != null;
             if (!hasChanges) {
-                throw new IllegalArgumentException(
+                throw new InvalidRequestException(
                         "At least one product attribute must be provided");
             }
             boolean hasDigitalFields =
                     productDTO.getDownloadLink() != null || productDTO.getLicense() != null;
             if (hasDigitalFields && !(product instanceof ProductDigital)) {
-                throw new IllegalArgumentException(
+                throw new InvalidRequestException(
                         "Physical product cannot have digital product fields");
             }
             if (productDTO.getNameProduct() != null) {
