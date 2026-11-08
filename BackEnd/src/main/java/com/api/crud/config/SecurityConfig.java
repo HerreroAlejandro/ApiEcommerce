@@ -44,6 +44,7 @@ public class SecurityConfig {
                                 .requestMatchers(HttpMethod.GET, "/order-items/**").authenticated()
                                 .requestMatchers("/order-items/**").denyAll()
                                 .requestMatchers("/orders", "/orders/**").authenticated()
+                                .requestMatchers(HttpMethod.GET, "/admin/users/*/status-history").hasAnyAuthority("ADMIN", "SUPPORT")
                                 .requestMatchers("/admin/**").hasAuthority("ADMIN")
                                 .requestMatchers("/support/**").hasAnyAuthority("ADMIN", "SUPPORT")
                                 .requestMatchers(HttpMethod.GET, "/products/ShowProducts", "/products/GetProductById/{id}").permitAll()
