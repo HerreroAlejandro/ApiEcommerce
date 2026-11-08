@@ -1,11 +1,11 @@
 package com.api.crud.services;
 
-import com.api.crud.DTO.CartAdminListDTO;
 import com.api.crud.DTO.CartAdminDetailDTO;
+import com.api.crud.DTO.CartAdminFilterDTO;
+import com.api.crud.DTO.CartAdminListDTO;
 import com.api.crud.DTO.CartItemAdminListDTO;
-import com.api.crud.DTO.CartItemDTO;
-import com.api.crud.DTO.MyCartResponseDTO;
 import com.api.crud.DTO.MyCartItemResponseDTO;
+import com.api.crud.DTO.MyCartResponseDTO;
 import com.api.crud.models.entity.Cart;
 import com.api.crud.models.entity.CartItem;
 import com.api.crud.models.entity.UserModel;
@@ -13,22 +13,27 @@ import com.api.crud.repositories.CartDao;
 import com.api.crud.repositories.CartItemDao;
 import com.api.crud.repositories.ProductDao;
 import com.api.crud.repositories.UserDao;
+
 import org.modelmapper.ModelMapper;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
-
 
 @Service
 public class CartService {
+
+    private static final Logger logger = LoggerFactory.getLogger(CartService.class);
 
     @Autowired
     private CartDao cartDao;
@@ -51,30 +56,37 @@ public class CartService {
     @Autowired
     private UserDao userDao;
 
-    private static final Logger logger = LoggerFactory.getLogger(CartService.class);
-
     private Optional<Cart> getMyCart(String email) {
-        UserModel user = userDao.getUserByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+        UserModel user =
+                userDao.getUserByEmail(email)
+                        .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
         return cartDao.getActiveCartByUserId(user.getId());
     }
 
     @Transactional(readOnly = true)
     public MyCartResponseDTO getMyActiveCart(String email) {
-        return getMyCart(email).map(cart -> {
-            List<MyCartItemResponseDTO> items = cart.getItemsCart().stream()
-                    .map(this::toMyCartItemResponse).toList();
-            MyCartResponseDTO response = new MyCartResponseDTO();
-            response.setItemsCart(items);
-            response.setTotal(items.stream().map(MyCartItemResponseDTO::getSubtotal)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add));
-            return response;
-        }).orElseGet(() -> {
-            MyCartResponseDTO response = new MyCartResponseDTO();
-            response.setItemsCart(List.of());
-            response.setTotal(BigDecimal.ZERO);
-            return response;
-        });
+        return getMyCart(email)
+                .map(
+                        cart -> {
+                            List<MyCartItemResponseDTO> items =
+                                    cart.getItemsCart().stream()
+                                            .map(this::toMyCartItemResponse)
+                                            .toList();
+                            MyCartResponseDTO response = new MyCartResponseDTO();
+                            response.setItemsCart(items);
+                            response.setTotal(
+                                    items.stream()
+                                            .map(MyCartItemResponseDTO::getSubtotal)
+                                            .reduce(BigDecimal.ZERO, BigDecimal::add));
+                            return response;
+                        })
+                .orElseGet(
+                        () -> {
+                            MyCartResponseDTO response = new MyCartResponseDTO();
+                            response.setItemsCart(List.of());
+                            response.setTotal(BigDecimal.ZERO);
+                            return response;
+                        });
     }
 
     private MyCartItemResponseDTO toMyCartItemResponse(CartItem item) {
@@ -91,8 +103,7 @@ public class CartService {
 
     @Transactional(readOnly = true)
     public BigDecimal getMyCartTotal(String email) {
-        return getMyCart(email).map(cart -> getCartTotal(cart.getIdCart()))
-                .orElse(BigDecimal.ZERO);
+        return getMyCart(email).map(cart -> getCartTotal(cart.getIdCart())).orElse(BigDecimal.ZERO);
     }
 
     @Transactional
@@ -100,25 +111,25 @@ public class CartService {
         getMyCart(email).ifPresent(cart -> cart.getItemsCart().clear());
     }
 
-
     @Transactional(readOnly = true)
-    public org.springframework.data.domain.Page<CartAdminListDTO> getCarts(
-            com.api.crud.DTO.CartAdminFilterDTO filter, org.springframework.data.domain.Pageable pageable) {
-        if (filter.getMinTotal() != null && filter.getMaxTotal() != null
+    public Page<CartAdminListDTO> getCarts(CartAdminFilterDTO filter, Pageable pageable) {
+        if (filter.getMinTotal() != null
+                && filter.getMaxTotal() != null
                 && filter.getMinTotal().compareTo(filter.getMaxTotal()) > 0) {
-            throw new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.BAD_REQUEST, "El importe minimo supera al maximo");
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "El importe minimo supera al maximo");
         }
         if (filter.getMinProductQuantity() != null && filter.getProductId() == null) {
-            throw new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.BAD_REQUEST, "Debe indicar productId al filtrar por cantidad");
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Debe indicar productId al filtrar por cantidad");
         }
         if (pageable.getPageSize() > 100 || pageable.getOffset() > Integer.MAX_VALUE) {
-            throw new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.BAD_REQUEST, "Paginacion fuera del limite");
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Paginacion fuera del limite");
         }
         return cartDao.getCarts(filter, pageable);
     }
+
     private CartAdminListDTO toAdminList(Cart cart) {
         CartAdminListDTO dto = new CartAdminListDTO();
         dto.setIdCart(cart.getIdCart());
@@ -126,8 +137,10 @@ public class CartService {
         dto.setActive(cart.isActive());
         dto.setCreationDate(cart.getCreationDate());
         dto.setItemCount(cart.getItemsCart().size());
-        dto.setTotal(cart.getItemsCart().stream().map(CartItem::getSubtotal)
-                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        dto.setTotal(
+                cart.getItemsCart().stream()
+                        .map(CartItem::getSubtotal)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add));
         return dto;
     }
 
@@ -140,16 +153,21 @@ public class CartService {
         dto.setCreationDate(summary.getCreationDate());
         dto.setItemCount(summary.getItemCount());
         dto.setTotal(summary.getTotal());
-        dto.setItemsCart(cart.getItemsCart().stream().map(item -> {
-            CartItemAdminListDTO row = new CartItemAdminListDTO();
-            row.setIdCartItem(item.getIdCartItem());
-            row.setProductId(item.getProductCartItem().getIdProduct());
-            row.setNameProduct(item.getProductCartItem().getNameProduct());
-            row.setAmountCartItem(item.getAmountCartItem());
-            row.setPriceProduct(item.getProductCartItem().getPriceProduct());
-            row.setSubtotal(item.getSubtotal());
-            return row;
-        }).toList());
+        dto.setItemsCart(
+                cart.getItemsCart().stream()
+                        .map(
+                                item -> {
+                                    CartItemAdminListDTO row = new CartItemAdminListDTO();
+                                    row.setIdCartItem(item.getIdCartItem());
+                                    row.setProductId(item.getProductCartItem().getIdProduct());
+                                    row.setNameProduct(item.getProductCartItem().getNameProduct());
+                                    row.setAmountCartItem(item.getAmountCartItem());
+                                    row.setPriceProduct(
+                                            item.getProductCartItem().getPriceProduct());
+                                    row.setSubtotal(item.getSubtotal());
+                                    return row;
+                                })
+                        .toList());
         return dto;
     }
 
@@ -171,14 +189,14 @@ public class CartService {
     @Transactional(readOnly = true)
     public List<CartAdminListDTO> getCartsByDateRange(LocalDate start, LocalDate end) {
         if (start.isAfter(end)) {
-            throw new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.BAD_REQUEST, "Rango de fechas invalido");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rango de fechas invalido");
         }
         return cartDao.getCartsByDateRange(start, end).stream().map(this::toAdminList).toList();
     }
 
     public BigDecimal getCartTotal(Long cartId) {
-        return cartItemDao.getItemsByCartId(cartId).stream().map(CartItem::getSubtotal)
+        return cartItemDao.getItemsByCartId(cartId).stream()
+                .map(CartItem::getSubtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }

@@ -3,8 +3,10 @@ package com.api.crud.models.entity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+
 import lombok.Getter;
 import lombok.Setter;
+
 import java.util.HashSet;
 import java.util.Set;
 
@@ -14,22 +16,25 @@ public class Role {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Getter @Setter
+    @Getter
+    @Setter
     private Long idRole;
 
     @Column(name = "nameRole", unique = true)
-    @Getter @Setter
+    @Getter
+    @Setter
     @NotNull(message = "NameRole cannot be null")
-    @Size(min =2, max =20)
+    @Size(min = 2, max = 20)
     private String nameRole;
 
     @ManyToMany(mappedBy = "roles")
-    @Getter @Setter
+    @Getter
+    @Setter
     private Set<UserModel> users = new HashSet<>();
 
     public Role(String nameRole) {
         this.nameRole = nameRole;
     }
 
-    public Role(){}
+    public Role() {}
 }

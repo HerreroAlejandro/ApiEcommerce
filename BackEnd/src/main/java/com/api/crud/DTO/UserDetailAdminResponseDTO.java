@@ -1,6 +1,7 @@
 package com.api.crud.DTO;
 
 import com.api.crud.models.enums.AccountStatus;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -8,28 +9,42 @@ import java.util.List;
 
 public class UserDetailAdminResponseDTO {
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private long id;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private String firstName;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private String lastName;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private String email;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private String phone;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private AccountStatus status;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private List<String> roles;
 
-    public UserDetailAdminResponseDTO(long id, String firstName, String lastName, String email, String phone, AccountStatus status, List<String> roles) {
+    public UserDetailAdminResponseDTO(
+            long id,
+            String firstName,
+            String lastName,
+            String email,
+            String phone,
+            AccountStatus status,
+            List<String> roles) {
         this.id = id;
         this.firstName = firstName;
         this.lastName = lastName;
@@ -39,5 +54,5 @@ public class UserDetailAdminResponseDTO {
         this.roles = roles;
     }
 
-    public UserDetailAdminResponseDTO(){}
+    public UserDetailAdminResponseDTO() {}
 }

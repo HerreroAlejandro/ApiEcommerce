@@ -1,15 +1,46 @@
 package com.api.crud.DTO;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
 import lombok.Getter;
 import lombok.Setter;
-@Getter @Setter
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
 public class CartAdminListDTO {
+
+    @Getter
+    @Setter
+    private Long idCart;
+
+    @Getter
+    @Setter
+    private Long userId;
+
+    @Getter
+    @Setter
+    private boolean active;
+
+    @Getter
+    @Setter
+    private LocalDate creationDate;
+
+    @Getter
+    @Setter
+    private int itemCount;
+
+    @Getter
+    @Setter
+    private BigDecimal total;
+
     public CartAdminListDTO() {}
 
-    public CartAdminListDTO(Long idCart, Long userId, boolean active, LocalDate creationDate,
-                            Long itemCount, BigDecimal total) {
+    public CartAdminListDTO(
+            Long idCart,
+            Long userId,
+            boolean active,
+            LocalDate creationDate,
+            Long itemCount,
+            BigDecimal total) {
         this.idCart = idCart;
         this.userId = userId;
         this.active = active;
@@ -17,11 +48,4 @@ public class CartAdminListDTO {
         this.itemCount = Math.toIntExact(itemCount);
         this.total = total;
     }
-    private Long idCart;
-    private Long userId;
-    private boolean active;
-    private LocalDate creationDate;
-    private int itemCount;
-    private BigDecimal total;
-
 }

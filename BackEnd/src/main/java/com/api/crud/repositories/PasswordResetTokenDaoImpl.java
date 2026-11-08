@@ -2,10 +2,12 @@ package com.api.crud.repositories;
 
 import com.api.crud.models.entity.PasswordResetToken;
 import com.api.crud.models.entity.UserModel;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.NoResultException;
 import jakarta.persistence.PersistenceContext;
 import jakarta.transaction.Transactional;
+
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
@@ -25,13 +27,16 @@ public class PasswordResetTokenDaoImpl implements PasswordResetTokenDao {
     @Override
     public Optional<PasswordResetToken> getByToken(String token) {
         try {
-            PasswordResetToken resetToken = entityManager
-                    .createQuery("SELECT t FROM PasswordResetToken t " + "JOIN FETCH t.user " + "WHERE t.token = :token", PasswordResetToken.class)
-                    .setParameter("token", token)
-                    .getSingleResult();
-
+            PasswordResetToken resetToken =
+                    entityManager
+                            .createQuery(
+                                    "SELECT t FROM PasswordResetToken t "
+                                            + "JOIN FETCH t.user "
+                                            + "WHERE t.token = :token",
+                                    PasswordResetToken.class)
+                            .setParameter("token", token)
+                            .getSingleResult();
             return Optional.of(resetToken);
-
         } catch (NoResultException e) {
             return Optional.empty();
         }
@@ -40,7 +45,12 @@ public class PasswordResetTokenDaoImpl implements PasswordResetTokenDao {
     @Override
     @Transactional
     public void invalidateTokensByUser(UserModel user) {
-        entityManager.createQuery("UPDATE PasswordResetToken t " + "SET t.used = true " + "WHERE t.user = :user " + "AND t.used = false")
+        entityManager
+                .createQuery(
+                        "UPDATE PasswordResetToken t "
+                                + "SET t.used = true "
+                                + "WHERE t.user = :user "
+                                + "AND t.used = false")
                 .setParameter("user", user)
                 .executeUpdate();
     }

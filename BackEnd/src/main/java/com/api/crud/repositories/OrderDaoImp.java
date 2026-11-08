@@ -4,9 +4,11 @@ import com.api.crud.models.entity.Order;
 import com.api.crud.models.entity.Product;
 import com.api.crud.models.enums.OrderStatus;
 import com.api.crud.models.enums.PaymentStatus;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.transaction.Transactional;
+
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -42,8 +44,8 @@ public class OrderDaoImp implements OrderDao {
 
     @Override
     public List<Order> getOrdersByUserEmail(String email) {
-        return entityManager.createQuery(
-                        "SELECT o FROM Order o WHERE o.userOrder.email = :email", Order.class)
+        return entityManager
+                .createQuery("SELECT o FROM Order o WHERE o.userOrder.email = :email", Order.class)
                 .setParameter("email", email)
                 .getResultList();
     }
@@ -51,7 +53,8 @@ public class OrderDaoImp implements OrderDao {
     @Override
     public List<Order> getOrdersByUserId(Long userId) {
         String query = "FROM Order o WHERE o.userOrder.id = :userId";
-        return entityManager.createQuery(query, Order.class)
+        return entityManager
+                .createQuery(query, Order.class)
                 .setParameter("userId", userId)
                 .getResultList();
     }
@@ -59,7 +62,8 @@ public class OrderDaoImp implements OrderDao {
     @Override
     public List<Order> getOrdersByStatus(OrderStatus status) {
         String query = "FROM Order o WHERE o.orderStatus = :status";
-        return entityManager.createQuery(query, Order.class)
+        return entityManager
+                .createQuery(query, Order.class)
                 .setParameter("status", status)
                 .getResultList();
     }
@@ -67,7 +71,8 @@ public class OrderDaoImp implements OrderDao {
     @Override
     public List<Order> getOrdersByDateRange(LocalDateTime startDate, LocalDateTime endDate) {
         String query = "FROM Order o WHERE o.purchaseDateOrder BETWEEN :startDate AND :endDate";
-        return entityManager.createQuery(query, Order.class)
+        return entityManager
+                .createQuery(query, Order.class)
                 .setParameter("startDate", startDate)
                 .setParameter("endDate", endDate)
                 .getResultList();
@@ -89,7 +94,8 @@ public class OrderDaoImp implements OrderDao {
     @Override
     public List<Order> getOrdersByPaymentStatus(PaymentStatus paymentStatus) {
         String query = "FROM Order o WHERE o.paymentStatus = :status";
-        return entityManager.createQuery(query, Order.class)
+        return entityManager
+                .createQuery(query, Order.class)
                 .setParameter("status", paymentStatus)
                 .getResultList();
     }
@@ -97,7 +103,8 @@ public class OrderDaoImp implements OrderDao {
     @Override
     public List<Order> getOrdersByUserAndStatus(Long userId, OrderStatus status) {
         String query = "FROM Order o WHERE o.userOrder.id = :userId AND o.orderStatus = :status";
-        return entityManager.createQuery(query, Order.class)
+        return entityManager
+                .createQuery(query, Order.class)
                 .setParameter("userId", userId)
                 .setParameter("status", status)
                 .getResultList();

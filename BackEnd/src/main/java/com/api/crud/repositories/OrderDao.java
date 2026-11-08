@@ -4,6 +4,7 @@ import com.api.crud.models.entity.Order;
 import com.api.crud.models.entity.Product;
 import com.api.crud.models.enums.OrderStatus;
 import com.api.crud.models.enums.PaymentStatus;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -33,5 +34,4 @@ public interface OrderDao {
     List<Order> getOrdersByUserAndStatus(Long userId, OrderStatus status);
 
     Optional<Product> getProductById(Long productId);
-
 }

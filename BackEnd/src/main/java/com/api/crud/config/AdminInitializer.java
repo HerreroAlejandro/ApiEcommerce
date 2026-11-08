@@ -1,11 +1,11 @@
 package com.api.crud.config;
 
-import com.api.crud.models.enums.AccountStatus;
-
 import com.api.crud.models.entity.Role;
 import com.api.crud.models.entity.UserModel;
+import com.api.crud.models.enums.AccountStatus;
 import com.api.crud.repositories.RoleDao;
 import com.api.crud.repositories.UserDao;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
@@ -38,31 +38,26 @@ public class AdminInitializer {
     @Bean
     CommandLineRunner createAdmin() {
         return args -> {
-
             Optional<UserModel> existingAdmin = userDao.getUserByEmail(adminEmail);
-
             if (existingAdmin.isPresent()) {
                 System.out.println("El usuario ADMIN ya existe: " + adminEmail);
                 return;
             }
-
-            Role adminRole = roleDao.getRoleByName("ADMIN")
-                    .orElseThrow(() ->
-                            new RuntimeException("El rol ADMIN no existe en la base de datos"));
-
+            Role adminRole =
+                    roleDao.getRoleByName("ADMIN")
+                            .orElseThrow(
+                                    () ->
+                                            new RuntimeException(
+                                                    "El rol ADMIN no existe en la base de datos"));
             UserModel admin = new UserModel();
-
             admin.setFirstName("Alejandro Ariel");
             admin.setLastName("Herrero");
             admin.setEmail(adminEmail);
             admin.setPhone(null);
             admin.setPassword(passwordEncoder.encode(adminPassword));
             admin.setStatus(AccountStatus.ACTIVE);
-
             admin.getRoles().add(adminRole);
-
             userDao.register(admin);
-
             System.out.println("======================================");
             System.out.println("Usuario ADMIN creado correctamente");
             System.out.println("Email: " + adminEmail);

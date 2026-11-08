@@ -1,6 +1,7 @@
 package com.api.crud.DTO;
 
 import com.api.crud.models.enums.ProductType;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -8,24 +9,31 @@ import java.math.BigDecimal;
 
 public class ProductAdminCatalogDTO {
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private Long idProduct;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private String nameProduct;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private BigDecimal priceProduct;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private String category;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private ProductType type;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private boolean active;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private Integer stockProduct;
 }

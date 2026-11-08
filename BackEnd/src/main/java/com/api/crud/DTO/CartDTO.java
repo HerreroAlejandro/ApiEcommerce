@@ -2,17 +2,21 @@ package com.api.crud.DTO;
 
 import lombok.Getter;
 import lombok.Setter;
+
 import java.util.List;
 
 public class CartDTO {
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private Long idCart;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private Long userCart;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private List<CartItemDTO> itemsCart;
 
     public CartDTO(Long idCart, Long userCart, List<CartItemDTO> itemsCart) {
@@ -21,5 +25,5 @@ public class CartDTO {
         this.itemsCart = itemsCart;
     }
 
-    public CartDTO(){}
+    public CartDTO() {}
 }

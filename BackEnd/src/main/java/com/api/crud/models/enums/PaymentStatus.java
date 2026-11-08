@@ -1,8 +1,13 @@
 package com.api.crud.models.enums;
 
 public enum PaymentStatus {
-    PENDING,      // El pago está pendiente
-    PAID,         // El pago está realizado
-    FAILED,       // El pago falló
-    REFUNDED      // El pago fue devuelto
+
+    // El pago está pendiente
+    PENDING,
+    // El pago está realizado
+    PAID,
+    // El pago falló
+    FAILED,
+    // El pago fue devuelto
+    REFUNDED
 }

@@ -3,32 +3,35 @@ package com.api.crud.services;
 import com.api.crud.DTO.CartItemAdminDetailDTO;
 import com.api.crud.DTO.CartItemAdminListDTO;
 import com.api.crud.models.entity.Cart;
+import com.api.crud.models.entity.CartChangeAudit;
 import com.api.crud.models.entity.CartItem;
 import com.api.crud.models.entity.Product;
+import com.api.crud.models.entity.ProductPhysical;
 import com.api.crud.models.entity.UserModel;
+import com.api.crud.repositories.CartChangeAuditDao;
 import com.api.crud.repositories.CartDao;
 import com.api.crud.repositories.CartItemDao;
 import com.api.crud.repositories.ProductDao;
 import com.api.crud.repositories.UserDao;
-import com.api.crud.repositories.CartChangeAuditDao;
-import com.api.crud.models.entity.CartChangeAudit;
+
 import jakarta.transaction.Transactional;
+
 import org.modelmapper.ModelMapper;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 public class CartItemService {
+
+    private static final Logger logger = LoggerFactory.getLogger(CartItemService.class);
 
     @Autowired
     private CartItemDao cartItemDao;
@@ -50,13 +53,20 @@ public class CartItemService {
 
     private String validReason(String reason) {
         if (reason == null || reason.isBlank() || reason.length() > 500) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Debe indicar un motivo de hasta 500 caracteres");
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Debe indicar un motivo de hasta 500 caracteres");
         }
         return reason.trim();
     }
 
-    private void audit(UserModel actor, Cart cart, Long productId, String action,
-                       int previous, int amount, String reason) {
+    private void audit(
+            UserModel actor,
+            Cart cart,
+            Long productId,
+            String action,
+            int previous,
+            int amount,
+            String reason) {
         CartChangeAudit record = new CartChangeAudit();
         record.setActorUserId(actor.getId());
         record.setTargetUserId(cart.getUserCart().getId());
@@ -66,13 +76,18 @@ public class CartItemService {
         record.setPreviousAmount(previous);
         record.setNewAmount(amount);
         record.setReason(reason);
-        record.setCreatedAt(java.time.LocalDateTime.now());
+        record.setCreatedAt(LocalDateTime.now());
         cartChangeAuditDao.save(record);
     }
 
     private CartItem adminItem(Long itemId) {
-        CartItem item = cartItemDao.getCartItemById(itemId).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "Item no encontrado"));
+        CartItem item =
+                cartItemDao
+                        .getCartItemById(itemId)
+                        .orElseThrow(
+                                () ->
+                                        new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND, "Item no encontrado"));
         if (!item.getCart().isActive()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Carrito inactivo");
         }
@@ -83,8 +98,12 @@ public class CartItemService {
     public void changeAdminCartState(String email, Long cartId, boolean active, String reason) {
         String motive = validReason(reason);
         UserModel actor = authenticatedUser(email);
-        Cart cart = cartDao.getCartById(cartId).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "Carrito no encontrado"));
+        Cart cart =
+                cartDao.getCartById(cartId)
+                        .orElseThrow(
+                                () ->
+                                        new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND, "Carrito no encontrado"));
         if (cart.isActive() != active) {
             audit(actor, cart, null, active ? "ENABLE" : "DISABLE", 0, 0, motive);
             cart.setActive(active);
@@ -95,11 +114,21 @@ public class CartItemService {
     public void deleteAdminCart(String email, Long cartId, String reason) {
         String motive = validReason(reason);
         UserModel actor = authenticatedUser(email);
-        Cart cart = cartDao.getCartById(cartId).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "Carrito no encontrado"));
+        Cart cart =
+                cartDao.getCartById(cartId)
+                        .orElseThrow(
+                                () ->
+                                        new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND, "Carrito no encontrado"));
         for (CartItem item : cart.getItemsCart()) {
-            audit(actor, cart, item.getProductCartItem().getIdProduct(), "DELETE_ITEM",
-                    item.getAmountCartItem(), 0, motive);
+            audit(
+                    actor,
+                    cart,
+                    item.getProductCartItem().getIdProduct(),
+                    "DELETE_ITEM",
+                    item.getAmountCartItem(),
+                    0,
+                    motive);
         }
         audit(actor, cart, null, "DELETE_CART", 0, 0, motive);
         cartDao.deleteCartById(cartId);
@@ -109,12 +138,18 @@ public class CartItemService {
     public void addAdminItem(String email, Long userId, Long productId, int amount, String reason) {
         String motive = validReason(reason);
         UserModel actor = authenticatedUser(email);
-        userDao.getUserById(userId).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+        userDao.getUserById(userId)
+                .orElseThrow(
+                        () ->
+                                new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND, "Usuario no encontrado"));
         positive(amount);
         Cart cart = cartDao.getOrCreateActiveCart(userId);
-        int previous = cartItemDao.getByCartAndProductId(cart.getIdCart(), productId)
-                .map(CartItem::getAmountCartItem).orElse(0);
+        int previous =
+                cartItemDao
+                        .getByCartAndProductId(cart.getIdCart(), productId)
+                        .map(CartItem::getAmountCartItem)
+                        .orElse(0);
         addItemToCart(userId, productId, amount);
         audit(actor, cart, productId, "ADD", previous, previous + amount, motive);
     }
@@ -141,22 +176,30 @@ public class CartItemService {
         changeAdminAmount(email, itemId, 0, "REMOVE", reason);
     }
 
-    private void changeAdminAmount(String email, Long itemId, int amount, String action, String reason) {
+    private void changeAdminAmount(
+            String email, Long itemId, int amount, String action, String reason) {
         String motive = validReason(reason);
         UserModel actor = authenticatedUser(email);
         CartItem item = adminItem(itemId);
         int previous = item.getAmountCartItem();
-        long next = switch (action) {
-            case "INCREASE" -> (long) previous + amount;
-            case "DECREASE" -> Math.max(0L, (long) previous - amount);
-            default -> amount;
-        };
+        long next =
+                switch (action) {
+                    case "INCREASE" -> (long) previous + amount;
+                    case "DECREASE" -> Math.max(0L, (long) previous - amount);
+                    default -> amount;
+                };
         if (!action.equals("REMOVE") && !action.equals("DECREASE")) {
             positive(amount);
             available(item.getProductCartItem(), next);
         }
-        audit(actor, item.getCart(), item.getProductCartItem().getIdProduct(), action,
-                previous, (int) next, motive);
+        audit(
+                actor,
+                item.getCart(),
+                item.getProductCartItem().getIdProduct(),
+                action,
+                previous,
+                (int) next,
+                motive);
         if (next == 0) {
             item.getCart().getItemsCart().remove(item);
             cartItemDao.removeCartItem(itemId);
@@ -169,8 +212,12 @@ public class CartItemService {
     public void clearAdminCart(String email, Long cartId, String reason) {
         String motive = validReason(reason);
         UserModel actor = authenticatedUser(email);
-        Cart cart = cartDao.getCartById(cartId).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "Carrito no encontrado"));
+        Cart cart =
+                cartDao.getCartById(cartId)
+                        .orElseThrow(
+                                () ->
+                                        new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND, "Carrito no encontrado"));
         if (!cart.isActive()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Carrito inactivo");
         }
@@ -178,23 +225,32 @@ public class CartItemService {
             audit(actor, cart, null, "CLEAR", 0, 0, motive);
         }
         for (CartItem item : cart.getItemsCart()) {
-            audit(actor, cart, item.getProductCartItem().getIdProduct(), "CLEAR",
-                    item.getAmountCartItem(), 0, motive);
+            audit(
+                    actor,
+                    cart,
+                    item.getProductCartItem().getIdProduct(),
+                    "CLEAR",
+                    item.getAmountCartItem(),
+                    0,
+                    motive);
         }
         cart.getItemsCart().clear();
     }
 
-    private static final Logger logger = LoggerFactory.getLogger(CartItemService.class);
-
     private UserModel authenticatedUser(String email) {
-        return userDao.getUserByEmail(email).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        return userDao.getUserByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
     }
 
     private CartItem ownedItem(String email, Long itemId) {
         UserModel user = authenticatedUser(email);
-        CartItem item = cartItemDao.getCartItemById(itemId).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "Item no encontrado"));
+        CartItem item =
+                cartItemDao
+                        .getCartItemById(itemId)
+                        .orElseThrow(
+                                () ->
+                                        new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND, "Item no encontrado"));
         if (item.getCart().getUserCart().getId() != user.getId() || !item.getCart().isActive()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Item no encontrado");
         }
@@ -203,7 +259,8 @@ public class CartItemService {
 
     private void positive(int amount) {
         if (amount <= 0 || amount > 99999999) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cantidad debe estar entre 1 y 99999999");
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "La cantidad debe estar entre 1 y 99999999");
         }
     }
 
@@ -211,8 +268,9 @@ public class CartItemService {
         if (!product.isActive()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Producto desactivado");
         }
-        if (amount > 99999999 || (product instanceof com.api.crud.models.entity.ProductPhysical physical
-                && amount > physical.getStockProduct())) {
+        if (amount > 99999999
+                || (product instanceof ProductPhysical physical
+                        && amount > physical.getStockProduct())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cantidad no disponible");
         }
     }
@@ -262,14 +320,18 @@ public class CartItemService {
     public void addItemToCart(Long userId, Long productId, int amount) {
         positive(amount);
         Cart cart = cartDao.getOrCreateActiveCart(userId);
-
-        Product product = productDao.getProductById(productId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
-
-        Optional<CartItem> existingCartItem = cartItemDao.getByCartAndProductId(cart.getIdCart(), productId);
-        long resultingAmount = (long) amount + existingCartItem.map(CartItem::getAmountCartItem).orElse(0);
+        Product product =
+                productDao
+                        .getProductById(productId)
+                        .orElseThrow(
+                                () ->
+                                        new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND, "Producto no encontrado"));
+        Optional<CartItem> existingCartItem =
+                cartItemDao.getByCartAndProductId(cart.getIdCart(), productId);
+        long resultingAmount =
+                (long) amount + existingCartItem.map(CartItem::getAmountCartItem).orElse(0);
         available(product, resultingAmount);
-
         if (existingCartItem.isPresent()) {
             CartItem cartItem = existingCartItem.get();
             cartItem.setAmountCartItem(cartItem.getAmountCartItem() + amount);
@@ -285,39 +347,48 @@ public class CartItemService {
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public Optional<CartItemAdminDetailDTO> getCartItemById(Long cartItemId) {
-        return cartItemDao.getCartItemById(cartItemId).map(item -> {
-            Product product = item.getProductCartItem();
-            CartItemAdminDetailDTO dto = new CartItemAdminDetailDTO();
-            dto.setIdCartItem(item.getIdCartItem());
-            dto.setCartId(item.getCart().getIdCart());
-            dto.setProductId(product.getIdProduct());
-            dto.setNameProduct(product.getNameProduct());
-            dto.setAmountCartItem(item.getAmountCartItem());
-            dto.setPriceProduct(product.getPriceProduct());
-            dto.setSubtotal(item.getSubtotal());
-            dto.setImageUrl(product.getImageUrl());
-            dto.setType(product.getType());
-            dto.setActive(product.isActive());
-            if (product instanceof com.api.crud.models.entity.ProductPhysical physical) {
-                dto.setStockProduct(physical.getStockProduct());
-            }
-            return dto;
-        });
+        return cartItemDao
+                .getCartItemById(cartItemId)
+                .map(
+                        item -> {
+                            Product product = item.getProductCartItem();
+                            CartItemAdminDetailDTO dto = new CartItemAdminDetailDTO();
+                            dto.setIdCartItem(item.getIdCartItem());
+                            dto.setCartId(item.getCart().getIdCart());
+                            dto.setProductId(product.getIdProduct());
+                            dto.setNameProduct(product.getNameProduct());
+                            dto.setAmountCartItem(item.getAmountCartItem());
+                            dto.setPriceProduct(product.getPriceProduct());
+                            dto.setSubtotal(item.getSubtotal());
+                            dto.setImageUrl(product.getImageUrl());
+                            dto.setType(product.getType());
+                            dto.setActive(product.isActive());
+                            if (product instanceof ProductPhysical physical) {
+                                dto.setStockProduct(physical.getStockProduct());
+                            }
+                            return dto;
+                        });
     }
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<CartItemAdminListDTO> getItemsByCartId(Long cartId) {
-        cartDao.getCartById(cartId).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "Carrito no encontrado"));
-        return cartItemDao.getItemsByCartId(cartId).stream().map(item -> {
-            CartItemAdminListDTO dto = new CartItemAdminListDTO();
-            dto.setIdCartItem(item.getIdCartItem());
-            dto.setProductId(item.getProductCartItem().getIdProduct());
-            dto.setNameProduct(item.getProductCartItem().getNameProduct());
-            dto.setAmountCartItem(item.getAmountCartItem());
-            dto.setPriceProduct(item.getProductCartItem().getPriceProduct());
-            dto.setSubtotal(item.getSubtotal());
-            return dto;
-        }).toList();
+        cartDao.getCartById(cartId)
+                .orElseThrow(
+                        () ->
+                                new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND, "Carrito no encontrado"));
+        return cartItemDao.getItemsByCartId(cartId).stream()
+                .map(
+                        item -> {
+                            CartItemAdminListDTO dto = new CartItemAdminListDTO();
+                            dto.setIdCartItem(item.getIdCartItem());
+                            dto.setProductId(item.getProductCartItem().getIdProduct());
+                            dto.setNameProduct(item.getProductCartItem().getNameProduct());
+                            dto.setAmountCartItem(item.getAmountCartItem());
+                            dto.setPriceProduct(item.getProductCartItem().getPriceProduct());
+                            dto.setSubtotal(item.getSubtotal());
+                            return dto;
+                        })
+                .toList();
     }
 }

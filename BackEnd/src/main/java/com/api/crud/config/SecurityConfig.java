@@ -1,6 +1,7 @@
 package com.api.crud.config;
 
 import com.api.crud.repositories.UserDao;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -11,12 +12,12 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
     private final JWTUtil jwtUtil;
+
     private final UserDao userDao;
 
     public SecurityConfig(JWTUtil jwtUtil, UserDao userDao) {
@@ -26,35 +27,63 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-                .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(authorizeRequests ->
-                        authorizeRequests
-                                .requestMatchers("/users/register").permitAll()
-                                .requestMatchers("/users/login").permitAll()
-                                .requestMatchers("/users/account-recovery/**").permitAll()
-                                .requestMatchers("/users/password-recovery/**").permitAll()
-                                .requestMatchers("/admin/products/**").hasAnyAuthority("ADMIN", "SUPPORT")
-                                .requestMatchers("/admin/cart/**").hasAnyAuthority("ADMIN", "SUPPORT")
-                                .requestMatchers("/admin/cart-items/**").hasAnyAuthority("ADMIN", "SUPPORT")
-                                .requestMatchers("/admin/orders/*/payment-status").hasAuthority("ADMIN")
-                                .requestMatchers("/admin/orders/**").hasAnyAuthority("ADMIN", "SUPPORT")
-                                .requestMatchers(HttpMethod.GET, "/admin/order-items/**").hasAnyAuthority("ADMIN", "SUPPORT")
-                                .requestMatchers("/admin/order-items/**").denyAll()
-                                .requestMatchers(HttpMethod.GET, "/order-items/**").authenticated()
-                                .requestMatchers("/order-items/**").denyAll()
-                                .requestMatchers("/orders", "/orders/**").authenticated()
-                                .requestMatchers(HttpMethod.GET, "/admin/users/*/status-history").hasAnyAuthority("ADMIN", "SUPPORT")
-                                .requestMatchers("/admin/**").hasAuthority("ADMIN")
-                                .requestMatchers("/support/**").hasAnyAuthority("ADMIN", "SUPPORT")
-                                .requestMatchers(HttpMethod.GET, "/products/ShowProducts", "/products/GetProductById/{id}").permitAll()
-                                .requestMatchers("/products/**").denyAll()
-                                .requestMatchers("/cart", "/cart/**").authenticated()
-                                .requestMatchers("/cartItem/**").authenticated()
-                                .anyRequest().authenticated()
-                )
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .addFilterBefore(new JWTFilter(jwtUtil, userDao ), UsernamePasswordAuthenticationFilter.class);
+        http.csrf(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(
+                        authorizeRequests ->
+                                authorizeRequests
+                                        .requestMatchers("/users/register")
+                                        .permitAll()
+                                        .requestMatchers("/users/login")
+                                        .permitAll()
+                                        .requestMatchers("/users/account-recovery/**")
+                                        .permitAll()
+                                        .requestMatchers("/users/password-recovery/**")
+                                        .permitAll()
+                                        .requestMatchers("/admin/products/**")
+                                        .hasAnyAuthority("ADMIN", "SUPPORT")
+                                        .requestMatchers("/admin/cart/**")
+                                        .hasAnyAuthority("ADMIN", "SUPPORT")
+                                        .requestMatchers("/admin/cart-items/**")
+                                        .hasAnyAuthority("ADMIN", "SUPPORT")
+                                        .requestMatchers("/admin/orders/*/payment-status")
+                                        .hasAuthority("ADMIN")
+                                        .requestMatchers("/admin/orders/**")
+                                        .hasAnyAuthority("ADMIN", "SUPPORT")
+                                        .requestMatchers(HttpMethod.GET, "/admin/order-items/**")
+                                        .hasAnyAuthority("ADMIN", "SUPPORT")
+                                        .requestMatchers("/admin/order-items/**")
+                                        .denyAll()
+                                        .requestMatchers(HttpMethod.GET, "/order-items/**")
+                                        .authenticated()
+                                        .requestMatchers("/order-items/**")
+                                        .denyAll()
+                                        .requestMatchers("/orders", "/orders/**")
+                                        .authenticated()
+                                        .requestMatchers(
+                                                HttpMethod.GET, "/admin/users/*/status-history")
+                                        .hasAnyAuthority("ADMIN", "SUPPORT")
+                                        .requestMatchers("/admin/**")
+                                        .hasAuthority("ADMIN")
+                                        .requestMatchers("/support/**")
+                                        .hasAnyAuthority("ADMIN", "SUPPORT")
+                                        .requestMatchers(
+                                                HttpMethod.GET,
+                                                "/products/ShowProducts",
+                                                "/products/GetProductById/{id}")
+                                        .permitAll()
+                                        .requestMatchers("/products/**")
+                                        .denyAll()
+                                        .requestMatchers("/cart", "/cart/**")
+                                        .authenticated()
+                                        .requestMatchers("/cartItem/**")
+                                        .authenticated()
+                                        .anyRequest()
+                                        .authenticated())
+                .sessionManagement(
+                        session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .addFilterBefore(
+                        new JWTFilter(jwtUtil, userDao),
+                        UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 }

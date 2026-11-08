@@ -1,6 +1,7 @@
 package com.api.crud.repositories;
 
 import com.api.crud.models.entity.CartItem;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -14,10 +15,5 @@ public interface CartItemDao {
 
     Optional<CartItem> getByCartAndProductId(Long cartId, Long productId);
 
-
-
     void removeCartItem(Long cartItemId);
-
-
-
 }

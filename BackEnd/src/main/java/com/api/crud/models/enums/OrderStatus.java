@@ -1,9 +1,15 @@
 package com.api.crud.models.enums;
 
 public enum OrderStatus {
-    PENDING,      // Pedido generado pero no procesado
-    CONFIRMED,    // Confirmado
-    SHIPPED,      // Enviado
-    DELIVERED,    // Entregado
-    CANCELED      // Cancelado
+
+    // Pedido generado pero no procesado
+    PENDING,
+    // Confirmado
+    CONFIRMED,
+    // Enviado
+    SHIPPED,
+    // Entregado
+    DELIVERED,
+    // Cancelado
+    CANCELED
 }

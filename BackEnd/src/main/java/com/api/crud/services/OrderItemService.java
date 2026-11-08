@@ -1,34 +1,51 @@
 package com.api.crud.services;
-import com.api.crud.DTO.OrderItemResponseDTO;
+
 import com.api.crud.DTO.OrderItemAdminDetailDTO;
+import com.api.crud.DTO.OrderItemResponseDTO;
 import com.api.crud.models.entity.Order;
 import com.api.crud.models.entity.OrderItem;
 import com.api.crud.repositories.*;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
+
 import java.util.List;
 
 @Service
 @Transactional(readOnly = true)
 public class OrderItemService {
+
     private final OrderItemDao items;
+
     private final OrderDao orders;
+
     private final UserDao users;
+
     public OrderItemService(OrderItemDao items, OrderDao orders, UserDao users) {
-        this.items = items; this.orders = orders; this.users = users;
+        this.items = items;
+        this.orders = orders;
+        this.users = users;
     }
 
     private long userId(String email) {
-        return users.getUserByEmail(email).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.UNAUTHORIZED)).getId();
+        return users.getUserByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED))
+                .getId();
     }
+
     private ResponseStatusException notFound() {
         return new ResponseStatusException(HttpStatus.NOT_FOUND, "Orden o item no encontrado");
     }
-    private OrderItem item(Long id) { return items.getOrderItemById(id).orElseThrow(this::notFound); }
-    private Order order(Long id) { return orders.getOrderById(id).orElseThrow(this::notFound); }
+
+    private OrderItem item(Long id) {
+        return items.getOrderItemById(id).orElseThrow(this::notFound);
+    }
+
+    private Order order(Long id) {
+        return orders.getOrderById(id).orElseThrow(this::notFound);
+    }
 
     private OrderItemResponseDTO response(OrderItem item) {
         OrderItemResponseDTO dto = new OrderItemResponseDTO();

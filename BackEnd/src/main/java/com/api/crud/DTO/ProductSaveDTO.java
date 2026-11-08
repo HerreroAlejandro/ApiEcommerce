@@ -1,69 +1,90 @@
 package com.api.crud.DTO;
 
+import com.api.crud.models.enums.ProductType;
 import com.api.crud.validation.HttpUrl;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+import jakarta.validation.constraints.*;
 import jakarta.validation.constraints.AssertTrue;
 
-import com.api.crud.models.enums.ProductType;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.Setter;
+
 import java.math.BigDecimal;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ProductSaveDTO {
 
-    @Getter @Setter
+    @Getter
+    @Setter
     @Null(message = "El ID se genera en el servidor")
     private Long idProduct;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     @NotBlank(message = "Product name cannot be blank")
     @Size(min = 2, max = 30, message = "Product name must be between 2 and 30 characters")
     private String nameProduct;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     @NotNull(message = "Product price cannot be null")
     @DecimalMin(value = "0.0", inclusive = false, message = "Product price must be greater than 0")
     @Digits(integer = 8, fraction = 2)
     private BigDecimal priceProduct;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     @Size(max = 200, message = "Description cannot exceed 200 characters")
     private String description;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     @Size(max = 200, message = "Image URL cannot exceed 200 characters")
     @HttpUrl(allowBlank = true)
     private String imageUrl;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     @NotBlank(message = "Product category cannot be blank")
     @Size(max = 50, message = "Product category cannot exceed 50 characters")
     private String category;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     @NotNull(message = "Product type cannot be null")
     private ProductType type;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     @Size(max = 200, message = "Download link cannot exceed 200 characters")
     @HttpUrl
     private String downloadLink;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     @Size(max = 50, message = "License cannot exceed 50 characters")
     private String license;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     @Min(value = 0, message = "Stock cannot be negative")
     private Integer stockProduct;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private boolean active;
 
-    public ProductSaveDTO(String nameProduct, BigDecimal priceProduct, String description, String imageUrl, String category, ProductType type, String downloadLink, String license) {
+    public ProductSaveDTO(
+            String nameProduct,
+            BigDecimal priceProduct,
+            String description,
+            String imageUrl,
+            String category,
+            ProductType type,
+            String downloadLink,
+            String license) {
         this.nameProduct = nameProduct;
         this.priceProduct = priceProduct;
         this.description = description;
@@ -74,7 +95,14 @@ public class ProductSaveDTO {
         this.license = license;
     }
 
-    public ProductSaveDTO(String nameProduct, BigDecimal priceProduct, String description, String imageUrl, String category, ProductType type, Integer stockProduct) {
+    public ProductSaveDTO(
+            String nameProduct,
+            BigDecimal priceProduct,
+            String description,
+            String imageUrl,
+            String category,
+            ProductType type,
+            Integer stockProduct) {
         this.nameProduct = nameProduct;
         this.priceProduct = priceProduct;
         this.description = description;
@@ -84,10 +112,12 @@ public class ProductSaveDTO {
         this.stockProduct = stockProduct;
     }
 
-    public ProductSaveDTO(){}
+    public ProductSaveDTO() {}
 
     @JsonIgnore
-    @AssertTrue(message = "El producto fisico requiere stock y no admite campos digitales; el digital requiere descarga y no admite stock")
+    @AssertTrue(
+            message =
+                    "El producto fisico requiere stock y no admite campos digitales; el digital requiere descarga y no admite stock")
     public boolean isProductFieldsValid() {
         if (type == null) return true;
         return switch (type) {

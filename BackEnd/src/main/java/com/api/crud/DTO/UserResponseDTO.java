@@ -5,27 +5,32 @@ import lombok.Setter;
 
 public class UserResponseDTO {
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private long id;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private String firstName;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private String lastName;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private String email;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private String phone;
 
-    public UserResponseDTO(String firstName, String lastName, String email, String phone){
-        this.firstName=firstName;
-        this.lastName=lastName;
-        this.email=email;
-        this.phone=phone;
+    public UserResponseDTO(String firstName, String lastName, String email, String phone) {
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.email = email;
+        this.phone = phone;
     }
 
-    public UserResponseDTO(){}
+    public UserResponseDTO() {}
 }

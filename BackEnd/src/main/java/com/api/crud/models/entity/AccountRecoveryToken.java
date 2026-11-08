@@ -1,7 +1,7 @@
 package com.api.crud.models.entity;
 
-
 import jakarta.persistence.*;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -12,27 +12,39 @@ public class AccountRecoveryToken {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Getter @Setter
+    @Getter
+    @Setter
     private Long id;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private String token;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private LocalDateTime createdAt;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private LocalDateTime expirationDate;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private boolean used;
 
     @ManyToOne
     @JoinColumn(name = "user_id")
-    @Getter @Setter
+    @Getter
+    @Setter
     private UserModel user;
 
-    public AccountRecoveryToken(Long id, String token, LocalDateTime createdAt, LocalDateTime expirationDate, boolean used, UserModel user) {
+    public AccountRecoveryToken(
+            Long id,
+            String token,
+            LocalDateTime createdAt,
+            LocalDateTime expirationDate,
+            boolean used,
+            UserModel user) {
         this.id = id;
         this.token = token;
         this.createdAt = createdAt;
@@ -41,5 +53,5 @@ public class AccountRecoveryToken {
         this.user = user;
     }
 
-    public AccountRecoveryToken(){}
+    public AccountRecoveryToken() {}
 }

@@ -1,19 +1,52 @@
 package com.api.crud.DTO;
+
 import com.api.crud.models.enums.OrderStatus;
 import com.api.crud.models.enums.PaymentStatus;
+
 import lombok.Getter;
 import lombok.Setter;
+
 import java.math.BigDecimal;
-@Getter @Setter
+
 public class OrderItemAdminDetailDTO {
+
+    @Getter
+    @Setter
     private Long idOrderItem;
+
+    @Getter
+    @Setter
     private Long orderId;
+
+    @Getter
+    @Setter
     private Long userId;
+
+    @Getter
+    @Setter
     private OrderStatus orderStatus;
+
+    @Getter
+    @Setter
     private PaymentStatus paymentStatus;
+
+    @Getter
+    @Setter
     private Long productId;
+
+    @Getter
+    @Setter
     private String productName;
+
+    @Getter
+    @Setter
     private int amountOrderItem;
+
+    @Getter
+    @Setter
     private BigDecimal priceOrderItem;
+
+    @Getter
+    @Setter
     private BigDecimal subtotal;
 }

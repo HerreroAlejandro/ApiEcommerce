@@ -2,37 +2,47 @@ package com.api.crud.models.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Digits;
+
 import lombok.Getter;
 import lombok.Setter;
+
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "cart_items", uniqueConstraints = @UniqueConstraint(
-        name = "uk_cart_item_product", columnNames = {"cart_id", "product_id"}))
+@Table(
+        name = "cart_items",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_cart_item_product",
+                        columnNames = {"cart_id", "product_id"}))
 public class CartItem {
+
     @Version
     private Long version;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Getter @Setter
+    @Getter
+    @Setter
     private Long idCartItem;
 
     @ManyToOne
     @JoinColumn(name = "cart_id")
-    @Getter @Setter
+    @Getter
+    @Setter
     private Cart cart;
 
     @ManyToOne
     @JoinColumn(name = "product_id")
-    @Getter @Setter
+    @Getter
+    @Setter
     private Product productCartItem;
 
     @Column(name = "amountCartItem")
-    @Getter @Setter
+    @Getter
+    @Setter
     @Digits(integer = 8, fraction = 0)
     private int amountCartItem;
-
-
 
     public CartItem(Long idCartItem, Cart cart, Product productCartItem, int amountCartItem) {
         this.idCartItem = idCartItem;
@@ -41,11 +51,10 @@ public class CartItem {
         this.amountCartItem = amountCartItem;
     }
 
-    public CartItem(){}
+    public CartItem() {}
 
     @Transient
     public BigDecimal getSubtotal() {
         return productCartItem.getPriceProduct().multiply(BigDecimal.valueOf(amountCartItem));
     }
-
 }

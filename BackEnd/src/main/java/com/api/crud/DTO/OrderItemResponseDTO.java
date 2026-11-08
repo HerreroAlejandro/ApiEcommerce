@@ -7,21 +7,27 @@ import java.math.BigDecimal;
 
 public class OrderItemResponseDTO {
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private Long idOrderItem;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private BigDecimal priceOrderItem;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private int amountOrderItem;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private BigDecimal subtotal;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private Long productId;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private String productName;
 }

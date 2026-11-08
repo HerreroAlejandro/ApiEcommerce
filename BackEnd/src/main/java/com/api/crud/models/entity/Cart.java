@@ -2,6 +2,7 @@ package com.api.crud.models.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -10,31 +11,38 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table (name = "carts")
+@Table(name = "carts")
 public class Cart {
+
     @Version
     private Long version;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Getter @Setter
+    @Getter
+    @Setter
     private Long idCart;
 
     @OneToOne
     @JoinColumn(name = "user_id", nullable = false, unique = true)
-    @Getter @Setter
+    @Getter
+    @Setter
     @NotNull
     private UserModel userCart;
 
     @Column(nullable = false)
-    @Getter @Setter
+    @Getter
+    @Setter
     private boolean active = true;
 
     @Column(nullable = false, updatable = false)
-    @Getter @Setter
+    @Getter
+    @Setter
     private LocalDate creationDate;
 
     @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Getter @Setter
+    @Getter
+    @Setter
     private List<CartItem> itemsCart = new ArrayList<>();
 
     public Cart(Long idCart, UserModel userCart, LocalDate creationDate, List<CartItem> itemsCart) {
@@ -44,6 +52,5 @@ public class Cart {
         this.itemsCart = new ArrayList<>();
     }
 
-    public Cart(){}
-
+    public Cart() {}
 }
