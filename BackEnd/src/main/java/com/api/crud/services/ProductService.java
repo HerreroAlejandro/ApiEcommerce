@@ -14,6 +14,8 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import com.api.crud.validation.InputRules;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -68,6 +70,8 @@ public class ProductService {
                 "Starting to process showProducts in service - name: {}, category: {}, type: {}, minPrice: {}, maxPrice: {}, inStock: {}, page: {}, size: {}",
                 name, category, type, minPrice, maxPrice, inStock, pageable.getPageNumber(), pageable.getPageSize());
 
+        InputRules.priceRange(minPrice, maxPrice);
+        InputRules.page(pageable);
         List<Product> products = productDao.showProducts(name, category, type, minPrice, maxPrice, inStock, pageable);
 
         long totalProducts = productDao.countProducts(name, category, type, minPrice, maxPrice, inStock);
@@ -85,6 +89,8 @@ public class ProductService {
         logger.info("Starting to process adminShowProducts in service - name: {}, category: {}, type: {}, minPrice: {}, maxPrice: {}, active: {}, inStock: {}, page: {}, size: {}",
                 name, category, type, minPrice, maxPrice, active, inStock, pageable.getPageNumber(), pageable.getPageSize());
 
+        InputRules.priceRange(minPrice, maxPrice);
+        InputRules.page(pageable);
         List<Product> products = productDao.adminShowProducts(name, category, type, minPrice, maxPrice, active, inStock, pageable);
 
         long totalProducts = productDao.countAdminProducts(name, category, type, minPrice, maxPrice, active, inStock);
@@ -201,7 +207,8 @@ public class ProductService {
                             .multiply(percentage)
                             .divide(BigDecimal.valueOf(100));
 
-            BigDecimal newPrice = currentPrice.add(adjustment);
+            BigDecimal newPrice = currentPrice.add(adjustment).setScale(2, RoundingMode.HALF_UP);
+            InputRules.price(newPrice);
 
             product.setPriceProduct(newPrice);
 
@@ -228,10 +235,13 @@ public class ProductService {
                 int currentStock = physicalProduct.getStockProduct();
                 int adjustment = adjustmentDTO.getAdjustment();
 
-                int newStock = currentStock + adjustment;
+                long newStock = (long) currentStock + adjustment;
+                if (newStock < 0 || newStock > Integer.MAX_VALUE) {
+                    throw new IllegalArgumentException("El ajuste produce un stock fuera de rango");
+                }
 
                 if (newStock >= 0) {
-                    physicalProduct.setStockProduct(newStock);
+                    physicalProduct.setStockProduct((int) newStock);
                     updated = true;
                 }
             }

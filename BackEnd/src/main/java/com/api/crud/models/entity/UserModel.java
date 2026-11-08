@@ -1,6 +1,7 @@
 package com.api.crud.models.entity;
 
 import jakarta.persistence.*;
+import com.api.crud.models.enums.AccountStatus;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -19,6 +20,12 @@ import java.util.stream.Collectors;
 @ToString
 @EqualsAndHashCode
 public class UserModel {
+    @Version
+    private Long version;
+
+    @Column(nullable = false, columnDefinition = "bigint default 0")
+    @Getter @Setter
+    private long authVersion = 0;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -53,9 +60,10 @@ public class UserModel {
     @NotNull (message = "Password cannot be null")
     private String password;
 
-    @Column(name = "active")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
     @Getter @Setter
-    private boolean active = true;
+    private AccountStatus status = AccountStatus.ACTIVE;
 
     @ManyToMany (fetch = FetchType.LAZY)
     @JoinTable(
@@ -65,7 +73,7 @@ public class UserModel {
     @Getter @Setter
     private Set<Role> roles = new HashSet<>();
 
-    @OneToMany(mappedBy = "userOrder", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "userOrder")
     @Getter @Setter
     private List<Order> orders = new ArrayList<>();
 

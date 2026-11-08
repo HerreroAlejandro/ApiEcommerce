@@ -102,10 +102,23 @@ public class CartService {
 
 
     @Transactional(readOnly = true)
-    public List<CartAdminListDTO> getCarts() {
-        return cartDao.getCarts().stream().map(this::toAdminList).toList();
+    public org.springframework.data.domain.Page<CartAdminListDTO> getCarts(
+            com.api.crud.DTO.CartAdminFilterDTO filter, org.springframework.data.domain.Pageable pageable) {
+        if (filter.getMinTotal() != null && filter.getMaxTotal() != null
+                && filter.getMinTotal().compareTo(filter.getMaxTotal()) > 0) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "El importe minimo supera al maximo");
+        }
+        if (filter.getMinProductQuantity() != null && filter.getProductId() == null) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "Debe indicar productId al filtrar por cantidad");
+        }
+        if (pageable.getPageSize() > 100 || pageable.getOffset() > Integer.MAX_VALUE) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "Paginacion fuera del limite");
+        }
+        return cartDao.getCarts(filter, pageable);
     }
-
     private CartAdminListDTO toAdminList(Cart cart) {
         CartAdminListDTO dto = new CartAdminListDTO();
         dto.setIdCart(cart.getIdCart());
@@ -156,26 +169,12 @@ public class CartService {
     }
 
     @Transactional(readOnly = true)
-    public Optional<CartAdminDetailDTO> getActiveCartByUserId(Long id) {
-        return cartDao.getActiveCartByUserId(id).map(this::toAdminDetail);
-    }
-
-    @Transactional(readOnly = true)
     public List<CartAdminListDTO> getCartsByDateRange(LocalDate start, LocalDate end) {
         if (start.isAfter(end)) {
             throw new org.springframework.web.server.ResponseStatusException(
                     org.springframework.http.HttpStatus.BAD_REQUEST, "Rango de fechas invalido");
         }
         return cartDao.getCartsByDateRange(start, end).stream().map(this::toAdminList).toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<CartAdminListDTO> getCartsWithMoreThanNItems(int minItems) {
-        if (minItems < 0) {
-            throw new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.BAD_REQUEST, "Cantidad invalida");
-        }
-        return cartDao.getCartsWithMoreThanNItems(minItems).stream().map(this::toAdminList).toList();
     }
 
     public BigDecimal getCartTotal(Long cartId) {

@@ -1,5 +1,9 @@
 package com.api.crud.DTO;
 
+import com.api.crud.validation.HttpUrl;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.validation.constraints.AssertTrue;
+
 import com.api.crud.models.enums.ProductType;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.constraints.*;
@@ -11,6 +15,7 @@ import java.math.BigDecimal;
 public class ProductSaveDTO {
 
     @Getter @Setter
+    @Null(message = "El ID se genera en el servidor")
     private Long idProduct;
 
     @Getter @Setter
@@ -30,6 +35,7 @@ public class ProductSaveDTO {
 
     @Getter @Setter
     @Size(max = 200, message = "Image URL cannot exceed 200 characters")
+    @HttpUrl(allowBlank = true)
     private String imageUrl;
 
     @Getter @Setter
@@ -43,6 +49,7 @@ public class ProductSaveDTO {
 
     @Getter @Setter
     @Size(max = 200, message = "Download link cannot exceed 200 characters")
+    @HttpUrl
     private String downloadLink;
 
     @Getter @Setter
@@ -79,4 +86,13 @@ public class ProductSaveDTO {
 
     public ProductSaveDTO(){}
 
+    @JsonIgnore
+    @AssertTrue(message = "El producto fisico requiere stock y no admite campos digitales; el digital requiere descarga y no admite stock")
+    public boolean isProductFieldsValid() {
+        if (type == null) return true;
+        return switch (type) {
+            case PHYSICAL -> stockProduct != null && downloadLink == null && license == null;
+            case DIGITAL -> stockProduct == null && downloadLink != null && !downloadLink.isBlank();
+        };
+    }
 }

@@ -202,8 +202,8 @@ public class CartItemService {
     }
 
     private void positive(int amount) {
-        if (amount <= 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cantidad debe ser mayor a cero");
+        if (amount <= 0 || amount > 99999999) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cantidad debe estar entre 1 y 99999999");
         }
     }
 
@@ -211,7 +211,7 @@ public class CartItemService {
         if (!product.isActive()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Producto desactivado");
         }
-        if (amount > Integer.MAX_VALUE || (product instanceof com.api.crud.models.entity.ProductPhysical physical
+        if (amount > 99999999 || (product instanceof com.api.crud.models.entity.ProductPhysical physical
                 && amount > physical.getStockProduct())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cantidad no disponible");
         }
