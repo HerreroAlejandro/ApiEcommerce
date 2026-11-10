@@ -13,6 +13,7 @@ import com.api.crud.services.ProductService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -43,6 +44,41 @@ class ProductValidationRulesTests {
                 service.adjustProductPrice(
                         1L, new ProductPriceAdjustmentDTO(new BigDecimal("10"))));
         assertEquals(new BigDecimal("2.19"), product.getPriceProduct());
+    }
+
+    @Test
+    void unusedActiveOrInactiveProductCanBeDeleted() {
+        when(products.deleteProduct(1L)).thenReturn(true);
+        product.setActive(true);
+        assertTrue(service.deleteProduct(1L));
+        product.setActive(false);
+        assertTrue(service.deleteProduct(1L));
+        verify(products, times(2)).deleteProduct(1L);
+    }
+
+    @Test
+    void referencedProductCannotBeDeletedOrAutomaticallyDeactivated() {
+        product.setActive(true);
+        when(products.hasProductReferences(1L)).thenReturn(true);
+        BusinessConflictException exception = assertThrows(
+                BusinessConflictException.class, () -> service.deleteProduct(1L));
+        assertTrue(exception.getMessage().contains("Puede desactivarlo"));
+        assertTrue(product.isActive());
+        verify(products, never()).deleteProduct(anyLong());
+    }
+
+    @Test
+    void missingProductPreservesNotFoundBehavior() {
+        assertFalse(service.deleteProduct(99L));
+        verify(products, never()).hasProductReferences(99L);
+        verify(products, never()).deleteProduct(anyLong());
+    }
+
+    @Test
+    void referenceCreatedDuringDeletionReturnsBusinessConflict() {
+        when(products.deleteProduct(1L)).thenThrow(
+                new DataIntegrityViolationException("Foreign key"));
+        assertThrows(BusinessConflictException.class, () -> service.deleteProduct(1L));
     }
 
     @Test

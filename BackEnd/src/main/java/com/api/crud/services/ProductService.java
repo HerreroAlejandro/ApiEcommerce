@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -145,9 +146,23 @@ public class ProductService {
                 .map(product -> modelMapper.map(product, ProductAdminDetailDTO.class));
     }
 
+    @Transactional
     public boolean deleteProduct(Long idProduct) {
         logger.info("Starting to process delete Product with id {} in services", idProduct);
-        boolean result = productDao.deleteProduct(idProduct);
+        if (productDao.getProductById(idProduct).isEmpty()) {
+            return false;
+        }
+        if (productDao.hasProductReferences(idProduct)) {
+            throw new BusinessConflictException(
+                    "El producto tiene registros asociados y no puede eliminarse. Puede desactivarlo");
+        }
+        boolean result;
+        try {
+            result = productDao.deleteProduct(idProduct);
+        } catch (DataIntegrityViolationException exception) {
+            throw new BusinessConflictException(
+                    "El producto tiene registros asociados y no puede eliminarse. Puede desactivarlo");
+        }
         if (result) {
             logger.info("Product with id {} deleted", idProduct);
         } else {

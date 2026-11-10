@@ -51,5 +51,7 @@ public interface ProductDao {
 
     Optional<Product> getProductById(Long idProduct);
 
+    boolean hasProductReferences(Long idProduct);
+
     boolean deleteProduct(Long idProduct);
 }

@@ -461,12 +461,37 @@ public class ProductDaoImp implements ProductDao {
     }
 
     @Override
+    public boolean hasProductReferences(Long idProduct) {
+        return !entityManager.createQuery(
+                        "SELECT i.idCartItem FROM CartItem i WHERE i.productCartItem.idProduct = :id",
+                        Long.class)
+                .setParameter("id", idProduct)
+                .setMaxResults(1)
+                .getResultList()
+                .isEmpty()
+                || !entityManager.createQuery(
+                        "SELECT i.idOrderItem FROM OrderItem i WHERE i.productOrderItem.idProduct = :id",
+                        Long.class)
+                .setParameter("id", idProduct)
+                .setMaxResults(1)
+                .getResultList()
+                .isEmpty()
+                || !entityManager.createQuery(
+                        "SELECT a.id FROM CartChangeAudit a WHERE a.productId = :id", Long.class)
+                .setParameter("id", idProduct)
+                .setMaxResults(1)
+                .getResultList()
+                .isEmpty();
+    }
+
+    @Override
     public boolean deleteProduct(Long idProduct) {
         logger.debug("Executing query Attempting to delete product with ID: {}", idProduct);
         boolean response = false;
         Product product = entityManager.find(Product.class, idProduct);
         if (product != null) {
             entityManager.remove(product);
+            entityManager.flush();
             response = true;
         }
         return response;
