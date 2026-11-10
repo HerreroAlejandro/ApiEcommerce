@@ -7,6 +7,7 @@ import com.api.crud.models.entity.PasswordResetToken;
 import com.api.crud.models.entity.Role;
 import com.api.crud.models.entity.UserModel;
 import com.api.crud.models.enums.AccountStatus;
+import com.api.crud.repositories.AccountRecoveryTokenDao;
 import com.api.crud.repositories.PasswordResetTokenDao;
 import com.api.crud.repositories.RoleDao;
 import com.api.crud.repositories.UserDao;
@@ -53,6 +54,9 @@ public class UserService {
 
     @Autowired
     private PasswordResetTokenDao passwordResetTokenDao;
+
+    @Autowired
+    private AccountRecoveryTokenDao accountRecoveryTokenDao;
 
     @Autowired
     private AccountStatusService accountStatusService;
@@ -171,9 +175,7 @@ public class UserService {
         if (!dto.getNewPassword().equals(dto.getConfirmPassword())) {
             throw new InvalidRequestException("La nueva contraseña y su confirmación no coinciden");
         }
-        user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
-        user.setAuthVersion(Math.incrementExact(user.getAuthVersion()));
-        userDao.update(user);
+        updatePasswordAndInvalidateTokens(user, dto.getNewPassword());
     }
 
     public List<UserResponseDTO> getUsers() {
@@ -224,9 +226,7 @@ public class UserService {
         if (!dto.getNewPassword().equals(dto.getConfirmPassword())) {
             throw new InvalidRequestException("La nueva contraseña y su confirmación no coinciden");
         }
-        user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
-        user.setAuthVersion(Math.incrementExact(user.getAuthVersion()));
-        userDao.update(user);
+        updatePasswordAndInvalidateTokens(user, dto.getNewPassword());
     }
 
     public void requestAccountRecovery(String email) {
@@ -235,6 +235,14 @@ public class UserService {
 
     public void activateAccountWithRecoveryToken(String token) {
         accountStatusService.activateWithRecoveryToken(token);
+    }
+
+    private void updatePasswordAndInvalidateTokens(UserModel user, String newPassword) {
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setAuthVersion(Math.incrementExact(user.getAuthVersion()));
+        userDao.update(user);
+        passwordResetTokenDao.invalidateTokensByUser(user);
+        accountRecoveryTokenDao.invalidateTokensByUser(user);
     }
 
     @Transactional
@@ -282,10 +290,7 @@ public class UserService {
             throw new InvalidRequestException("La nueva contraseña y su confirmación no coinciden");
         }
         UserModel user = resetToken.getUser();
-        user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
-        user.setAuthVersion(Math.incrementExact(user.getAuthVersion()));
+        updatePasswordAndInvalidateTokens(user, dto.getNewPassword());
         resetToken.setUsed(true);
-        userDao.update(user);
-        passwordResetTokenDao.update(resetToken);
     }
 }
