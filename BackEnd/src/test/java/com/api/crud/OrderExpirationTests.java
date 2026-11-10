@@ -43,7 +43,8 @@ class OrderExpirationTests {
                         workflow,
                         new ModelMapperConfig().modelMapper(),
                         mock(DigitalDeliveryService.class),
-                        mock(OrderShippingService.class));
+                        mock(OrderShippingService.class),
+                        mock(PaymentDao.class));
         UserModel user = new UserModel();
         user.setId(7L);
         when(users.getUserByEmail("admin@example.com")).thenReturn(Optional.of(user));

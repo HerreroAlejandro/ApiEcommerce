@@ -62,9 +62,15 @@ public class Order {
     @Setter
     private BigDecimal shippingCost = new BigDecimal("0.00");
 
-    @Embedded @Getter @Setter private OrderShippingAddress shippingAddress;
+    @Embedded
+    @Getter
+    @Setter
+    private OrderShippingAddress shippingAddress;
 
-    @Embedded @Getter @Setter private OrderShipmentTracking shipmentTracking;
+    @Embedded
+    @Getter
+    @Setter
+    private OrderShipmentTracking shipmentTracking;
 
     @NotNull(message = "purchaseDate cannot be null")
     @Getter
@@ -82,6 +88,11 @@ public class Order {
     @Getter
     @Setter
     private PaymentStatus paymentStatus;
+
+    @Column(length = 64)
+    @Getter
+    @Setter
+    private String providerPaymentId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "orderStatus", nullable = false)

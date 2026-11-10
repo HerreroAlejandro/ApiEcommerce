@@ -12,6 +12,7 @@ import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -34,6 +35,8 @@ public class OrderService {
 
     private final OrderShippingService shipping;
 
+    private final PaymentDao payments;
+
     @Value("${orders.expiration.reservation-minutes:30}")
     private long reservationMinutes = 30;
 
@@ -43,13 +46,15 @@ public class OrderService {
             OrderWorkflowDao workflow,
             ModelMapper mapper,
             DigitalDeliveryService digitalDeliveries,
-            OrderShippingService shipping) {
+            OrderShippingService shipping,
+            PaymentDao payments) {
         this.orderDao = orderDao;
         this.userDao = userDao;
         this.workflow = workflow;
         this.mapper = mapper;
         this.digitalDeliveries = digitalDeliveries;
         this.shipping = shipping;
+        this.payments = payments;
     }
 
     @PostConstruct
@@ -66,6 +71,12 @@ public class OrderService {
     @Transactional
     public boolean expireOrder(Long id) {
         Order order = workflow.lockOrder(id);
+        return expireReservedOrder(order);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean expireReservedOrder(Order order) {
+        // Payment reconciliation already holds the lock; do not refresh pending changes.
         if (!isDue(order, LocalDateTime.now())) return false;
         if (order.getExpiresAt() == null) {
             order.setExpiresAt(order.getPurchaseDateOrder().plusMinutes(reservationMinutes));
@@ -295,6 +306,9 @@ public class OrderService {
 
     private void cancel(Order order, UserModel actor, String reason) {
         if (order.getOrderStatus() == OrderStatus.CANCELED) return;
+        if (order.getPaymentStatus() == PaymentStatus.REVIEW) {
+            throw conflict("No se puede cancelar una orden con el pago en revision");
+        }
         if ((order.getOrderStatus() != OrderStatus.PENDING
                         && order.getOrderStatus() != OrderStatus.CONFIRMED)
                 || order.getPaymentStatus() == PaymentStatus.PAID) {
@@ -305,6 +319,16 @@ public class OrderService {
         String before = order.getOrderStatus().name();
         order.setOrderStatus(OrderStatus.CANCELED);
         audit(order, actor, "CANCEL", before, "CANCELED", reason);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void cancelRefundedOrder(Order order) {
+        // The provider confirmation already holds this order's write lock.
+        if (order.getPaymentStatus() == PaymentStatus.REFUNDED
+                && (order.getOrderStatus() == OrderStatus.PENDING
+                        || order.getOrderStatus() == OrderStatus.CONFIRMED)) {
+            cancel(order, null, "Cancelacion por reembolso total verificado del proveedor");
+        }
     }
 
     private void restoreStock(Order order) {
@@ -368,6 +392,10 @@ public class OrderService {
         if (status == null) throw new InvalidRequestException("Estado requerido");
         UserModel actor = user(email);
         Order order = workflow.lockOrder(id);
+        if (order.getProviderPaymentId() != null || payments.getCheckoutByOrderId(id).isPresent()) {
+            throw conflict(
+                    "Los pagos online se actualizan mediante confirmacion verificada del proveedor");
+        }
         if (isDue(order, LocalDateTime.now())) {
             throw conflict("La reserva de esta orden vencio. Debe iniciar una nueva compra");
         }

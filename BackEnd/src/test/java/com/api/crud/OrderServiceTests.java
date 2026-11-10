@@ -17,6 +17,8 @@ import jakarta.validation.Validation;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.data.domain.*;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -77,7 +79,8 @@ class OrderServiceTests {
                         workflow,
                         new ModelMapperConfig().modelMapper(),
                         mock(DigitalDeliveryService.class),
-                        shippingService());
+                        shippingService(),
+                        mock(PaymentDao.class));
         user = new UserModel();
         user.setId(7L);
         user.setEmail("client@example.com");
@@ -210,6 +213,41 @@ class OrderServiceTests {
         assertEquals(OrderStatus.CANCELED, order.getOrderStatus());
     }
 
+    @ParameterizedTest
+    @EnumSource(
+            value = OrderStatus.class,
+            names = {"PENDING", "CONFIRMED"})
+    void paymentsUnderReviewCannotBeCanceledOrReleaseStock(OrderStatus status) {
+        order.setOrderStatus(status);
+        order.setPaymentStatus(PaymentStatus.REVIEW);
+
+        BusinessConflictException cancellation =
+                assertThrows(
+                        BusinessConflictException.class,
+                        () ->
+                                service.cancelAdminOrder(
+                                        "client@example.com", 10L, "Cancelar pedido"));
+        assertEquals(409, ExceptionProblems.status(cancellation).value());
+        assertThrows(
+                BusinessConflictException.class,
+                () ->
+                        service.updateOrderStatus(
+                                "client@example.com",
+                                10L,
+                                OrderStatus.CANCELED,
+                                "Cancelar por estado"));
+        assertThrows(
+                ApplicationException.class,
+                () -> service.cancelMyOrder("client@example.com", 10L, "Cancelar compra"));
+
+        assertEquals(status, order.getOrderStatus());
+        assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
+        assertTrue(order.isStockDeducted());
+        assertEquals(5, product.getStockProduct());
+        verify(workflow, never()).lockProduct(anyLong());
+        verify(workflow, never()).saveAudit(any());
+    }
+
     @Test
     void transitionsRequirePaymentAndPreventReversal() {
         assertThrows(
@@ -281,5 +319,57 @@ class OrderServiceTests {
         service.updatePaymentStatus(
                 "client@example.com", 10L, PaymentStatus.REFUNDED, "Reembolso confirmado");
         verify(deliveries).revokeOrder(order);
+    }
+
+    @Test
+    void registeredOnlineCheckoutCannotBeOverriddenByManualStatusUpdates() {
+        PaymentDao payments = (PaymentDao) ReflectionTestUtils.getField(service, "payments");
+        when(payments.getCheckoutByOrderId(10L)).thenReturn(Optional.of(new PaymentCheckout()));
+        assertThrows(
+                BusinessConflictException.class,
+                () ->
+                        service.updatePaymentStatus(
+                                "client@example.com",
+                                10L,
+                                PaymentStatus.PAID,
+                                "Confirmacion manual"));
+        assertEquals(PaymentStatus.PENDING, order.getPaymentStatus());
+    }
+
+    @Test
+    void paymentExpiryUsesTheAlreadyLockedOrderWithoutRefreshingChanges() {
+        order.setExpiresAt(java.time.LocalDateTime.now().minusMinutes(1));
+        order.setPaymentStatus(PaymentStatus.REVIEW);
+        assertFalse(service.expireReservedOrder(order));
+        assertTrue(order.isStockDeducted());
+        verify(workflow, never()).lockOrder(any());
+        order.setPaymentStatus(PaymentStatus.PENDING);
+        assertTrue(service.expireReservedOrder(order));
+        assertEquals(OrderStatus.EXPIRED, order.getOrderStatus());
+        assertEquals(7, product.getStockProduct());
+        assertFalse(service.expireReservedOrder(order));
+        assertEquals(7, product.getStockProduct());
+    }
+
+    @Test
+    void refundOfDeliveredMerchandisePreservesDeliveryAndDoesNotRestock() {
+        order.setOrderStatus(OrderStatus.DELIVERED);
+        order.setPaymentStatus(PaymentStatus.REFUNDED);
+        service.cancelRefundedOrder(order);
+        assertEquals(OrderStatus.DELIVERED, order.getOrderStatus());
+        assertEquals(5, product.getStockProduct());
+        assertTrue(order.isStockDeducted());
+        verify(workflow, never()).lockProduct(anyLong());
+        verify(workflow, never()).saveAudit(any());
+    }
+
+    @Test
+    void verifiedRefundCancelsAnUnshippedOrderAndRestoresStockOnce() {
+        order.setPaymentStatus(PaymentStatus.REFUNDED);
+        service.cancelRefundedOrder(order);
+        assertEquals(OrderStatus.CANCELED, order.getOrderStatus());
+        assertEquals(7, product.getStockProduct());
+        service.cancelRefundedOrder(order);
+        assertEquals(7, product.getStockProduct());
     }
 }

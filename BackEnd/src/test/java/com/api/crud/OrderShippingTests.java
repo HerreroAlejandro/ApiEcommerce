@@ -59,7 +59,8 @@ class OrderShippingTests {
                         workflow,
                         mapper,
                         mock(DigitalDeliveryService.class),
-                        shipping);
+                        shipping,
+                        mock(PaymentDao.class));
         user = new UserModel();
         user.setId(7L);
         user.setFirstName("Nombre del perfil");

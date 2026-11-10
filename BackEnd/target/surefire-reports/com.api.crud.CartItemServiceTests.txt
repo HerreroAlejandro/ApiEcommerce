@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.api.crud.CartItemServiceTests
 -------------------------------------------------------------------------------
-Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.599 s -- in com.api.crud.CartItemServiceTests
+Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.807 s -- in com.api.crud.CartItemServiceTests

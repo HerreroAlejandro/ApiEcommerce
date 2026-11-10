@@ -39,6 +39,11 @@ public class SecurityConfig {
                                 authorizeRequests
                                         .requestMatchers("/users/register")
                                         .permitAll()
+                                        .requestMatchers(
+                                                HttpMethod.POST, "/payments/mercadopago/webhook")
+                                        .permitAll()
+                                        .requestMatchers("/payments/**")
+                                        .denyAll()
                                         .requestMatchers("/users/login")
                                         .permitAll()
                                         .requestMatchers("/users/account-recovery/**")
@@ -46,6 +51,10 @@ public class SecurityConfig {
                                         .requestMatchers("/users/password-recovery/**")
                                         .permitAll()
                                         .requestMatchers("/admin/products/**")
+                                        .hasAnyAuthority("ADMIN", "SUPPORT")
+                                        .requestMatchers("/admin/payments/*/refund")
+                                        .hasAuthority("ADMIN")
+                                        .requestMatchers(HttpMethod.GET, "/admin/payments/**")
                                         .hasAnyAuthority("ADMIN", "SUPPORT")
                                         .requestMatchers("/admin/digital-deliveries/**")
                                         .hasAnyAuthority("ADMIN", "SUPPORT")

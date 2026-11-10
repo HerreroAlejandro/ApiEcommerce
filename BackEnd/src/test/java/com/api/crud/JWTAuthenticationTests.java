@@ -9,6 +9,7 @@ import com.api.crud.config.JWTFilter;
 import com.api.crud.config.JWTUtil;
 import com.api.crud.models.entity.PasswordResetToken;
 import com.api.crud.models.entity.UserModel;
+import com.api.crud.repositories.AccountRecoveryTokenDao;
 import com.api.crud.repositories.PasswordResetTokenDao;
 import com.api.crud.repositories.UserDao;
 import com.api.crud.services.UserService;
@@ -41,6 +42,8 @@ class JWTAuthenticationTests {
 
     private PasswordResetTokenDao resetTokens;
 
+    private AccountRecoveryTokenDao recoveryTokens;
+
     @BeforeEach
     void setUp() {
         jwt = new JWTUtil(TEST_SECRET);
@@ -60,6 +63,8 @@ class JWTAuthenticationTests {
         ReflectionTestUtils.setField(service, "passwordEncoder", encoder);
         resetTokens = mock(PasswordResetTokenDao.class);
         ReflectionTestUtils.setField(service, "passwordResetTokenDao", resetTokens);
+        recoveryTokens = mock(AccountRecoveryTokenDao.class);
+        ReflectionTestUtils.setField(service, "accountRecoveryTokenDao", recoveryTokens);
         SecurityContextHolder.clearContext();
     }
 
@@ -119,6 +124,8 @@ class JWTAuthenticationTests {
         service.changePassword(
                 user.getEmail(),
                 new PasswordChangeRequestDTO("old-password", "new-password", "new-password"));
+        verify(resetTokens).invalidateTokensByUser(user);
+        verify(recoveryTokens).invalidateTokensByUser(user);
         assertEquals(1L, user.getAuthVersion());
         assertEquals("new-hash", user.getPassword());
         assertFalse(accepted(previous));
@@ -129,6 +136,8 @@ class JWTAuthenticationTests {
     void adminResetInvalidatesExistingTokens() throws Exception {
         String previous = token();
         service.resetPasswordByAdmin(7L, new PasswordResetDTO("new-password", "new-password"));
+        verify(resetTokens).invalidateTokensByUser(user);
+        verify(recoveryTokens).invalidateTokensByUser(user);
         assertEquals(1L, user.getAuthVersion());
         assertFalse(accepted(previous));
     }
@@ -144,6 +153,8 @@ class JWTAuthenticationTests {
         service.resetPasswordByToken(
                 "reset-token", new PasswordResetDTO("new-password", "new-password"));
         assertTrue(reset.isUsed());
+        verify(resetTokens).invalidateTokensByUser(user);
+        verify(recoveryTokens).invalidateTokensByUser(user);
         assertEquals(1L, user.getAuthVersion());
         assertFalse(accepted(previous));
     }
@@ -158,6 +169,7 @@ class JWTAuthenticationTests {
                                 user.getEmail(),
                                 new PasswordChangeRequestDTO(
                                         "wrong-password", "new-password", "new-password")));
+        verifyNoInteractions(resetTokens, recoveryTokens);
         assertEquals(0L, user.getAuthVersion());
         assertTrue(accepted(previous));
     }

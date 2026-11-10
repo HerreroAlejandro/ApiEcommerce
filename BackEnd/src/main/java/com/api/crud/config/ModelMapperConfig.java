@@ -47,6 +47,43 @@ public class ModelMapperConfig {
         configureShipping(modelMapper);
         configureOrders(modelMapper);
         configureDigitalDeliveries(modelMapper);
+        modelMapper
+                .createTypeMap(
+                        PaymentRefund.class,
+                        PaymentRefundResponseDTO.class,
+                        modelMapper
+                                .getConfiguration()
+                                .copy()
+                                .setMatchingStrategy(MatchingStrategies.STRICT))
+                .addMapping(
+                        source -> source.getPayment().getId(),
+                        PaymentRefundResponseDTO::setPaymentId);
+        modelMapper
+                .createTypeMap(
+                        PaymentCheckout.class,
+                        CheckoutResponseDTO.class,
+                        modelMapper
+                                .getConfiguration()
+                                .copy()
+                                .setMatchingStrategy(MatchingStrategies.STRICT))
+                .addMappings(
+                        mapping ->
+                                mapping.map(
+                                        source -> source.getOrder().getIdOrder(),
+                                        CheckoutResponseDTO::setOrderId));
+        modelMapper
+                .createTypeMap(
+                        Payment.class,
+                        PaymentAdminResponseDTO.class,
+                        modelMapper
+                                .getConfiguration()
+                                .copy()
+                                .setMatchingStrategy(MatchingStrategies.STRICT))
+                .addMappings(
+                        mapping ->
+                                mapping.map(
+                                        source -> source.getCheckout().getOrder().getIdOrder(),
+                                        PaymentAdminResponseDTO::setOrderId));
         return modelMapper;
     }
 

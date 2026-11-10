@@ -265,6 +265,8 @@ after verification. No database migration is executed by this change automatical
 
 ## Orders workflow
 
+Online payment integration and setup are documented in [PAYMENTS.md](PAYMENTS.md).
+
 Physical delivery uses one shipment per order. Set `ORDER_SHIPPING_FLAT_RATE` to
 the nonnegative fixed delivery amount (up to two decimal places, in the same
 monetary unit as product prices). There is no implicit free-shipping default:
@@ -440,8 +442,9 @@ Digital-only orders go from CONFIRMED directly to DELIVERED. Administrative
 cancellation is limited to PENDING/CONFIRMED orders and requires any paid amount
 to be marked REFUNDED first. Shipped/delivered returns require a separate future flow.
 Manual payment transitions are PENDING -> PAID/FAILED, FAILED -> PENDING/PAID,
-and PAID -> REFUNDED, only before shipping. These endpoints record a manually
-verified payment/refund; they do not charge or refund through a payment provider.
+and PAID -> REFUNDED, only before shipping. This legacy endpoint applies only to
+orders without an online checkout. Once a Mercado Pago checkout exists, manual
+payment changes are rejected and only verified provider confirmations update it.
 
 There is no exposed order-deletion endpoint. Order items are read-only:
 GET /order-items/{itemId} and GET /order-items/order/{orderId} require ownership

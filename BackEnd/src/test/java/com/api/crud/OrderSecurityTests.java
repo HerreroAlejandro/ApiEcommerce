@@ -4,11 +4,13 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.api.crud.DTO.PaymentRefundResponseDTO;
 import com.api.crud.config.*;
 import com.api.crud.config.ModelMapperConfig;
 import com.api.crud.controllers.*;
 import com.api.crud.models.entity.UserModel;
 import com.api.crud.models.enums.AccountStatus;
+import com.api.crud.models.enums.PaymentRefundStatus;
 import com.api.crud.repositories.PasswordResetTokenDao;
 import com.api.crud.repositories.RoleDao;
 import com.api.crud.repositories.UserDao;
@@ -18,6 +20,8 @@ import com.api.crud.services.DigitalFileGateway;
 import com.api.crud.services.EmailService;
 import com.api.crud.services.OrderItemService;
 import com.api.crud.services.OrderService;
+import com.api.crud.services.PaymentRefundService;
+import com.api.crud.services.PaymentService;
 import com.api.crud.services.UserService;
 
 import org.junit.jupiter.api.*;
@@ -46,6 +50,35 @@ class OrderSecurityTests {
     @EnableWebMvc
     @EnableSpringDataWebSupport
     static class Config {
+
+        @Bean
+        PaymentService paymentService() {
+            return mock(PaymentService.class);
+        }
+
+        @Bean
+        PaymentController paymentController() {
+            return new PaymentController(paymentService());
+        }
+
+        @Bean
+        AdminPaymentController adminPaymentController() {
+            return new AdminPaymentController(paymentService(), paymentRefundService());
+        }
+
+        @Bean
+        PaymentRefundService paymentRefundService() {
+            PaymentRefundService service = mock(PaymentRefundService.class);
+            PaymentRefundResponseDTO response = new PaymentRefundResponseDTO();
+            response.setStatus(PaymentRefundStatus.REQUESTED);
+            when(service.refund(anyString(), anyLong(), anyString())).thenReturn(response);
+            return service;
+        }
+
+        @Bean
+        MercadoPagoWebhookController mercadoPagoWebhookController() {
+            return new MercadoPagoWebhookController(paymentService());
+        }
 
         @Bean
         DigitalDeliveryService digitalDeliveryService() {
@@ -313,6 +346,61 @@ class OrderSecurityTests {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"reason\":\"Despacho\"}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void refundRequestsAndTheirDetailsAreRestrictedToAdminAndRequireAReason() throws Exception {
+        for (String role : List.of("client", "support")) {
+            mvc.perform(
+                            post("/admin/payments/5/refund")
+                                    .header("Authorization", "Bearer " + role)
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content("{\"reason\":\"Devolver\"}"))
+                    .andExpect(status().isForbidden());
+            mvc.perform(get("/admin/payments/5/refund").header("Authorization", "Bearer " + role))
+                    .andExpect(status().isForbidden());
+        }
+        mvc.perform(
+                        post("/admin/payments/5/refund")
+                                .header("Authorization", "Bearer admin")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"reason\":\" \"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(
+                        post("/admin/payments/5/refund")
+                                .header("Authorization", "Bearer admin")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"reason\":\"Pago duplicado\"}"))
+                .andExpect(status().isAccepted());
+        mvc.perform(get("/admin/payments/5/refund").header("Authorization", "Bearer admin"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void paymentRoutesRequireAuthenticationAndOnlyWebhookPostIsPublic() throws Exception {
+        mvc.perform(post("/orders/10/checkout")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/orders/10/checkout").header("Authorization", "Bearer client"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/admin/orders/10/payments").header("Authorization", "Bearer support"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/admin/payments/review").header("Authorization", "Bearer support"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/admin/payments/review").header("Authorization", "Bearer client"))
+                .andExpect(status().isForbidden());
+        mvc.perform(
+                        post("/admin/payment-checkouts/ORDTST123/sync")
+                                .header("Authorization", "Bearer support"))
+                .andExpect(status().isForbidden());
+        mvc.perform(
+                        post("/admin/payment-checkouts/ORDTST123/sync")
+                                .header("Authorization", "Bearer admin"))
+                .andExpect(status().isOk());
+        mvc.perform(
+                        post("/payments/mercadopago/webhook")
+                                .param("type", "order")
+                                .param("data.id", "123"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/payments/mercadopago/webhook")).andExpect(status().isUnauthorized());
     }
 
     @Test

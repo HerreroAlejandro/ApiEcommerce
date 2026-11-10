@@ -1,0 +1,15 @@
+package com.api.crud.models.enums;
+
+public enum PaymentReviewReason {
+    NONE,
+    AMOUNT_MISMATCH,
+    CURRENCY_MISMATCH,
+    COLLECTOR_MISMATCH,
+    MODE_MISMATCH,
+    LATE_APPROVAL,
+    DUPLICATE_PAYMENT,
+    PARTIAL_REFUND,
+    CHARGEBACK,
+    UNSUPPORTED_METHOD,
+    INVALID_PROVIDER_STATE
+}

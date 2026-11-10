@@ -9,5 +9,7 @@ public enum PaymentStatus {
     // El pago falló
     FAILED,
     // El pago fue devuelto
-    REFUNDED
+    REFUNDED,
+    // Cobro o devolucion que requiere revision administrativa
+    REVIEW
 }
