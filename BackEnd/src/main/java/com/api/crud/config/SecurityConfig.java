@@ -66,6 +66,13 @@ public class SecurityConfig {
                                         .hasAnyAuthority("ADMIN", "SUPPORT")
                                         .requestMatchers("/admin/orders/*/payment-status")
                                         .hasAuthority("ADMIN")
+                                        .requestMatchers(
+                                                HttpMethod.GET, "/admin/orders/*/physical-return")
+                                        .hasAnyAuthority("ADMIN", "SUPPORT")
+                                        .requestMatchers(
+                                                "/admin/orders/*/physical-return",
+                                                "/admin/orders/*/physical-return/**")
+                                        .hasAuthority("ADMIN")
                                         .requestMatchers("/admin/orders/**")
                                         .hasAnyAuthority("ADMIN", "SUPPORT")
                                         .requestMatchers(HttpMethod.GET, "/admin/order-items/**")

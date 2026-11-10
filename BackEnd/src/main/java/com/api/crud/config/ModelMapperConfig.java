@@ -49,6 +49,17 @@ public class ModelMapperConfig {
         configureDigitalDeliveries(modelMapper);
         modelMapper
                 .createTypeMap(
+                        PhysicalReturn.class,
+                        PhysicalReturnResponseDTO.class,
+                        modelMapper
+                                .getConfiguration()
+                                .copy()
+                                .setMatchingStrategy(MatchingStrategies.STRICT))
+                .addMapping(
+                        source -> source.getOrder().getIdOrder(),
+                        PhysicalReturnResponseDTO::setOrderId);
+        modelMapper
+                .createTypeMap(
                         PaymentRefund.class,
                         PaymentRefundResponseDTO.class,
                         modelMapper

@@ -11,6 +11,7 @@ import com.api.crud.controllers.*;
 import com.api.crud.models.entity.UserModel;
 import com.api.crud.models.enums.AccountStatus;
 import com.api.crud.models.enums.PaymentRefundStatus;
+import com.api.crud.repositories.AccountRecoveryTokenDao;
 import com.api.crud.repositories.PasswordResetTokenDao;
 import com.api.crud.repositories.RoleDao;
 import com.api.crud.repositories.UserDao;
@@ -22,6 +23,7 @@ import com.api.crud.services.OrderItemService;
 import com.api.crud.services.OrderService;
 import com.api.crud.services.PaymentRefundService;
 import com.api.crud.services.PaymentService;
+import com.api.crud.services.PhysicalReturnService;
 import com.api.crud.services.UserService;
 
 import org.junit.jupiter.api.*;
@@ -50,6 +52,16 @@ class OrderSecurityTests {
     @EnableWebMvc
     @EnableSpringDataWebSupport
     static class Config {
+
+        @Bean
+        PhysicalReturnService physicalReturnService() {
+            return mock(PhysicalReturnService.class);
+        }
+
+        @Bean
+        AdminPhysicalReturnController adminPhysicalReturnController() {
+            return new AdminPhysicalReturnController(physicalReturnService());
+        }
 
         @Bean
         PaymentService paymentService() {
@@ -166,6 +178,11 @@ class OrderSecurityTests {
         @Bean
         PasswordResetTokenDao passwordResetTokenDao() {
             return mock(PasswordResetTokenDao.class);
+        }
+
+        @Bean
+        AccountRecoveryTokenDao accountRecoveryTokenDao() {
+            return mock(AccountRecoveryTokenDao.class);
         }
 
         @Bean
@@ -346,6 +363,49 @@ class OrderSecurityTests {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"reason\":\"Despacho\"}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void physicalReturnWritesRequireAdminAndReceiptQuantitiesAreValidated() throws Exception {
+        String path = "/admin/orders/10/physical-return";
+        for (String role : List.of("client", "support")) {
+            for (String suffix : List.of("", "/receive", "/waive")) {
+                mvc.perform(
+                                post(path + suffix)
+                                        .header("Authorization", "Bearer " + role)
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content("{\"reason\":\"Devolver\"}"))
+                        .andExpect(status().isForbidden());
+            }
+        }
+        mvc.perform(get(path).header("Authorization", "Bearer client"))
+                .andExpect(status().isForbidden());
+        mvc.perform(get(path).header("Authorization", "Bearer support")).andExpect(status().isOk());
+        mvc.perform(
+                        post(path)
+                                .header("Authorization", "Bearer admin")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"reason\":\"Devolver\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(
+                        post(path + "/receive")
+                                .header("Authorization", "Bearer admin")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"reason\":\"Recepcion\",\"items\":[]}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(
+                        post(path + "/receive")
+                                .header("Authorization", "Bearer admin")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"reason\":\"Recepcion\",\"items\":[{\"orderItemId\":20,\"receivedQuantity\":2,\"restockedQuantity\":1}]}"))
+                .andExpect(status().isOk());
+        mvc.perform(
+                        post(path + "/waive")
+                                .header("Authorization", "Bearer admin")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"reason\":\"Sin retorno por excepcion\"}"))
+                .andExpect(status().isOk());
     }
 
     @Test

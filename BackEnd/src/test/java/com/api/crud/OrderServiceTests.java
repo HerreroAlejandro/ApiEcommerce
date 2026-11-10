@@ -24,6 +24,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.locks.ReentrantLock;
 
 class OrderServiceTests {
 
@@ -126,6 +128,59 @@ class OrderServiceTests {
     }
 
     @Test
+    void twoBuyersCompetingForLastUnitProduceOnlyOneOrder() throws Exception {
+        product.setStockProduct(1);
+        cart.getItemsCart().clear();
+        cart.getItemsCart().add(new CartItem(1L, cart, product, 1));
+        UserModel secondBuyer = new UserModel();
+        secondBuyer.setId(8L);
+        secondBuyer.setEmail("second@example.com");
+        Cart secondCart = new Cart();
+        secondCart.setUserCart(secondBuyer);
+        secondCart.setIdCart(13L);
+        secondCart.getItemsCart().add(new CartItem(2L, secondCart, product, 1));
+        when(users.getUserByEmail(secondBuyer.getEmail())).thenReturn(Optional.of(secondBuyer));
+        when(workflow.lockCart(8L)).thenReturn(Optional.of(secondCart));
+
+        // Simulates the DAO's product write lock, held until the transaction finishes.
+        // Actual MySQL locking must also be checked in an isolated integration environment.
+        ReentrantLock productLock = new ReentrantLock();
+        when(workflow.lockProduct(4L)).thenAnswer(call -> {
+            productLock.lock();
+            return product;
+        });
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            List<Future<Boolean>> attempts = new ArrayList<>();
+            for (String email : List.of(user.getEmail(), secondBuyer.getEmail())) {
+                attempts.add(executor.submit(() -> {
+                    assertTrue(start.await(5, TimeUnit.SECONDS));
+                    try {
+                        service.createMyOrder(email, checkoutRequest());
+                        return true;
+                    } catch (InsufficientStockException exception) {
+                        return false;
+                    } finally {
+                        if (productLock.isHeldByCurrentThread()) productLock.unlock();
+                    }
+                }));
+            }
+            start.countDown();
+            int successful = 0;
+            for (Future<Boolean> attempt : attempts) {
+                if (attempt.get(10, TimeUnit.SECONDS)) successful++;
+            }
+            assertEquals(1, successful);
+            assertEquals(0, product.getStockProduct());
+            assertEquals(1, cart.getItemsCart().size() + secondCart.getItemsCart().size());
+            verify(orders).saveOrder(any());
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
     void checkoutUsesCurrentPriceCapturesNameDecreasesStockAndClearsCart() {
         var result = service.createMyOrder("client@example.com", checkoutRequest());
         assertEquals(11L, result.getIdOrder());
@@ -218,6 +273,7 @@ class OrderServiceTests {
             value = OrderStatus.class,
             names = {"PENDING", "CONFIRMED"})
     void paymentsUnderReviewCannotBeCanceledOrReleaseStock(OrderStatus status) {
+        user.setRoles(Set.of(new Role("ADMIN")));
         order.setOrderStatus(status);
         order.setPaymentStatus(PaymentStatus.REVIEW);
 
@@ -250,6 +306,7 @@ class OrderServiceTests {
 
     @Test
     void transitionsRequirePaymentAndPreventReversal() {
+        user.setRoles(Set.of(new Role("ADMIN")));
         assertThrows(
                 ApplicationException.class,
                 () ->

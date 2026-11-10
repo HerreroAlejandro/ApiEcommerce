@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.api.crud.OrderSecurityTests
 -------------------------------------------------------------------------------
-Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.999 s -- in com.api.crud.OrderSecurityTests
+Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.933 s -- in com.api.crud.OrderSecurityTests

@@ -3,6 +3,7 @@ C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\DTO\OrderListDTO.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\repositories\impl\CartItemDaoImp.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\controllers\AdminDigitalDeliveryController.java
+C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\models\entity\PhysicalReturnLine.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\DTO\OrderAdminListDTO.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\DTO\ProductAdminCatalogDTO.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\DTO\ProductStockUpdateDTO.java
@@ -35,7 +36,9 @@ C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\DTO\MyCartItemResponseDTO.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\controllers\AdminPaymentController.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\repositories\impl\OrderWorkflowDaoImp.java
+C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\repositories\impl\PhysicalReturnDaoImp.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\controllers\RoleController.java
+C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\DTO\PhysicalReturnItemRequestDTO.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\models\entity\AccountStatusAudit.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\models\entity\Order.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\services\DigitalFileGateway.java
@@ -54,6 +57,7 @@ C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\DTO\RoleDTO.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\services\OrderService.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\exceptions\UnauthenticatedException.java
+C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\models\enums\PhysicalReturnStatus.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\controllers\PaymentController.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\models\entity\AccountRecoveryToken.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\models\entity\PaymentRefund.java
@@ -73,6 +77,7 @@ C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\controllers\UserController.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\services\OrderShippingService.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\controllers\AdminOrderItemController.java
+C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\models\entity\PhysicalReturn.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\config\ModelMapperConfig.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\repositories\PaymentRefundDao.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\config\SecurityConfig.java
@@ -82,6 +87,7 @@ C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\models\entity\CartChangeAudit.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\repositories\impl\UserDaoImp.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\repositories\impl\RoleDaoImp.java
+C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\DTO\PhysicalReturnReceiveRequestDTO.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\services\RoleService.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\DTO\UserResponseDTO.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\controllers\CartItemController.java
@@ -93,6 +99,7 @@ C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\validation\PasswordValue.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\DTO\OrderStatusUpdateRequestDTO.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\DTO\ShippingAddressDTO.java
+C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\DTO\PhysicalReturnResponseDTO.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\models\entity\OrderShipmentTracking.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\services\PaymentConfirmationService.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\config\AdminInitializer.java
@@ -106,6 +113,7 @@ C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\services\PaymentService.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\DTO\ShippingRateDTO.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\services\MercadoPagoWebhookVerifier.java
+C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\controllers\AdminPhysicalReturnController.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\exceptions\InputValidationHandler.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\services\CartService.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\repositories\impl\OrderDaoImp.java
@@ -114,6 +122,7 @@ C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\exceptions\InsufficientStockException.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\controllers\AdminUserController.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\DTO\CheckoutResponseDTO.java
+C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\repositories\PhysicalReturnDao.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\services\MercadoPagoClient.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\repositories\OrderItemDao.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\DTO\ProductUpdateDTO.java
@@ -122,6 +131,7 @@ C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\DTO\CartItemDTO.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\repositories\PaymentDao.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\DTO\MyCartResponseDTO.java
+C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\services\PhysicalReturnService.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\repositories\PasswordResetTokenDao.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\exceptions\ExternalServiceException.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\DTO\PaymentStatusUpdateRequestDTO.java
@@ -155,6 +165,7 @@ C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\CrudApplication.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\services\AccountStatusService.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\DTO\UserDetailAdminResponseDTO.java
+C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\DTO\PhysicalReturnItemResponseDTO.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\services\OrderItemService.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\services\PaymentRefundService.java
 C:\Users\aleja\Documents\Github\ApiEcommerce\BackEnd\src\main\java\com\api\crud\services\ProductService.java

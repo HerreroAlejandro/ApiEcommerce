@@ -354,6 +354,10 @@ public class OrderService {
         String motive = reason(reason);
         if (status == null) throw new InvalidRequestException("Estado requerido");
         UserModel actor = user(email);
+        if (actor.getRoleNames().stream()
+                .noneMatch(role -> role.equals("ADMIN") || role.equals("SUPPORT"))) {
+            throw new ForbiddenOperationException();
+        }
         Order order = workflow.lockOrder(id);
         if (status == OrderStatus.CANCELED) {
             cancel(order, actor, motive);

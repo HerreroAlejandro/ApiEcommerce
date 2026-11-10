@@ -24,6 +24,7 @@ class PaymentRefundTests {
     private PaymentRefundDao refunds;
     private OrderWorkflowDao workflow;
     private DigitalDeliveryService deliveries;
+    private PhysicalReturnService physicalReturns;
     private MercadoPagoClient client;
     private PaymentRefundPersistence persistence;
     private MercadoPagoProperties properties;
@@ -85,6 +86,7 @@ class PaymentRefundTests {
                 .when(refunds)
                 .save(any());
         when(client.refundPayment(any())).thenReturn(new MercadoPagoClient.RefundReceipt("REF123"));
+        physicalReturns = mock(PhysicalReturnService.class);
         persistence =
                 new PaymentRefundPersistence(
                         payments,
@@ -94,7 +96,8 @@ class PaymentRefundTests {
                         properties,
                         client,
                         deliveries,
-                        new ModelMapperConfig().modelMapper());
+                        new ModelMapperConfig().modelMapper(),
+                        physicalReturns);
     }
 
     @Test
@@ -117,6 +120,61 @@ class PaymentRefundTests {
         verify(client).refundPayment(refund);
         assertEquals(id, persistence.getRefund("admin@example.com", 5L).getId());
         assertEquals(5L, persistence.getRefund("admin@example.com", 5L).getPaymentId());
+    }
+
+    @Test
+    void shippedPurchaseRequiresReturnResolutionBeforeARefundIsCreated() {
+        order.setOrderStatus(OrderStatus.SHIPPED);
+        doThrow(new BusinessConflictException("Recepcion pendiente"))
+                .when(physicalReturns)
+                .requireRefundReady(order);
+        assertThrows(
+                BusinessConflictException.class,
+                () -> persistence.prepare("admin@example.com", 5L, "Reembolsar"));
+        assertTrue(saved.isEmpty());
+        assertEquals(PaymentStatus.PAID, order.getPaymentStatus());
+        verifyNoInteractions(deliveries);
+        doNothing().when(physicalReturns).requireRefundReady(order);
+        persistence.prepare("admin@example.com", 5L, "Devolucion recibida");
+        assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
+    }
+
+    @Test
+    void extraPaymentRefundDoesNotRequireReturningTheOriginalPurchase() {
+        order.setOrderStatus(OrderStatus.DELIVERED);
+        order.setProviderPaymentId("PAYORIGINAL");
+        payment.setReviewReason(PaymentReviewReason.DUPLICATE_PAYMENT);
+        persistence.prepare("admin@example.com", 5L, "Pago duplicado");
+        verifyNoInteractions(physicalReturns, deliveries);
+        assertEquals(PaymentStatus.PAID, order.getPaymentStatus());
+    }
+
+    @Test
+    void refundRequestedBeforeDispatchPreventsTheShipmentTransition() {
+        order.setOrderStatus(OrderStatus.CONFIRMED);
+        order.setItemsOrder(
+                List.of(new OrderItem(order, new ProductPhysical(), 1, BigDecimal.TEN)));
+        persistence.prepare("admin@example.com", 5L, "Cancelar antes del envio");
+        UserDao actors = mock(UserDao.class);
+        when(actors.getUserByEmail("admin@example.com")).thenReturn(Optional.of(admin));
+        OrderShippingService shipping = mock(OrderShippingService.class);
+        OrderService lifecycle =
+                new OrderService(
+                        mock(OrderDao.class),
+                        actors,
+                        workflow,
+                        new ModelMapperConfig().modelMapper(),
+                        deliveries,
+                        shipping,
+                        payments);
+        assertThrows(
+                BusinessConflictException.class,
+                () ->
+                        lifecycle.updateOrderStatus(
+                                "admin@example.com", 10L, OrderStatus.SHIPPED, "Despachar"));
+        assertEquals(OrderStatus.CONFIRMED, order.getOrderStatus());
+        assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
+        verifyNoInteractions(shipping);
     }
 
     @Test

@@ -140,6 +140,67 @@ class OrderShippingTests {
     }
 
     @Test
+    void freePhysicalOrderFollowsPreparationShipmentAndDeliveryWithoutExtraStockChanges() {
+        ReflectionTestUtils.setField(shipping, "flatRate", "0.00");
+        var result = service.createMyOrder("buyer@example.com", request);
+        Order order = savedOrder();
+        assertEquals(new BigDecimal("0.00"), result.getShippingCost());
+        assertEquals(result.getItemsSubtotal(), result.getTotalOrder());
+        order.setPaymentStatus(PaymentStatus.PAID);
+        clearInvocations(workflow);
+        service.updateOrderStatus("buyer@example.com", 10L, OrderStatus.CONFIRMED, "Preparacion");
+        service.updateShipment("buyer@example.com", 10L, tracking("TRACK123"));
+        assertEquals(OrderStatus.CONFIRMED, order.getOrderStatus());
+        assertNull(order.getShipmentTracking().getShippedAt());
+        service.updateOrderStatus("buyer@example.com", 10L, OrderStatus.SHIPPED, "Salida");
+        LocalDateTime shippedAt = order.getShipmentTracking().getShippedAt();
+        assertNotNull(shippedAt);
+        service.updateOrderStatus("buyer@example.com", 10L, OrderStatus.SHIPPED, "Reintento");
+        assertEquals(shippedAt, order.getShipmentTracking().getShippedAt());
+        service.updateOrderStatus("buyer@example.com", 10L, OrderStatus.DELIVERED, "Recibido");
+        LocalDateTime deliveredAt = order.getShipmentTracking().getDeliveredAt();
+        service.updateOrderStatus("buyer@example.com", 10L, OrderStatus.DELIVERED, "Reintento");
+        assertEquals(deliveredAt, order.getShipmentTracking().getDeliveredAt());
+        assertFalse(deliveredAt.isBefore(shippedAt));
+        assertEquals(8, physical.getStockProduct());
+        verify(workflow, times(3)).saveAudit(argThat(audit -> "ORDER_STATUS".equals(audit.getAction())));
+        verify(workflow, never()).lockProduct(anyLong());
+    }
+
+    @Test
+    void physicalOrderCannotSkipShipmentOrMoveBackwards() {
+        service.createMyOrder("buyer@example.com", request);
+        Order order = savedOrder();
+        order.setPaymentStatus(PaymentStatus.PAID);
+        assertThrows(BusinessConflictException.class, () -> service.updateOrderStatus(
+                "buyer@example.com", 10L, OrderStatus.SHIPPED, "Salto"));
+        service.updateOrderStatus("buyer@example.com", 10L, OrderStatus.CONFIRMED, "Preparacion");
+        assertThrows(BusinessConflictException.class, () -> service.updateOrderStatus(
+                "buyer@example.com", 10L, OrderStatus.DELIVERED, "Salto"));
+        service.updateShipment("buyer@example.com", 10L, tracking("TRACK123"));
+        service.updateOrderStatus("buyer@example.com", 10L, OrderStatus.SHIPPED, "Salida");
+        assertThrows(BusinessConflictException.class, () -> service.updateOrderStatus(
+                "buyer@example.com", 10L, OrderStatus.CONFIRMED, "Volver"));
+        order.setPaymentStatus(PaymentStatus.REVIEW);
+        assertThrows(BusinessConflictException.class, () -> service.updateOrderStatus(
+                "buyer@example.com", 10L, OrderStatus.DELIVERED, "Revision pendiente"));
+    }
+
+    @Test
+    void clientCannotChangeOrderStatusEvenWhenCallingServiceDirectly() {
+        service.createMyOrder("buyer@example.com", request);
+        Order order = savedOrder();
+        order.setPaymentStatus(PaymentStatus.PAID);
+        user.setRoles(Set.of(new Role("CLIENT")));
+        clearInvocations(workflow);
+        assertThrows(ForbiddenOperationException.class, () -> service.updateOrderStatus(
+                "buyer@example.com", 10L, OrderStatus.CONFIRMED, "Confirmar"));
+        assertEquals(OrderStatus.PENDING, order.getOrderStatus());
+        verify(workflow, never()).lockOrder(anyLong());
+        verify(workflow, never()).saveAudit(any());
+    }
+
+    @Test
     void missingAddressAndUnconfiguredRateDoNotDeductStockOrClearCart() {
         assertThrows(
                 InvalidRequestException.class,

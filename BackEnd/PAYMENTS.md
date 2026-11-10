@@ -151,6 +151,11 @@ reembolso. Las operaciones en REVIEW requieren seguimiento administrativo.
 
 ## Reembolsos administrativos
 
+Para el pago principal de un pedido físico ya enviado o entregado, primero debe
+registrarse la recepción de la devolución o una excepción administrativa con motivo.
+Los pagos duplicados no exigen devolver la compra original. El flujo, los endpoints
+y las cantidades que vuelven a stock se describen en [RETURNS.md](RETURNS.md).
+
 Aplicá `src/main/resources/db/manual/2026-11-10-payment-refunds.sql` en la misma
 base de datos. Solo agrega payment_refunds y tolera que Hibernate ya la haya
 creado. No modifica usuarios ni genera movimientos en Mercado Pago.

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import com.api.crud.config.ModelMapperConfig;
+import com.api.crud.exceptions.ExternalServiceException;
 import com.api.crud.models.entity.*;
 import com.api.crud.models.entity.Order;
 import com.api.crud.models.enums.*;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 
@@ -98,6 +100,53 @@ class PaymentConfirmationTests {
                 version.minusSeconds(10),
                 updated,
                 false);
+    }
+
+    @Test
+    void expirationBeforeConfirmationKeepsOrderExpiredAndRestoresStockOnlyOnce() {
+        ProductPhysical product = new ProductPhysical();
+        product.setIdProduct(4L);
+        product.setStockProduct(0);
+        order.setPurchaseDateOrder(LocalDateTime.now().minusHours(1));
+        order.setExpiresAt(LocalDateTime.now().minusMinutes(1));
+        order.setItemsOrder(List.of(new OrderItem(order, product, 1, checkout.getAmount())));
+        when(workflow.lockProduct(4L)).thenReturn(product);
+        OrderService expiration = new OrderService(
+                mock(OrderDao.class), mock(UserDao.class), workflow,
+                new ModelMapperConfig().modelMapper(), deliveries,
+                mock(OrderShippingService.class), payments);
+
+        assertTrue(expiration.expireOrder(10L));
+        VerifiedPayment approved = snapshot("PAY1", "approved", "100.00", "0.00", version);
+        service.apply(approved);
+        service.apply(approved);
+
+        assertEquals(OrderStatus.EXPIRED, order.getOrderStatus());
+        assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
+        assertEquals(PaymentReviewReason.LATE_APPROVAL, records.get("PAY1").getReviewReason());
+        assertEquals(1, product.getStockProduct());
+        assertFalse(order.isStockDeducted());
+        assertFalse(expiration.expireOrder(10L));
+        verify(deliveries, never()).enablePaidOrder(any());
+        verify(workflow).lockProduct(4L);
+    }
+
+    @Test
+    void confirmationBeforeExpirationKeepsPaidOrderAndItsReservedStock() {
+        order.setExpiresAt(LocalDateTime.now().plusMinutes(1));
+        service.apply(snapshot("PAY1", "approved", "100.00", "0.00", version));
+        order.setExpiresAt(LocalDateTime.now().minusMinutes(1));
+        OrderService expiration = new OrderService(
+                mock(OrderDao.class), mock(UserDao.class), workflow,
+                new ModelMapperConfig().modelMapper(), deliveries,
+                mock(OrderShippingService.class), payments);
+
+        assertFalse(expiration.expireOrder(10L));
+        assertEquals(PaymentStatus.PAID, order.getPaymentStatus());
+        assertEquals(OrderStatus.PENDING, order.getOrderStatus());
+        assertTrue(order.isStockDeducted());
+        verify(workflow, never()).lockProduct(anyLong());
+        verify(deliveries).enablePaidOrder(order);
     }
 
     @Test
@@ -194,10 +243,48 @@ class PaymentConfirmationTests {
     }
 
     @Test
+    void adminSynchronizationRecoversMissedNotificationAndCanBeRepeated() {
+        UserDao users = mock(UserDao.class);
+        UserModel admin = mock(UserModel.class);
+        when(admin.getRoleNames()).thenReturn(List.of("ADMIN"));
+        when(users.getUserByEmail("admin@example.com")).thenReturn(Optional.of(admin));
+        MercadoPagoClient client = mock(MercadoPagoClient.class);
+        var remote = new MercadoPagoClient.VerifiedOrder(
+                "ORDTST123", checkout.getReference(), "99", "ARS",
+                checkout.getAmount(), false,
+                List.of(snapshot("PAY1", "approved", "100.00", "0.00", version)));
+        when(client.getOrder("ORDTST123"))
+                .thenThrow(new ExternalServiceException("Conexion temporalmente no disponible"))
+                .thenReturn(remote);
+        PaymentService coordinator = new PaymentService(
+                mock(PaymentCheckoutPersistence.class), service, client,
+                mock(MercadoPagoWebhookVerifier.class), payments,
+                mock(OrderDao.class), users, new ModelMapperConfig().modelMapper());
+
+        assertThrows(ExternalServiceException.class,
+                () -> coordinator.synchronize("admin@example.com", "ORDTST123"));
+        assertEquals(PaymentStatus.PENDING, order.getPaymentStatus());
+        assertTrue(records.isEmpty());
+        coordinator.synchronize("admin@example.com", "ORDTST123");
+        coordinator.synchronize("admin@example.com", "ORDTST123");
+        assertEquals(PaymentStatus.PAID, order.getPaymentStatus());
+        assertEquals(1, records.size());
+        verify(deliveries).enablePaidOrder(order);
+        verify(workflow).saveAudit(any());
+    }
+
+    @Test
     void rejectedAttemptDoesNotPreventAnotherAttemptFromPaying() {
-        service.apply(snapshot("122", "rejected", "100.00", "0.00", version));
+        var rejected = snapshot("122", "rejected", "100.00", "0.00", version);
+        service.apply(rejected);
+        service.apply(rejected);
         assertEquals(PaymentStatus.FAILED, order.getPaymentStatus());
+        assertEquals(OrderStatus.PENDING, order.getOrderStatus());
+        assertTrue(order.isStockDeducted());
+        verify(deliveries, never()).enablePaidOrder(any());
+        verify(workflow).saveAudit(any());
         service.apply(snapshot("123", "approved", "100.00", "0.00", version));
+        service.apply(rejected);
         assertEquals(PaymentStatus.PAID, order.getPaymentStatus());
         assertEquals(2, records.size());
         verify(deliveries).enablePaidOrder(order);

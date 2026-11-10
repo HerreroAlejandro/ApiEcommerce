@@ -34,4 +34,5 @@ com\api\crud\ExceptionHandlingTests$ErrorController$Input.class
 com\api\crud\PaymentCheckoutTests.class
 com\api\crud\EndpointValidationTests.class
 com\api\crud\MercadoPagoClientTests$1.class
+com\api\crud\PhysicalReturnTests.class
 com\api\crud\ShippingControllerTests.class

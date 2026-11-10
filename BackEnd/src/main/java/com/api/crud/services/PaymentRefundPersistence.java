@@ -28,6 +28,7 @@ public class PaymentRefundPersistence {
     private final MercadoPagoClient client;
     private final DigitalDeliveryService deliveries;
     private final ModelMapper mapper;
+    private final PhysicalReturnService physicalReturns;
 
     public PaymentRefundPersistence(
             PaymentDao payments,
@@ -37,7 +38,8 @@ public class PaymentRefundPersistence {
             MercadoPagoProperties properties,
             MercadoPagoClient client,
             DigitalDeliveryService deliveries,
-            ModelMapper mapper) {
+            ModelMapper mapper,
+            PhysicalReturnService physicalReturns) {
         this.payments = payments;
         this.refunds = refunds;
         this.workflow = workflow;
@@ -46,6 +48,7 @@ public class PaymentRefundPersistence {
         this.client = client;
         this.deliveries = deliveries;
         this.mapper = mapper;
+        this.physicalReturns = physicalReturns;
     }
 
     private UserModel admin(String email) {
@@ -98,7 +101,8 @@ public class PaymentRefundPersistence {
                                 PaymentReviewReason.PARTIAL_REFUND)
                         .contains(payment.getReviewReason())) {
             throw new BusinessConflictException(
-                    "El pago no permite solicitar esta devolucion; los contracargos se gestionan por separado");
+                    "El pago no permite solicitar esta devolucion; los contracargos se gestionan"
+                        + " por separado");
         }
     }
 
@@ -118,6 +122,9 @@ public class PaymentRefundPersistence {
             return existing.getId();
         }
         refundable(payment);
+        if (payment.getProviderPaymentId().equals(order.getProviderPaymentId())) {
+            physicalReturns.requireRefundReady(order);
+        }
         if (payment.getCheckout().getProviderOrderId() == null)
             throw new BusinessConflictException(
                     "El pago no tiene una order de Mercado Pago vinculada");
