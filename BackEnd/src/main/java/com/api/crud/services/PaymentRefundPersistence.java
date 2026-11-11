@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -102,7 +103,7 @@ public class PaymentRefundPersistence {
                         .contains(payment.getReviewReason())) {
             throw new BusinessConflictException(
                     "El pago no permite solicitar esta devolucion; los contracargos se gestionan"
-                        + " por separado");
+                            + " por separado");
         }
     }
 
@@ -159,7 +160,8 @@ public class PaymentRefundPersistence {
         PaymentRefund refund =
                 refunds.getById(refundId).orElseThrow(ResourceNotFoundException::new);
         refunds.refresh(refund);
-        if (refund.getStatus() == PaymentRefundStatus.CONFIRMED) return;
+        if (refund.getStatus() == PaymentRefundStatus.CONFIRMED
+                || refund.getStatus() == PaymentRefundStatus.REJECTED) return;
         Payment payment = refund.getPayment();
         payments.refreshPayment(payment);
         refundable(payment);
@@ -170,10 +172,74 @@ public class PaymentRefundPersistence {
                     "El pago cambio durante el reembolso; sincronice y revise la operacion");
         }
         if (refund.getStatus() == PaymentRefundStatus.PROCESSING) return;
-        MercadoPagoClient.RefundReceipt receipt = client.refundPayment(refund);
+        MercadoPagoClient.RefundReceipt receipt;
+        try {
+            receipt = client.refundPayment(refund);
+        } catch (RefundRejectedException rejection) {
+            verifyRejection(refund, client.getOrder(refund.getProviderOrderId()));
+            String description =
+                    switch (rejection.getProviderCode()) {
+                        case "refund_amount_exceeds" ->
+                                "El importe solicitado supera el disponible para reembolso";
+                        case "transaction_not_found" ->
+                                "Mercado Pago rechazo el identificador de la transaccion";
+                        case "cannot_refund_order" ->
+                                "Mercado Pago no permite reembolsar la orden en su estado actual";
+                        default ->
+                                throw new ExternalServiceException(
+                                        "El rechazo del reembolso requiere revision");
+                    };
+            refund.setStatus(PaymentRefundStatus.REJECTED);
+            refund.setRejectedAt(Instant.now());
+            refund.setRejectionCode(rejection.getProviderCode());
+            refund.setRejectionReason(description);
+            audit(refund, null, "REFUND_REJECTED", "REQUESTED", "REJECTED");
+            return;
+        }
         refund.setProviderRefundId(receipt.id());
         refund.setStatus(PaymentRefundStatus.PROCESSING);
         audit(refund, null, "REFUND_ACCEPTED", "REQUESTED", "PROCESSING");
+    }
+
+    private void verifyRejection(PaymentRefund refund, MercadoPagoClient.VerifiedOrder remote) {
+        Payment payment = refund.getPayment();
+        PaymentCheckout checkout = payment.getCheckout();
+        boolean matches =
+                remote != null
+                        && refund.getProviderOrderId().equals(remote.id())
+                        && checkout.getReference().equals(remote.reference())
+                        && checkout.getCollectorId().equals(remote.collectorId())
+                        && checkout.getCurrency().equals(remote.currency())
+                        && checkout.isLiveMode() == remote.liveMode()
+                        && checkout.getAmount().compareTo(remote.amount()) == 0
+                        && remote.unsettledRefundPaymentIds() != null
+                        && !remote.unsettledRefundPaymentIds()
+                                .contains(payment.getProviderPaymentId());
+        var snapshots =
+                remote == null || remote.payments() == null
+                        ? List.<MercadoPagoClient.VerifiedPayment>of()
+                        : remote.payments().stream()
+                                .filter(
+                                        snapshot ->
+                                                payment.getProviderPaymentId()
+                                                        .equals(snapshot.id()))
+                                .toList();
+        if (!matches || snapshots.size() != 1)
+            throw new ExternalServiceException("No se pudo verificar el resultado del reembolso");
+        var snapshot = snapshots.get(0);
+        if (!"approved".equals(snapshot.status())
+                || !checkout.getReference().equals(snapshot.reference())
+                || !checkout.getCollectorId().equals(snapshot.collectorId())
+                || !checkout.getCurrency().equals(snapshot.currency())
+                || checkout.isLiveMode() != snapshot.liveMode()
+                || payment.getAmount().compareTo(snapshot.amount()) != 0
+                || refund.getPreviouslyRefundedAmount().compareTo(snapshot.refundedAmount()) != 0
+                || snapshot.updatedAt() == null
+                || (payment.getProviderUpdatedAt() != null
+                        && snapshot.updatedAt().isBefore(payment.getProviderUpdatedAt())))
+            throw new ExternalServiceException(
+                    "El resultado financiero requiere sincronizacion antes de registrar un"
+                        + " rechazo");
     }
 
     private void audit(
@@ -185,6 +251,14 @@ public class PaymentRefundPersistence {
         audit.setPreviousValue(before);
         audit.setNewValue(after);
         audit.setReason("Reembolso " + refund.getId() + ": " + refund.getReason());
+        if (refund.getStatus() == PaymentRefundStatus.REJECTED)
+            audit.setReason(
+                    "Reembolso "
+                            + refund.getId()
+                            + ": "
+                            + refund.getRejectionCode()
+                            + ": "
+                            + refund.getRejectionReason());
         // The request stores the full reason; the audit column is capped at 500 characters.
         if (audit.getReason().length() > 500) audit.setReason(audit.getReason().substring(0, 500));
         audit.setCreatedAt(LocalDateTime.now());

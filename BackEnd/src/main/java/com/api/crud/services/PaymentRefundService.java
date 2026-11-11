@@ -37,8 +37,8 @@ public class PaymentRefundService {
         try {
             synchronize(providerOrderId);
         } catch (ExternalServiceException exception) {
-            // The provider accepted it, but confirmation may arrive later through the webhook.
-            log.warn("Reembolso {} aceptado, pendiente de confirmacion verificable", refundId);
+            // Keep the recorded result if the follow-up synchronization is unavailable.
+            log.warn("Reembolso {} pendiente de sincronizacion verificable", refundId);
         }
         return persistence.getRefund(email, paymentId);
     }

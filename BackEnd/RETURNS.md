@@ -1,5 +1,10 @@
 # Devoluciones físicas y reembolsos
 
+Las devoluciones físicas también se aplican a ventas presenciales sin cuenta de comprador.
+En ese caso, la devolución de dinero se realiza fuera de la API y ADMIN la registra con
+`POST /admin/store-sales/{orderId}/refund`, según [STORE_SALES.md](STORE_SALES.md).
+Los reembolsos online siguen el endpoint de pagos de Mercado Pago descrito abajo.
+
 Esta primera versión admite la devolución de **todos los artículos físicos del pedido**, con una sola recepción definitiva. No admite devoluciones ni reembolsos parciales elegidos por artículo. En pedidos mixtos se reciben todos los artículos físicos y el reembolso total también revoca el acceso digital.
 
 ## Antes del envío

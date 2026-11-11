@@ -79,7 +79,10 @@ public class PaymentService {
     public List<PaymentResponseDTO> getMyPayments(String email, Long orderId) {
         long userId = user(email).getId();
         orders.getOrderById(orderId)
-                .filter(order -> order.getUserOrder().getId() == userId)
+                .filter(
+                        order ->
+                                order.getUserOrder() != null
+                                        && order.getUserOrder().getId() == userId)
                 .orElseThrow(ResourceNotFoundException::new);
         return payments.getByOrderId(orderId).stream()
                 .map(payment -> mapper.map(payment, PaymentResponseDTO.class))

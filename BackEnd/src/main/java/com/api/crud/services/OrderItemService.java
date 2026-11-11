@@ -58,14 +58,16 @@ public class OrderItemService {
     public OrderItemResponseDTO getMyItem(String email, Long id) {
         long userId = userId(email);
         OrderItem item = item(id);
-        if (item.getOrder().getUserOrder().getId() != userId) throw notFound();
+        if (item.getOrder().getUserOrder() == null
+                || item.getOrder().getUserOrder().getId() != userId) throw notFound();
         return response(item);
     }
 
     public List<OrderItemResponseDTO> getMyItems(String email, Long orderId) {
         long userId = userId(email);
         Order order = order(orderId);
-        if (order.getUserOrder().getId() != userId) throw notFound();
+        if (order.getUserOrder() == null || order.getUserOrder().getId() != userId)
+            throw notFound();
         return items.getItemsByOrderId(orderId).stream().map(this::response).toList();
     }
 

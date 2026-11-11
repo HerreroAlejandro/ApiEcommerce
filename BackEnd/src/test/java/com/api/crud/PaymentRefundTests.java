@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.*;
 
 class PaymentRefundTests {
@@ -32,6 +33,32 @@ class PaymentRefundTests {
     private Order order;
     private Payment payment;
     private Map<String, PaymentRefund> saved;
+
+    private MercadoPagoClient.VerifiedOrder unchangedProviderOrder(Set<String> unsettled) {
+        var snapshot =
+                new MercadoPagoClient.VerifiedPayment(
+                        "PAY123",
+                        "checkout",
+                        "99",
+                        "ARS",
+                        new BigDecimal("100.00"),
+                        BigDecimal.ZERO,
+                        "approved",
+                        "credit_card",
+                        "visa",
+                        Instant.now().minusSeconds(10),
+                        Instant.now(),
+                        false);
+        return new MercadoPagoClient.VerifiedOrder(
+                "ORDTST123",
+                "checkout",
+                "99",
+                "ARS",
+                new BigDecimal("100.00"),
+                false,
+                List.of(snapshot),
+                unsettled);
+    }
 
     @BeforeEach
     void setUp() {
@@ -120,6 +147,122 @@ class PaymentRefundTests {
         verify(client).refundPayment(refund);
         assertEquals(id, persistence.getRefund("admin@example.com", 5L).getId());
         assertEquals(5L, persistence.getRefund("admin@example.com", 5L).getPaymentId());
+    }
+
+    @Test
+    void verifiedProviderRejectionIsRecordedWithoutReleasingFulfillmentOrSendingAgain() {
+        String id = persistence.prepare("admin@example.com", 5L, "Cancelar la compra");
+        when(client.refundPayment(any()))
+                .thenThrow(new RefundRejectedException("cannot_refund_order"));
+        when(client.getOrder("ORDTST123")).thenReturn(unchangedProviderOrder(Set.of()));
+        persistence.dispatch("admin@example.com", id);
+        var result = persistence.getRefund("admin@example.com", 5L);
+        assertEquals(PaymentRefundStatus.REJECTED, result.getStatus());
+        assertEquals("cannot_refund_order", result.getRejectionCode());
+        assertNotNull(result.getRejectedAt());
+        assertTrue(result.getRejectionReason().contains("estado actual"));
+        assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
+        assertTrue(order.isStockDeducted());
+        assertEquals(id, persistence.prepare("admin@example.com", 5L, "Otro intento"));
+        persistence.dispatch("admin@example.com", id);
+        verify(client).refundPayment(any());
+        verify(client).getOrder("ORDTST123");
+        verify(deliveries).revokeOrder(order);
+        verify(workflow, never()).lockProduct(anyLong());
+        verify(workflow)
+                .saveAudit(
+                        argThat(
+                                audit ->
+                                        "REFUND_REJECTED".equals(audit.getAction())
+                                                && audit.getReason()
+                                                        .contains("cannot_refund_order")));
+    }
+
+    @Test
+    void failedCanonicalVerificationKeepsTheOutcomeUncertainAndTheSameRequestKey() {
+        String id = persistence.prepare("admin@example.com", 5L, "Cancelar la compra");
+        when(client.refundPayment(any()))
+                .thenThrow(new RefundRejectedException("refund_amount_exceeds"));
+        when(client.getOrder("ORDTST123")).thenThrow(new ExternalServiceException("Sin conexion"));
+        assertThrows(
+                ExternalServiceException.class,
+                () -> persistence.dispatch("admin@example.com", id));
+        assertEquals(PaymentRefundStatus.REQUESTED, saved.get(id).getStatus());
+        assertNull(saved.get(id).getRejectionCode());
+        doReturn(unchangedProviderOrder(Set.of("PAY123"))).when(client).getOrder("ORDTST123");
+        assertThrows(
+                ExternalServiceException.class,
+                () -> persistence.dispatch("admin@example.com", id));
+        assertEquals(PaymentRefundStatus.REQUESTED, saved.get(id).getStatus());
+        assertNull(saved.get(id).getRejectedAt());
+        assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
+    }
+
+    @Test
+    void aDifferentProviderResourceCannotBeUsedToVerifyARejection() {
+        String id = persistence.prepare("admin@example.com", 5L, "Cancelar");
+        when(client.refundPayment(any()))
+                .thenThrow(new RefundRejectedException("transaction_not_found"));
+        var original = unchangedProviderOrder(Set.of());
+        when(client.getOrder("ORDTST123"))
+                .thenReturn(
+                        new MercadoPagoClient.VerifiedOrder(
+                                "ORDTST999",
+                                original.reference(),
+                                original.collectorId(),
+                                original.currency(),
+                                original.amount(),
+                                original.liveMode(),
+                                original.payments()));
+        assertThrows(
+                ExternalServiceException.class,
+                () -> persistence.dispatch("admin@example.com", id));
+        assertEquals(PaymentRefundStatus.REQUESTED, saved.get(id).getStatus());
+        assertNull(saved.get(id).getRejectedAt());
+    }
+
+    @Test
+    void changedRefundedAmountOrStaleFinancialDataCannotVerifyARejection() {
+        String id = persistence.prepare("admin@example.com", 5L, "Cancelar");
+        when(client.refundPayment(any()))
+                .thenThrow(new RefundRejectedException("refund_amount_exceeds"));
+        var original = unchangedProviderOrder(Set.of());
+        var previous = original.payments().get(0);
+        var changed =
+                new MercadoPagoClient.VerifiedPayment(
+                        previous.id(),
+                        previous.reference(),
+                        previous.collectorId(),
+                        previous.currency(),
+                        previous.amount(),
+                        BigDecimal.TEN,
+                        previous.status(),
+                        previous.paymentType(),
+                        previous.paymentMethod(),
+                        previous.approvedAt(),
+                        previous.updatedAt(),
+                        previous.liveMode());
+        when(client.getOrder("ORDTST123"))
+                .thenReturn(
+                        new MercadoPagoClient.VerifiedOrder(
+                                original.id(),
+                                original.reference(),
+                                original.collectorId(),
+                                original.currency(),
+                                original.amount(),
+                                original.liveMode(),
+                                List.of(changed)));
+        assertThrows(
+                ExternalServiceException.class,
+                () -> persistence.dispatch("admin@example.com", id));
+        when(client.getOrder("ORDTST123")).thenReturn(original);
+        payment.setProviderUpdatedAt(previous.updatedAt().plusSeconds(1));
+        assertThrows(
+                ExternalServiceException.class,
+                () -> persistence.dispatch("admin@example.com", id));
+        assertEquals(PaymentRefundStatus.REQUESTED, saved.get(id).getStatus());
+        assertNull(saved.get(id).getRejectionCode());
+        assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
     }
 
     @Test

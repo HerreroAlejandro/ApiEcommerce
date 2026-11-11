@@ -45,4 +45,16 @@ public class PaymentRefundResponseDTO {
     @Getter
     @Setter
     private Instant confirmedAt;
+
+    @Getter
+    @Setter
+    private Instant rejectedAt;
+
+    @Getter
+    @Setter
+    private String rejectionCode;
+
+    @Getter
+    @Setter
+    private String rejectionReason;
 }

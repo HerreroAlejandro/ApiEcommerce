@@ -1,7 +1,9 @@
 package com.api.crud.models.entity;
 
+import com.api.crud.models.enums.DeliveryMethod;
 import com.api.crud.models.enums.OrderStatus;
 import com.api.crud.models.enums.PaymentStatus;
+import com.api.crud.models.enums.SalesChannel;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Digits;
@@ -25,6 +27,30 @@ public class Order {
 
     @Version
     private Long version;
+
+    @Enumerated(EnumType.STRING)
+    @Column(
+            nullable = false,
+            columnDefinition = "enum('ONLINE','IN_STORE') default 'ONLINE'",
+            updatable = false)
+    @Getter
+    @Setter
+    private SalesChannel salesChannel = SalesChannel.ONLINE;
+
+    @Enumerated(EnumType.STRING)
+    @Column(
+            nullable = false,
+            columnDefinition =
+                    "enum('SHIPPING','STORE_PICKUP','DIGITAL_DOWNLOAD') default 'SHIPPING'",
+            updatable = false)
+    @Getter
+    @Setter
+    private DeliveryMethod deliveryMethod = DeliveryMethod.SHIPPING;
+
+    @Embedded
+    @Getter
+    @Setter
+    private StoreSaleDetails storeSale;
 
     @Column(nullable = false, columnDefinition = "boolean default false")
     @Getter

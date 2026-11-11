@@ -94,7 +94,8 @@ public class OrderService {
     }
 
     private boolean isDue(Order order, LocalDateTime now) {
-        if (order.getOrderStatus() != OrderStatus.PENDING
+        if (order.getSalesChannel() != SalesChannel.ONLINE
+                || order.getOrderStatus() != OrderStatus.PENDING
                 || (order.getPaymentStatus() != PaymentStatus.PENDING
                         && order.getPaymentStatus() != PaymentStatus.FAILED)) {
             return false;
@@ -113,7 +114,10 @@ public class OrderService {
     private Order owned(String email, Long id) {
         long userId = user(email).getId();
         return orderDao.getOrderById(id)
-                .filter(order -> order.getUserOrder().getId() == userId)
+                .filter(
+                        order ->
+                                order.getUserOrder() != null
+                                        && order.getUserOrder().getId() == userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Orden no encontrada"));
     }
 
@@ -141,7 +145,8 @@ public class OrderService {
             throw new ForbiddenOperationException();
         }
         Order order = workflow.lockOrder(id);
-        if (order.getPaymentStatus() != PaymentStatus.PAID
+        if (order.getDeliveryMethod() != DeliveryMethod.SHIPPING
+                || order.getPaymentStatus() != PaymentStatus.PAID
                 || (order.getOrderStatus() != OrderStatus.CONFIRMED
                         && order.getOrderStatus() != OrderStatus.SHIPPED)
                 || order.getItemsOrder().stream()
@@ -225,6 +230,8 @@ public class OrderService {
                 cart.getItemsCart().stream()
                         .anyMatch(item -> item.getProductCartItem() instanceof ProductPhysical);
         shipping.prepare(order, request, requiresShipping);
+        order.setDeliveryMethod(
+                requiresShipping ? DeliveryMethod.SHIPPING : DeliveryMethod.DIGITAL_DOWNLOAD);
         order.setUserOrder(buyer);
         order.setPurchaseDateOrder(LocalDateTime.now());
         order.setExpiresAt(order.getPurchaseDateOrder().plusMinutes(reservationMinutes));
@@ -285,7 +292,7 @@ public class OrderService {
         // Check ownership before locking or revealing the order state.
         owned(email, id);
         Order order = workflow.lockOrder(id);
-        if (order.getUserOrder().getId() != actor.getId()) {
+        if (order.getUserOrder() == null || order.getUserOrder().getId() != actor.getId()) {
             throw new ResourceNotFoundException("Orden no encontrada");
         }
         if (order.getOrderStatus() == OrderStatus.CANCELED) return;
@@ -313,7 +320,8 @@ public class OrderService {
                         && order.getOrderStatus() != OrderStatus.CONFIRMED)
                 || order.getPaymentStatus() == PaymentStatus.PAID) {
             throw conflict(
-                    "La cancelacion requiere una orden sin enviar y sin pago pendiente de reembolso");
+                    "La cancelacion requiere una orden sin enviar y sin pago pendiente de"
+                        + " reembolso");
         }
         restoreStock(order);
         String before = order.getOrderStatus().name();
@@ -327,7 +335,9 @@ public class OrderService {
         if (order.getPaymentStatus() == PaymentStatus.REFUNDED
                 && (order.getOrderStatus() == OrderStatus.PENDING
                         || order.getOrderStatus() == OrderStatus.CONFIRMED)) {
-            cancel(order, null, "Cancelacion por reembolso total verificado del proveedor");
+            cancel(order, null, order.getSalesChannel() == SalesChannel.IN_STORE
+                    ? "Cancelacion por reembolso total presencial registrado"
+                    : "Cancelacion por reembolso total verificado del proveedor");
         }
     }
 
@@ -372,19 +382,30 @@ public class OrderService {
                 (previous == OrderStatus.PENDING && status == OrderStatus.CONFIRMED)
                         || (previous == OrderStatus.CONFIRMED
                                 && status == OrderStatus.SHIPPED
+                                && order.getDeliveryMethod() == DeliveryMethod.SHIPPING
                                 && !digitalOnly)
                         || (previous == OrderStatus.SHIPPED && status == OrderStatus.DELIVERED)
                         || (previous == OrderStatus.CONFIRMED
                                 && status == OrderStatus.DELIVERED
-                                && digitalOnly);
+                                && (digitalOnly
+                                        || order.getDeliveryMethod()
+                                                == DeliveryMethod.STORE_PICKUP));
         if (!allowed || order.getPaymentStatus() != PaymentStatus.PAID)
             throw conflict("Transicion de orden no permitida");
-        if (!digitalOnly && (status == OrderStatus.SHIPPED || status == OrderStatus.DELIVERED)) {
+        if (!digitalOnly
+                && order.getDeliveryMethod() == DeliveryMethod.SHIPPING
+                && (status == OrderStatus.SHIPPED || status == OrderStatus.DELIVERED)) {
             shipping.requireReadyToShip(order);
             if (status == OrderStatus.SHIPPED)
                 order.getShipmentTracking().setShippedAt(LocalDateTime.now());
             if (status == OrderStatus.DELIVERED)
                 order.getShipmentTracking().setDeliveredAt(LocalDateTime.now());
+        }
+        if (status == OrderStatus.DELIVERED
+                && order.getDeliveryMethod() == DeliveryMethod.STORE_PICKUP) {
+            if (order.getStoreSale() == null)
+                throw conflict("El retiro no tiene datos de venta presencial");
+            order.getStoreSale().setDeliveredAt(LocalDateTime.now());
         }
         order.setOrderStatus(status);
         audit(order, actor, "ORDER_STATUS", previous.name(), status.name(), motive);
@@ -392,36 +413,13 @@ public class OrderService {
 
     @Transactional
     public void updatePaymentStatus(String email, Long id, PaymentStatus status, String reason) {
-        String motive = reason(reason);
+        reason(reason);
         if (status == null) throw new InvalidRequestException("Estado requerido");
-        UserModel actor = user(email);
-        Order order = workflow.lockOrder(id);
-        if (order.getProviderPaymentId() != null || payments.getCheckoutByOrderId(id).isPresent()) {
-            throw conflict(
-                    "Los pagos online se actualizan mediante confirmacion verificada del proveedor");
-        }
-        if (isDue(order, LocalDateTime.now())) {
-            throw conflict("La reserva de esta orden vencio. Debe iniciar una nueva compra");
-        }
-        PaymentStatus previous = order.getPaymentStatus();
-        if (previous == status) {
-            if (status == PaymentStatus.PAID) digitalDeliveries.enablePaidOrder(order);
-            return;
-        }
-        boolean beforeShipping =
-                order.getOrderStatus() == OrderStatus.PENDING
-                        || order.getOrderStatus() == OrderStatus.CONFIRMED;
-        boolean allowed =
-                (previous == PaymentStatus.PENDING
-                                && (status == PaymentStatus.PAID || status == PaymentStatus.FAILED))
-                        || (previous == PaymentStatus.FAILED
-                                && (status == PaymentStatus.PENDING
-                                        || status == PaymentStatus.PAID))
-                        || (previous == PaymentStatus.PAID && status == PaymentStatus.REFUNDED);
-        if (!beforeShipping || !allowed) throw conflict("Transicion de pago no permitida");
-        order.setPaymentStatus(status);
-        if (status == PaymentStatus.PAID) digitalDeliveries.enablePaidOrder(order);
-        if (status == PaymentStatus.REFUNDED) digitalDeliveries.revokeOrder(order);
-        audit(order, actor, "PAYMENT_STATUS", previous.name(), status.name(), motive);
+        user(email);
+        workflow.lockOrder(id);
+        throw conflict(
+                "Los pagos online se verifican con Mercado Pago; las ventas presenciales se"
+                    + " registran en /admin/store-sales y sus devoluciones en"
+                    + " /admin/store-sales/{orderId}/refund");
     }
 }

@@ -59,15 +59,20 @@ public class PaymentCheckoutPersistence {
         UserModel user = users.getUserByEmail(email).orElseThrow(UnauthenticatedException::new);
         if (user.getStatus() != AccountStatus.ACTIVE) throw new UnauthenticatedException();
         orders.getOrderById(orderId)
-                .filter(order -> order.getUserOrder().getId() == user.getId())
+                .filter(
+                        order ->
+                                order.getUserOrder() != null
+                                        && order.getUserOrder().getId() == user.getId())
                 .orElseThrow(ResourceNotFoundException::new);
         Order order = workflow.lockOrder(orderId);
-        if (order.getUserOrder().getId() != user.getId()) throw new ResourceNotFoundException();
+        if (order.getUserOrder() == null || order.getUserOrder().getId() != user.getId())
+            throw new ResourceNotFoundException();
         return order;
     }
 
     private Instant requirePayable(Order order) {
-        if (order.getOrderStatus() != OrderStatus.PENDING
+        if (order.getSalesChannel() != SalesChannel.ONLINE
+                || order.getOrderStatus() != OrderStatus.PENDING
                 || !order.isStockDeducted()
                 || (order.getPaymentStatus() != PaymentStatus.PENDING
                         && order.getPaymentStatus() != PaymentStatus.FAILED)

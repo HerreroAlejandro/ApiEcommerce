@@ -44,7 +44,10 @@ public class AdminPaymentController {
         PaymentRefundResponseDTO refund =
                 refunds.refund(authentication.getName(), paymentId, request.getReason());
         return ResponseEntity.status(
-                        refund.getStatus() == PaymentRefundStatus.CONFIRMED ? 200 : 202)
+                        refund.getStatus() == PaymentRefundStatus.CONFIRMED
+                                        || refund.getStatus() == PaymentRefundStatus.REJECTED
+                                ? 200
+                                : 202)
                 .cacheControl(CacheControl.noStore())
                 .body(refund);
     }

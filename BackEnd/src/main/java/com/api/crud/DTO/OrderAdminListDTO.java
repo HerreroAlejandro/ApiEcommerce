@@ -1,7 +1,9 @@
 package com.api.crud.DTO;
 
+import com.api.crud.models.enums.DeliveryMethod;
 import com.api.crud.models.enums.OrderStatus;
 import com.api.crud.models.enums.PaymentStatus;
+import com.api.crud.models.enums.SalesChannel;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -10,6 +12,14 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public class OrderAdminListDTO {
+
+    @Getter
+    @Setter
+    private SalesChannel salesChannel;
+
+    @Getter
+    @Setter
+    private DeliveryMethod deliveryMethod;
 
     @Getter
     @Setter

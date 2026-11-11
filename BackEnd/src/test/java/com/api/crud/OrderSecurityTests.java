@@ -8,6 +8,8 @@ import com.api.crud.DTO.PaymentRefundResponseDTO;
 import com.api.crud.config.*;
 import com.api.crud.config.ModelMapperConfig;
 import com.api.crud.controllers.*;
+import com.api.crud.exceptions.BusinessConflictException;
+import com.api.crud.exceptions.GlobalExceptionHandler;
 import com.api.crud.models.entity.UserModel;
 import com.api.crud.models.enums.AccountStatus;
 import com.api.crud.models.enums.PaymentRefundStatus;
@@ -24,6 +26,7 @@ import com.api.crud.services.OrderService;
 import com.api.crud.services.PaymentRefundService;
 import com.api.crud.services.PaymentService;
 import com.api.crud.services.PhysicalReturnService;
+import com.api.crud.services.StoreSaleService;
 import com.api.crud.services.UserService;
 
 import org.junit.jupiter.api.*;
@@ -41,6 +44,7 @@ import org.springframework.web.context.support.AnnotationConfigWebApplicationCon
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
 import java.util.*;
+import java.time.Instant;
 
 class OrderSecurityTests {
 
@@ -52,6 +56,21 @@ class OrderSecurityTests {
     @EnableWebMvc
     @EnableSpringDataWebSupport
     static class Config {
+
+        @Bean
+        GlobalExceptionHandler globalExceptionHandler() {
+            return new GlobalExceptionHandler();
+        }
+
+        @Bean
+        StoreSaleService storeSaleService() {
+            return mock(StoreSaleService.class);
+        }
+
+        @Bean
+        AdminStoreSaleController adminStoreSaleController() {
+            return new AdminStoreSaleController(storeSaleService());
+        }
 
         @Bean
         PhysicalReturnService physicalReturnService() {
@@ -238,7 +257,10 @@ class OrderSecurityTests {
     }
 
     @Test
-    void supportCanReadButOnlyAdminCanManuallyChangePayment() throws Exception {
+    void legacyPaymentStatusRouteCannotReplaceTheSpecificPaymentFlows() throws Exception {
+        doThrow(new BusinessConflictException("Use el flujo de pago correspondiente"))
+                .when(context.getBean(OrderService.class))
+                .updatePaymentStatus(anyString(), anyLong(), any(), anyString());
         mvc.perform(get("/admin/orders/getOrders").header("Authorization", "Bearer support"))
                 .andExpect(status().isOk());
         String body = "{\"status\":\"PAID\",\"reason\":\"Pago recibido\"}";
@@ -253,7 +275,52 @@ class OrderSecurityTests {
                                 .header("Authorization", "Bearer admin")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void storeSalesRequireStaffAndRecordingARefundRequiresAdmin() throws Exception {
+        String body =
+                "{\"reference\":\"5e87d37f-1873-41af-abdf-d88acc762dc9\","
+                    + "\"deliveryMethod\":\"STORE_PICKUP\",\"deliveredImmediately\":true,\"paymentMethod\":\"CASH\",\"amountPaid\":100.00,\"reason\":\"Venta"
+                    + " cobrada\",\"items\":[{\"productId\":4,\"quantity\":1}]}";
+        mvc.perform(
+                        post("/admin/store-sales")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(
+                        post("/admin/store-sales")
+                                .header("Authorization", "Bearer client")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isForbidden());
+        for (String role : List.of("support", "admin")) {
+            mvc.perform(
+                            post("/admin/store-sales")
+                                    .header("Authorization", "Bearer " + role)
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(body))
+                    .andExpect(status().isOk());
+        }
+        mvc.perform(
+                        post("/admin/store-sales")
+                                .header("Authorization", "Bearer admin")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(
+                        post("/admin/store-sales/10/refund")
+                                .header("Authorization", "Bearer support")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"reason\":\"Dinero devuelto\"}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(
+                        post("/admin/store-sales/10/refund")
+                                .header("Authorization", "Bearer admin")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"reason\":\"Dinero devuelto\"}"))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -434,6 +501,27 @@ class OrderSecurityTests {
                 .andExpect(status().isAccepted());
         mvc.perform(get("/admin/payments/5/refund").header("Authorization", "Bearer admin"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void rejectedRefundResponseIsTerminalAndExposesItsSafeReasonForAdmin() throws Exception {
+        PaymentRefundResponseDTO rejected = new PaymentRefundResponseDTO();
+        rejected.setStatus(PaymentRefundStatus.REJECTED);
+        rejected.setRejectionCode("cannot_refund_order");
+        rejected.setRejectionReason("El proveedor no permite reembolsar la orden");
+        rejected.setRejectedAt(Instant.now());
+        when(context.getBean(PaymentRefundService.class)
+                        .refund(anyString(), anyLong(), anyString()))
+                .thenReturn(rejected);
+        mvc.perform(
+                        post("/admin/payments/5/refund")
+                                .header("Authorization", "Bearer admin")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"reason\":\"Cancelar compra\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REJECTED"))
+                .andExpect(jsonPath("$.rejectionCode").value("cannot_refund_order"))
+                .andExpect(jsonPath("$.rejectedAt").exists());
     }
 
     @Test

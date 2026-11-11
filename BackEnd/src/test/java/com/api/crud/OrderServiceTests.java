@@ -145,26 +145,31 @@ class OrderServiceTests {
         // Simulates the DAO's product write lock, held until the transaction finishes.
         // Actual MySQL locking must also be checked in an isolated integration environment.
         ReentrantLock productLock = new ReentrantLock();
-        when(workflow.lockProduct(4L)).thenAnswer(call -> {
-            productLock.lock();
-            return product;
-        });
+        when(workflow.lockProduct(4L))
+                .thenAnswer(
+                        call -> {
+                            productLock.lock();
+                            return product;
+                        });
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
             List<Future<Boolean>> attempts = new ArrayList<>();
             for (String email : List.of(user.getEmail(), secondBuyer.getEmail())) {
-                attempts.add(executor.submit(() -> {
-                    assertTrue(start.await(5, TimeUnit.SECONDS));
-                    try {
-                        service.createMyOrder(email, checkoutRequest());
-                        return true;
-                    } catch (InsufficientStockException exception) {
-                        return false;
-                    } finally {
-                        if (productLock.isHeldByCurrentThread()) productLock.unlock();
-                    }
-                }));
+                attempts.add(
+                        executor.submit(
+                                () -> {
+                                    assertTrue(start.await(5, TimeUnit.SECONDS));
+                                    try {
+                                        service.createMyOrder(email, checkoutRequest());
+                                        return true;
+                                    } catch (InsufficientStockException exception) {
+                                        return false;
+                                    } finally {
+                                        if (productLock.isHeldByCurrentThread())
+                                            productLock.unlock();
+                                    }
+                                }));
             }
             start.countDown();
             int successful = 0;
@@ -262,9 +267,8 @@ class OrderServiceTests {
         assertThrows(
                 ApplicationException.class,
                 () -> service.cancelAdminOrder("client@example.com", 10L, "Error"));
-        service.updatePaymentStatus(
-                "client@example.com", 10L, PaymentStatus.REFUNDED, "Reembolso manual confirmado");
-        service.cancelAdminOrder("client@example.com", 10L, "Cancelacion luego de reembolso");
+        order.setPaymentStatus(PaymentStatus.REFUNDED);
+        service.cancelRefundedOrder(order);
         assertEquals(OrderStatus.CANCELED, order.getOrderStatus());
     }
 
@@ -312,7 +316,7 @@ class OrderServiceTests {
                 () ->
                         service.updateOrderStatus(
                                 "client@example.com", 10L, OrderStatus.CONFIRMED, "Confirmacion"));
-        service.updatePaymentStatus("client@example.com", 10L, PaymentStatus.PAID, "Pago recibido");
+        order.setPaymentStatus(PaymentStatus.PAID);
         service.updateOrderStatus("client@example.com", 10L, OrderStatus.CONFIRMED, "Confirmacion");
         service.updateOrderStatus("client@example.com", 10L, OrderStatus.SHIPPED, "Envio");
         assertThrows(
@@ -365,17 +369,26 @@ class OrderServiceTests {
     }
 
     @Test
-    void paymentAndRefundDelegateDeliveryChangesInsideTheOrderWorkflow() {
+    void manualStatusChangesCannotInventAPaymentOrRefund() {
         DigitalDeliveryService deliveries =
                 (DigitalDeliveryService)
                         org.springframework.test.util.ReflectionTestUtils.getField(
                                 service, "digitalDeliveries");
-        service.updatePaymentStatus(
-                "client@example.com", 10L, PaymentStatus.PAID, "Pago confirmado");
-        verify(deliveries).enablePaidOrder(order);
-        service.updatePaymentStatus(
-                "client@example.com", 10L, PaymentStatus.REFUNDED, "Reembolso confirmado");
-        verify(deliveries).revokeOrder(order);
+        assertThrows(
+                BusinessConflictException.class,
+                () ->
+                        service.updatePaymentStatus(
+                                "client@example.com", 10L, PaymentStatus.PAID, "Pago confirmado"));
+        assertThrows(
+                BusinessConflictException.class,
+                () ->
+                        service.updatePaymentStatus(
+                                "client@example.com",
+                                10L,
+                                PaymentStatus.REFUNDED,
+                                "Reembolso confirmado"));
+        assertEquals(PaymentStatus.PENDING, order.getPaymentStatus());
+        verifyNoInteractions(deliveries);
     }
 
     @Test

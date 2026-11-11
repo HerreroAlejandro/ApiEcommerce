@@ -151,6 +151,11 @@ reembolso. Las operaciones en REVIEW requieren seguimiento administrativo.
 
 ## Reembolsos administrativos
 
+Las ventas presenciales ya cobradas tienen un flujo separado: [STORE_SALES.md](STORE_SALES.md).
+Los cobros de caja o terminal no se registran como pagos de Mercado Pago. El antiguo
+endpoint genérico de cambio de estado de pago queda bloqueado incluso sin checkout;
+se utiliza la venta presencial o la confirmación verificada del proveedor, según el canal.
+
 Para el pago principal de un pedido físico ya enviado o entregado, primero debe
 registrarse la recepción de la devolución o una excepción administrativa con motivo.
 Los pagos duplicados no exigen devolver la compra original. El flujo, los endpoints
@@ -186,12 +191,14 @@ solicitud, la aceptación del proveedor y la confirmación verificada.
 | REQUESTED | Intención registrada; el envío puede no haberse completado o su resultado ser incierto |
 | PROCESSING | Mercado Pago aceptó la solicitud; falta verificar la devolución completa |
 | CONFIRMED | El importe acumulado devuelto fue verificado consultando Orders |
+| REJECTED | Esta solicitud fue rechazada con un código reconocido y una consulta posterior no mostró dinero adicional devuelto ni reembolsos pendientes para el pago |
 
-HTTP 200 significa CONFIRMED; HTTP 202 devuelve una solicitud aún pendiente.
+HTTP 200 devuelve un resultado CONFIRMED o REJECTED; hay que leer `status`.
+HTTP 202 devuelve una solicitud aún pendiente.
 Un timeout puede devolver 503 aunque MP haya recibido la petición. Consultá
 GET /admin/payments/{paymentId}/refund y sincronizá la order si es necesario;
 no crees otra solicitud con una clave distinta. Repetir el mismo POST reutiliza
-la clave. Cuando ya está PROCESSING no se vuelve a enviar el reembolso.
+la clave. Cuando ya está PROCESSING, CONFIRMED o REJECTED no se vuelve a enviar el reembolso.
 
 Si se devuelve el pago principal, la orden queda en REVIEW mientras se tramita,
 se bloquea el despacho y se revocan permisos digitales. Esto no afirma que el
@@ -209,8 +216,48 @@ reintento por discrepancia y requiere conciliar la operación en Mercado Pago.
 El listado /admin/payments/review también incluye solicitudes sin confirmar.
 
 Los rechazos del proveedor no habilitan por sí solos a liberar el pedido ni a
-suponer que nunca recibió la solicitud. Revisá el estado y resolvé el incidente
-mediante sincronización, reintento con la misma clave o gestión en Mercado Pago.
+suponer que nunca recibió la solicitud.
+
+### Rechazo verificado de una solicitud
+
+Se reconocen exclusivamente estas respuestas del POST de reembolso, según la
+[referencia de Mercado Pago](https://www.mercadopago.com.ar/developers/es/reference/online-payments/checkout-pro-orders/refund-order/post):
+
+- HTTP 400 con `refund_amount_exceeds`.
+- HTTP 404 con `transaction_not_found`.
+- HTTP 409 con `cannot_refund_order`.
+
+La respuesta por sí sola no alcanza: antes de guardar REJECTED se consulta la
+order remota. Deben coincidir el checkout, vendedor, moneda, entorno, importe y
+pago; no puede haber un reembolso sin resolver para esa transacción, el importe
+ya devuelto debe seguir igual y la información no puede ser anterior a la guardada.
+Si falta esa verificación, se conserva REQUESTED y el resultado sigue incierto.
+No se guarda texto libre del proveedor: `rejectionCode` y `rejectionReason`
+contienen códigos conocidos y explicaciones locales; `rejectedAt` registra cuándo
+la API pudo comprobar el rechazo. Los tres campos aparecen en la consulta existente
+`GET /admin/payments/{paymentId}/refund`. Se audita `REFUND_REJECTED`.
+
+No se clasifican como rechazo los timeouts, errores de conexión, 401, 403, 429,
+5xx, datos malformados o códigos desconocidos. Tampoco `order_already_refunded`,
+`order_refund_already_in_process` ni `idempotency_key_already_used`: requieren
+consultar el estado financiero. Las transacciones de reembolso con estados no
+confirmados se consideran sin resolver; esta fase no interpreta automáticamente
+estados asíncronos de fallo que no estén documentados para este flujo.
+
+REJECTED cierra el envío de esta solicitud, pero no la situación comercial:
+la compra afectada permanece bloqueada, no se restaura PAID, no se repone stock
+ni se rehabilitan descargas. Un pago duplicado rechazado no afecta la compra
+principal. El listado de revisión conserva el caso. Todavía no existe una operación
+para cancelar la solicitud, crear otro intento ni continuar la compra.
+
+Si después se verifica que el dinero efectivamente fue devuelto, la solicitud
+puede pasar a CONFIRMED: se conservan los datos del rechazo anterior y su auditoría.
+La verdad financiera prevalece sobre el registro previo; no se envía otro reembolso.
+
+Migración: `src/main/resources/db/manual/2026-11-11-refund-rejections.sql`.
+Agrega el estado y los tres campos; inspeccionar primero la tabla si Hibernate ya
+la actualizó. El script no se ejecutó desde Codex ni devuelve dinero por sí mismo.
+
 No hay saldo a favor, transferencia de pagos entre órdenes ni cambios a UserModel.
 
 ## Endpoints

@@ -3,6 +3,7 @@ package com.api.crud.services;
 import com.api.crud.config.MercadoPagoProperties;
 import com.api.crud.exceptions.BusinessConflictException;
 import com.api.crud.exceptions.ExternalServiceException;
+import com.api.crud.exceptions.RefundRejectedException;
 import com.api.crud.models.entity.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -205,6 +206,7 @@ public class MercadoPagoClient {
                     && (!result.path("live_mode").isBoolean()
                             || result.path("live_mode").asBoolean() != live)) throw unavailable();
             List<VerifiedPayment> payments = new ArrayList<>();
+            Set<String> unsettledRefundPaymentIds = new HashSet<>();
             JsonNode transactions = result.path("transactions");
             for (String field : List.of("payments", "refunds", "chargebacks")) {
                 JsonNode entries = transactions.path(field);
@@ -223,6 +225,10 @@ public class MercadoPagoClient {
                 Set<String> refundIds = new HashSet<>();
                 for (JsonNode refund : transactions.path("refunds")) {
                     if (!refundIds.add(requiredText(refund, "id"))) throw unavailable();
+                    if (paymentId.equals(text(refund, "transaction_id"))
+                            && !"processed".equals(text(refund, "status"))) {
+                        unsettledRefundPaymentIds.add(paymentId);
+                    }
                     if (paymentId.equals(text(refund, "transaction_id"))
                             && "processed".equals(text(refund, "status"))) {
                         refunded = refunded.add(decimal(refund, "amount"));
@@ -259,7 +265,14 @@ public class MercadoPagoClient {
                                 live));
             }
             return new VerifiedOrder(
-                    id, reference, collector, currency, amount, live, List.copyOf(payments));
+                    id,
+                    reference,
+                    collector,
+                    currency,
+                    amount,
+                    live,
+                    List.copyOf(payments),
+                    Set.copyOf(unsettledRefundPaymentIds));
         } catch (IllegalArgumentException | DateTimeException exception) {
             throw unavailable();
         }
@@ -327,6 +340,10 @@ public class MercadoPagoClient {
             HttpResponse<String> response = send(builder.build());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 logProviderFailure(method, path, response);
+                if ("POST".equals(method) && path.matches("/v1/orders/ORD[A-Z0-9]{1,61}/refund")) {
+                    String code = refundRejectionCode(response);
+                    if (code != null) throw new RefundRejectedException(code);
+                }
                 throw unavailable();
             }
             JsonNode parsed = mapper.readTree(response.body());
@@ -349,6 +366,34 @@ public class MercadoPagoClient {
     protected HttpResponse<String> send(HttpRequest request)
             throws IOException, InterruptedException {
         return http.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private String refundRejectionCode(HttpResponse<String> response) {
+        String expected =
+                switch (response.statusCode()) {
+                    case 400 -> "refund_amount_exceeds";
+                    case 404 -> "transaction_not_found";
+                    case 409 -> "cannot_refund_order";
+                    default -> null;
+                };
+        if (expected == null) return null;
+        try {
+            JsonNode error = mapper.readTree(response.body());
+            if (error == null || !error.isObject()) return null;
+            Set<String> codes = new HashSet<>();
+            addDiagnosticCode(codes, error.path("error"));
+            addDiagnosticCode(codes, error.path("code"));
+            for (String collection : List.of("cause", "errors")) {
+                for (JsonNode cause : error.path(collection)) {
+                    addDiagnosticCode(codes, cause.path("code"));
+                    addDiagnosticCode(codes, cause.path("error"));
+                }
+            }
+            Set<String> allowed = Set.of(expected, "bad_request", "not_found", "conflict");
+            return codes.contains(expected) && allowed.containsAll(codes) ? expected : null;
+        } catch (IOException exception) {
+            return null;
+        }
     }
 
     private void logProviderFailure(String method, String path, HttpResponse<String> response) {
@@ -380,7 +425,8 @@ public class MercadoPagoClient {
                         .filter(value -> value.matches("[A-Za-z0-9-]{1,128}"))
                         .orElse("no_disponible");
         log.warn(
-                "Mercado Pago rechazo la solicitud: metodo={}, ruta={}, HTTP={}, codigos={}, campos={}, requestId={}",
+                "Mercado Pago rechazo la solicitud: metodo={}, ruta={}, HTTP={}, codigos={},"
+                    + " campos={}, requestId={}",
                 method,
                 path,
                 response.statusCode(),
@@ -436,7 +482,20 @@ public class MercadoPagoClient {
             String currency,
             BigDecimal amount,
             boolean liveMode,
-            List<VerifiedPayment> payments) {}
+            List<VerifiedPayment> payments,
+            Set<String> unsettledRefundPaymentIds) {
+
+        public VerifiedOrder(
+                String id,
+                String reference,
+                String collectorId,
+                String currency,
+                BigDecimal amount,
+                boolean liveMode,
+                List<VerifiedPayment> payments) {
+            this(id, reference, collectorId, currency, amount, liveMode, payments, Set.of());
+        }
+    }
 
     public record VerifiedPayment(
             String id,

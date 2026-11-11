@@ -79,7 +79,10 @@ public class DigitalDeliveryService {
     public List<DigitalDeliveryResponseDTO> getMyDeliveries(String email, Long orderId) {
         UserModel buyer = user(email);
         orders.getOrderById(orderId)
-                .filter(order -> order.getUserOrder().getId() == buyer.getId())
+                .filter(
+                        order ->
+                                order.getUserOrder() != null
+                                        && order.getUserOrder().getId() == buyer.getId())
                 .orElseThrow(ResourceNotFoundException::new);
         return deliveries.getByOrderId(orderId).stream()
                 .map(delivery -> mapper.map(delivery, DigitalDeliveryResponseDTO.class))
@@ -139,12 +142,16 @@ public class DigitalDeliveryService {
             requireStaff(actor);
         }
         DigitalDelivery found = deliveries.getById(id).orElseThrow(ResourceNotFoundException::new);
-        if (!staff && found.getOrderItem().getOrder().getUserOrder().getId() != actor.getId()) {
+        if (!staff
+                && (found.getOrderItem().getOrder().getUserOrder() == null
+                        || found.getOrderItem().getOrder().getUserOrder().getId()
+                                != actor.getId())) {
             throw new ResourceNotFoundException();
         }
         // All operations lock order before delivery, including payment/refund.
         Order order = workflow.lockOrder(found.getOrderItem().getOrder().getIdOrder());
-        if (!staff && order.getUserOrder().getId() != actor.getId())
+        if (!staff
+                && (order.getUserOrder() == null || order.getUserOrder().getId() != actor.getId()))
             throw new ResourceNotFoundException();
         requirePaid(order);
         return deliveries.lockById(id).orElseThrow(ResourceNotFoundException::new);

@@ -119,7 +119,7 @@ class OrderExpirationTests {
     @Test
     void timelyPaymentWinsAndCannotBeExpiredAfterward() {
         order.setExpiresAt(LocalDateTime.now().plusMinutes(10));
-        service.updatePaymentStatus("admin@example.com", 10L, PaymentStatus.PAID, "Pago recibido");
+        order.setPaymentStatus(PaymentStatus.PAID);
         order.setExpiresAt(LocalDateTime.now().minusMinutes(1));
         assertFalse(service.expireOrder(10L));
         assertEquals(3, product.getStockProduct());

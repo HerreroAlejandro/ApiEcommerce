@@ -111,10 +111,15 @@ class PaymentConfirmationTests {
         order.setExpiresAt(LocalDateTime.now().minusMinutes(1));
         order.setItemsOrder(List.of(new OrderItem(order, product, 1, checkout.getAmount())));
         when(workflow.lockProduct(4L)).thenReturn(product);
-        OrderService expiration = new OrderService(
-                mock(OrderDao.class), mock(UserDao.class), workflow,
-                new ModelMapperConfig().modelMapper(), deliveries,
-                mock(OrderShippingService.class), payments);
+        OrderService expiration =
+                new OrderService(
+                        mock(OrderDao.class),
+                        mock(UserDao.class),
+                        workflow,
+                        new ModelMapperConfig().modelMapper(),
+                        deliveries,
+                        mock(OrderShippingService.class),
+                        payments);
 
         assertTrue(expiration.expireOrder(10L));
         VerifiedPayment approved = snapshot("PAY1", "approved", "100.00", "0.00", version);
@@ -136,10 +141,15 @@ class PaymentConfirmationTests {
         order.setExpiresAt(LocalDateTime.now().plusMinutes(1));
         service.apply(snapshot("PAY1", "approved", "100.00", "0.00", version));
         order.setExpiresAt(LocalDateTime.now().minusMinutes(1));
-        OrderService expiration = new OrderService(
-                mock(OrderDao.class), mock(UserDao.class), workflow,
-                new ModelMapperConfig().modelMapper(), deliveries,
-                mock(OrderShippingService.class), payments);
+        OrderService expiration =
+                new OrderService(
+                        mock(OrderDao.class),
+                        mock(UserDao.class),
+                        workflow,
+                        new ModelMapperConfig().modelMapper(),
+                        deliveries,
+                        mock(OrderShippingService.class),
+                        payments);
 
         assertFalse(expiration.expireOrder(10L));
         assertEquals(PaymentStatus.PAID, order.getPaymentStatus());
@@ -243,25 +253,62 @@ class PaymentConfirmationTests {
     }
 
     @Test
+    void rejectedRefundStillBlocksDeliveryButVerifiedMoneyReturnedCanConfirmItLater() {
+        service.apply(snapshot("PAY1", "approved", "100.00", "0.00", version));
+        order.setPaymentStatus(PaymentStatus.REVIEW);
+        PaymentRefund refund = new PaymentRefund();
+        refund.setId("refund-request");
+        refund.setPayment(records.get("PAY1"));
+        refund.setStatus(PaymentRefundStatus.REJECTED);
+        refund.setAmount(new BigDecimal("100.00"));
+        refund.setPreviouslyRefundedAmount(BigDecimal.ZERO);
+        refund.setRejectedAt(version);
+        refund.setRejectionCode("cannot_refund_order");
+        when(refunds.getByPaymentId(records.get("PAY1").getId())).thenReturn(Optional.of(refund));
+        service.apply(snapshot("PAY1", "approved", "100.00", "0.00", version.plusSeconds(1)));
+        assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
+        assertEquals(PaymentRefundStatus.REJECTED, refund.getStatus());
+        service.apply(snapshot("PAY1", "refunded", "100.00", "100.00", version.plusSeconds(2)));
+        assertEquals(PaymentRefundStatus.CONFIRMED, refund.getStatus());
+        assertNotNull(refund.getConfirmedAt());
+        assertEquals(version, refund.getRejectedAt());
+        assertEquals("cannot_refund_order", refund.getRejectionCode());
+        verify(deliveries).enablePaidOrder(order);
+        verify(orders).cancelRefundedOrder(order);
+    }
+
+    @Test
     void adminSynchronizationRecoversMissedNotificationAndCanBeRepeated() {
         UserDao users = mock(UserDao.class);
         UserModel admin = mock(UserModel.class);
         when(admin.getRoleNames()).thenReturn(List.of("ADMIN"));
         when(users.getUserByEmail("admin@example.com")).thenReturn(Optional.of(admin));
         MercadoPagoClient client = mock(MercadoPagoClient.class);
-        var remote = new MercadoPagoClient.VerifiedOrder(
-                "ORDTST123", checkout.getReference(), "99", "ARS",
-                checkout.getAmount(), false,
-                List.of(snapshot("PAY1", "approved", "100.00", "0.00", version)));
+        var remote =
+                new MercadoPagoClient.VerifiedOrder(
+                        "ORDTST123",
+                        checkout.getReference(),
+                        "99",
+                        "ARS",
+                        checkout.getAmount(),
+                        false,
+                        List.of(snapshot("PAY1", "approved", "100.00", "0.00", version)));
         when(client.getOrder("ORDTST123"))
                 .thenThrow(new ExternalServiceException("Conexion temporalmente no disponible"))
                 .thenReturn(remote);
-        PaymentService coordinator = new PaymentService(
-                mock(PaymentCheckoutPersistence.class), service, client,
-                mock(MercadoPagoWebhookVerifier.class), payments,
-                mock(OrderDao.class), users, new ModelMapperConfig().modelMapper());
+        PaymentService coordinator =
+                new PaymentService(
+                        mock(PaymentCheckoutPersistence.class),
+                        service,
+                        client,
+                        mock(MercadoPagoWebhookVerifier.class),
+                        payments,
+                        mock(OrderDao.class),
+                        users,
+                        new ModelMapperConfig().modelMapper());
 
-        assertThrows(ExternalServiceException.class,
+        assertThrows(
+                ExternalServiceException.class,
                 () -> coordinator.synchronize("admin@example.com", "ORDTST123"));
         assertEquals(PaymentStatus.PENDING, order.getPaymentStatus());
         assertTrue(records.isEmpty());

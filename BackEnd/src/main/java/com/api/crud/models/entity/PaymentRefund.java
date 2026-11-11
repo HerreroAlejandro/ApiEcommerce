@@ -73,4 +73,18 @@ public class PaymentRefund {
     @Getter
     @Setter
     private Instant confirmedAt;
+
+    @Getter
+    @Setter
+    private Instant rejectedAt;
+
+    @Column(length = 64)
+    @Getter
+    @Setter
+    private String rejectionCode;
+
+    @Column(length = 500)
+    @Getter
+    @Setter
+    private String rejectionReason;
 }

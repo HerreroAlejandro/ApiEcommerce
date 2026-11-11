@@ -79,3 +79,5 @@ This generated password is for development use only. Your security configuration
 2026-11-10 01:13:01 [main] INFO  o.a.coyote.http11.Http11NioProtocol - Starting ProtocolHandler ["http-nio-8080"]
 2026-11-10 01:13:01 [main] INFO  com.api.crud.CrudApplication - Started CrudApplication in 5.188 seconds (process running for 5.506)
 2026-11-10 01:13:06 [http-nio-8080-exec-2] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-10 05:02:29 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
+2026-11-10 05:02:29 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.

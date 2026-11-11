@@ -49,6 +49,39 @@ public class ModelMapperConfig {
         configureDigitalDeliveries(modelMapper);
         modelMapper
                 .createTypeMap(
+                        StoreSaleCreateRequestDTO.class,
+                        StoreSaleDetails.class,
+                        modelMapper
+                                .getConfiguration()
+                                .copy()
+                                .setMatchingStrategy(MatchingStrategies.STRICT))
+                .addMappings(
+                        mapping -> {
+                            mapping.skip(StoreSaleDetails::setReference);
+                            mapping.skip(StoreSaleDetails::setRequestHash);
+                            mapping.skip(StoreSaleDetails::setCashierUserId);
+                            mapping.skip(StoreSaleDetails::setPaidAt);
+                            mapping.skip(StoreSaleDetails::setDeliveredAt);
+                            mapping.skip(StoreSaleDetails::setRefundedAt);
+                            mapping.skip(StoreSaleDetails::setRefundedBy);
+                            mapping.skip(StoreSaleDetails::setRefundReason);
+                        });
+        modelMapper.createTypeMap(
+                StoreSaleDetails.class,
+                StoreSaleResponseDTO.class,
+                modelMapper
+                        .getConfiguration()
+                        .copy()
+                        .setMatchingStrategy(MatchingStrategies.STRICT));
+        modelMapper.createTypeMap(
+                StoreSaleCreateRequestDTO.class,
+                OrderCreateRequestDTO.class,
+                modelMapper
+                        .getConfiguration()
+                        .copy()
+                        .setMatchingStrategy(MatchingStrategies.STRICT));
+        modelMapper
+                .createTypeMap(
                         PhysicalReturn.class,
                         PhysicalReturnResponseDTO.class,
                         modelMapper

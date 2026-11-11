@@ -52,6 +52,11 @@ public class SecurityConfig {
                                         .permitAll()
                                         .requestMatchers("/admin/products/**")
                                         .hasAnyAuthority("ADMIN", "SUPPORT")
+                                        .requestMatchers("/admin/store-sales/*/refund")
+                                        .hasAuthority("ADMIN")
+                                        .requestMatchers(
+                                                "/admin/store-sales", "/admin/store-sales/**")
+                                        .hasAnyAuthority("ADMIN", "SUPPORT")
                                         .requestMatchers("/admin/payments/*/refund")
                                         .hasAuthority("ADMIN")
                                         .requestMatchers(HttpMethod.GET, "/admin/payments/**")

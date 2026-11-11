@@ -10,6 +10,7 @@ import ch.qos.logback.core.read.ListAppender;
 import com.api.crud.config.MercadoPagoProperties;
 import com.api.crud.exceptions.BusinessConflictException;
 import com.api.crud.exceptions.ExternalServiceException;
+import com.api.crud.exceptions.RefundRejectedException;
 import com.api.crud.models.entity.*;
 import com.api.crud.services.MercadoPagoClient;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -31,16 +32,71 @@ import java.util.Map;
 class MercadoPagoClientTests {
 
     @Test
+    void onlyRecognizedRefundHttpErrorsAreClassifiedForSubsequentVerification() {
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.headers()).thenReturn(HttpHeaders.of(Map.of(), (name, value) -> true));
+        MercadoPagoClient client =
+                new MercadoPagoClient(properties(), new ObjectMapper()) {
+                    @Override
+                    protected HttpResponse<String> send(HttpRequest request) {
+                        return response;
+                    }
+                };
+        Payment payment = new Payment();
+        payment.setProviderPaymentId("PAY123");
+        PaymentRefund refund = new PaymentRefund();
+        refund.setId("a9d184ec-b676-4c01-95e5-f8c657690774");
+        refund.setPayment(payment);
+        refund.setProviderOrderId("ORDTST123");
+        refund.setAmount(BigDecimal.TEN);
+        for (var rejection :
+                Map.of(
+                                400,
+                                "refund_amount_exceeds",
+                                404,
+                                "transaction_not_found",
+                                409,
+                                "cannot_refund_order")
+                        .entrySet()) {
+            when(response.statusCode()).thenReturn(rejection.getKey());
+            when(response.body()).thenReturn("{\"error\":\"" + rejection.getValue() + "\"}");
+            assertEquals(
+                    rejection.getValue(),
+                    assertThrows(RefundRejectedException.class, () -> client.refundPayment(refund))
+                            .getProviderCode());
+        }
+        for (String code :
+                List.of(
+                        "order_refund_already_in_process",
+                        "order_already_refunded",
+                        "idempotency_key_already_used",
+                        "unknown_error")) {
+            when(response.statusCode()).thenReturn(409);
+            when(response.body()).thenReturn("{\"error\":\"" + code + "\"}");
+            assertThrowsExactly(ExternalServiceException.class, () -> client.refundPayment(refund));
+        }
+        for (int status : List.of(401, 403, 429, 500)) {
+            when(response.statusCode()).thenReturn(status);
+            when(response.body()).thenReturn("{\"error\":\"cannot_refund_order\"}");
+            assertThrowsExactly(ExternalServiceException.class, () -> client.refundPayment(refund));
+        }
+        when(response.statusCode()).thenReturn(400);
+        when(response.body()).thenReturn("not-json");
+        assertThrowsExactly(ExternalServiceException.class, () -> client.refundPayment(refund));
+    }
+
+    @Test
     void refundTargetsOnlyTheSelectedTransactionAndReusesItsIdempotencyKey() throws Exception {
         FakeClient client = new FakeClient(properties());
         client.response =
                 new ObjectMapper()
                         .readTree(
                                 """
-                {"id":"ORDTST123","transactions":{"refunds":[
-                  {"id":"REF123","transaction_id":"PAY123","amount":"80.00","status":"processing"}
-                ]}}
-                """);
+{"id":"ORDTST123","transactions":{"refunds":[
+  {"id":"REF123","transaction_id":"PAY123","amount":"80.00","status":"processing"}
+]}}
+""");
         Payment payment = new Payment();
         payment.setProviderPaymentId("PAY123");
         PaymentRefund refund = new PaymentRefund();
@@ -77,9 +133,9 @@ class MercadoPagoClientTests {
         when(response.body())
                 .thenReturn(
                         """
-                {"error":"bad_request","message":"Invalid expiration_time for buyer@example.com",
-                 "cause":[{"code":"invalid_expiration_time","message":"private-test-token"}]}
-                """);
+{"error":"bad_request","message":"Invalid expiration_time for buyer@example.com",
+ "cause":[{"code":"invalid_expiration_time","message":"private-test-token"}]}
+""");
         MercadoPagoClient client =
                 new MercadoPagoClient(properties, new ObjectMapper()) {
                     @Override
@@ -197,10 +253,10 @@ class MercadoPagoClientTests {
                 new ObjectMapper()
                         .readTree(
                                 """
-                {"id":"ORDTST123","type":"online","processing_mode":"manual","status":"processed",
-                 "checkout_url":"https://www.mercadopago.com.ar/checkout/v1/redirect?order_id=ORDTST123",
-                 "external_reference":"reference-1","user_id":"99","currency":"ARS","total_amount":"250.00"}
-                """);
+{"id":"ORDTST123","type":"online","processing_mode":"manual","status":"processed",
+ "checkout_url":"https://www.mercadopago.com.ar/checkout/v1/redirect?order_id=ORDTST123",
+ "external_reference":"reference-1","user_id":"99","currency":"ARS","total_amount":"250.00"}
+""");
         PaymentCheckout checkout = checkout();
         checkout.setRequestBody(client.prepareOrderRequest(checkout));
         client.createOrder(checkout);
@@ -236,13 +292,13 @@ class MercadoPagoClientTests {
         return new ObjectMapper()
                 .readTree(
                         """
-                {"id":"ORDTST123","type":"online","processing_mode":"manual","status":"processed",
-                 "external_reference":"reference-1","user_id":"99","currency":"ARS",
-                 "total_amount":"150.00","last_updated_date":"2026-11-09T12:00:00Z",
-                 "transactions":{"payments":[{"id":"PAY123","amount":"150.00",
-                 "status":"processed","status_detail":"accredited",
-                 "payment_method":{"type":"debit_card","id":"debvisa"}}]}}
-                """);
+{"id":"ORDTST123","type":"online","processing_mode":"manual","status":"processed",
+ "external_reference":"reference-1","user_id":"99","currency":"ARS",
+ "total_amount":"150.00","last_updated_date":"2026-11-09T12:00:00Z",
+ "transactions":{"payments":[{"id":"PAY123","amount":"150.00",
+ "status":"processed","status_detail":"accredited",
+ "payment_method":{"type":"debit_card","id":"debvisa"}}]}}
+""");
     }
 
     @Test
@@ -301,5 +357,22 @@ class MercadoPagoClientTests {
         ((ObjectNode) client.response.path("transactions").path("payments").get(0))
                 .put("status_detail", "partially_refunded");
         assertThrows(ExternalServiceException.class, () -> client.getOrder("ORDTST123"));
+    }
+
+    @Test
+    void unresolvedRefundsAreReportedWithoutCountingThemAsReturnedMoney() throws Exception {
+        FakeClient client = new FakeClient(properties());
+        client.response = remoteOrder();
+        ((ObjectNode) client.response.path("transactions"))
+                .putArray("refunds")
+                .addObject()
+                .put("id", "REF1")
+                .put("transaction_id", "PAY123")
+                .put("amount", "150.00")
+                .put("status", "processing");
+        var result = client.getOrder("ORDTST123");
+        assertTrue(result.unsettledRefundPaymentIds().contains("PAY123"));
+        assertEquals(0, result.payments().get(0).refundedAmount().signum());
+        assertEquals("approved", result.payments().get(0).status());
     }
 }
