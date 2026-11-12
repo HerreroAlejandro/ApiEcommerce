@@ -7,6 +7,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.api.crud.DTO.CartAdminFilterDTO;
 import com.api.crud.controllers.AdminCartController;
+import com.api.crud.services.AdministrativeHistoryService;
+import com.api.crud.services.CartItemService;
 import com.api.crud.services.CartService;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -15,7 +17,6 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -30,8 +31,11 @@ class AdminCartQueryTests {
     @BeforeEach
     void setUp() {
         service = mock(CartService.class);
-        AdminCartController controller = new AdminCartController();
-        ReflectionTestUtils.setField(controller, "cartService", service);
+        AdminCartController controller =
+                new AdminCartController(
+                        service,
+                        mock(CartItemService.class),
+                        mock(AdministrativeHistoryService.class));
         when(service.getCarts(any(), any())).thenAnswer(call -> Page.empty(call.getArgument(1)));
         mvc =
                 MockMvcBuilders.standaloneSetup(controller)

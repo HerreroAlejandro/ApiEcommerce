@@ -5,17 +5,22 @@ import com.api.crud.exceptions.*;
 import com.api.crud.models.entity.*;
 import com.api.crud.models.enums.*;
 import com.api.crud.repositories.*;
+import com.api.crud.validation.InputRules;
 
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
 
 import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
@@ -59,8 +64,16 @@ public class PhysicalReturnService {
         if ((order.getOrderStatus() != OrderStatus.SHIPPED
                         && order.getOrderStatus() != OrderStatus.DELIVERED)
                 || order.getItemsOrder().stream()
-                        .noneMatch(item -> item.getProductOrderItem() instanceof ProductPhysical)
-                || !Set.of(PaymentStatus.PAID, PaymentStatus.REVIEW, PaymentStatus.REFUNDED)
+                        .noneMatch(
+                                item ->
+                                        item.getProductOrderItem() instanceof ProductPhysical
+                                                && item.getFulfillmentQuantity() > 0)
+                || !Set.of(
+                                PaymentStatus.PAID,
+                                PaymentStatus.PARTIALLY_REFUNDED,
+                                PaymentStatus.CHARGED_BACK,
+                                PaymentStatus.REVIEW,
+                                PaymentStatus.REFUNDED)
                         .contains(order.getPaymentStatus()))
             throw new BusinessConflictException(
                     "La devolucion requiere una compra fisica enviada o entregada");
@@ -69,6 +82,14 @@ public class PhysicalReturnService {
     public PhysicalReturnResponseDTO get(String email, Long orderId) {
         staff(email, false);
         return response(returns.getByOrderId(orderId).orElseThrow(ResourceNotFoundException::new));
+    }
+
+    public Page<PhysicalReturnListDTO> getReturns(
+            String email, PhysicalReturnStatus status, Pageable pageable) {
+        staff(email, false);
+        InputRules.page(pageable);
+        return returns.getReturns(status, pageable)
+                .map(record -> mapper.map(record, PhysicalReturnListDTO.class));
     }
 
     @Transactional
@@ -90,7 +111,7 @@ public class PhysicalReturnService {
         return response(result);
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public PhysicalReturnResponseDTO receive(
             String email, Long orderId, PhysicalReturnReceiveRequestDTO request) {
         UserModel actor = staff(email, true);
@@ -113,45 +134,58 @@ public class PhysicalReturnService {
             if (received.put(line.getOrderItemId(), line) != null)
                 throw new InvalidRequestException("Articulo de devolucion repetido");
         }
-        if (received.size() != physical.size())
+        Map<Long, PhysicalReturnLine> previous = new HashMap<>();
+        result.getItems().forEach(line -> previous.put(line.getOrderItemId(), line));
+        Set<Long> physicalIds =
+                physical.stream().map(OrderItem::getIdOrderItem).collect(Collectors.toSet());
+        if (!physicalIds.containsAll(received.keySet()))
             throw new InvalidRequestException(
-                    "Debe registrar la devolucion de todos los articulos fisicos");
+                    "Hay articulos que no pertenecen a la entrega fisica");
         for (OrderItem item : physical) {
             var line = received.get(item.getIdOrderItem());
-            if (line == null
-                    || line.getReceivedQuantity() != item.getAmountOrderItem()
-                    || line.getRestockedQuantity() > line.getReceivedQuantity())
+            if (line == null) continue;
+            var before = previous.get(item.getIdOrderItem());
+            if (line.getReceivedQuantity() > item.getFulfillmentQuantity()
+                    || line.getRestockedQuantity() > line.getReceivedQuantity()
+                    || (before != null
+                            && (line.getReceivedQuantity() < before.getReceivedQuantity()
+                                    || line.getRestockedQuantity() < before.getRestockedQuantity()
+                                    || line.getRestockedQuantity() - before.getRestockedQuantity()
+                                            > line.getReceivedQuantity()
+                                                    - before.getReceivedQuantity())))
                 throw new InvalidRequestException(
-                        "Cantidades de devolucion invalidas; solo se admite devolucion total");
+                        "Las cantidades acumuladas de devolucion no pueden disminuir ni superar la"
+                                + " entrega");
         }
-        if (result.getStatus() == PhysicalReturnStatus.RECEIVED) {
-            boolean same =
-                    result.getItems().size() == received.size()
-                            && result.getItems().stream()
-                                    .allMatch(
-                                            line -> {
-                                                var input = received.get(line.getOrderItemId());
-                                                return input != null
-                                                        && input.getReceivedQuantity()
-                                                                == line.getReceivedQuantity()
-                                                        && input.getRestockedQuantity()
-                                                                == line.getRestockedQuantity();
-                                            });
-            if (!same)
-                throw new BusinessConflictException(
-                        "La recepcion ya fue registrada con otras cantidades");
-            return response(result);
-        }
-        if (result.getStatus() != PhysicalReturnStatus.REQUESTED)
+        if (result.getStatus() == PhysicalReturnStatus.WAIVED)
             throw new BusinessConflictException("La devolucion ya fue resuelta sin recepcion");
-        // Validate every stock change before applying any, using the same product lock order as
+        boolean changed =
+                received.values().stream()
+                        .anyMatch(
+                                line -> {
+                                    var before = previous.get(line.getOrderItemId());
+                                    return before == null
+                                            || before.getReceivedQuantity()
+                                                    != line.getReceivedQuantity()
+                                            || before.getRestockedQuantity()
+                                                    != line.getRestockedQuantity();
+                                });
+        if (!changed)
+            return response(
+                    result); // Validate every stock change before applying any, using the same
+        // product lock order as
         // checkout.
         Map<ProductPhysical, Integer> stocks = new LinkedHashMap<>();
         for (OrderItem item : physical) {
             ProductPhysical product =
                     (ProductPhysical)
                             workflow.lockProduct(item.getProductOrderItem().getIdProduct());
-            int quantity = received.get(item.getIdOrderItem()).getRestockedQuantity();
+            var line = received.get(item.getIdOrderItem());
+            if (line == null) continue;
+            var before = previous.get(item.getIdOrderItem());
+            int quantity =
+                    line.getRestockedQuantity()
+                            - (before == null ? 0 : before.getRestockedQuantity());
             long updated =
                     (long) stocks.getOrDefault(product, product.getStockProduct()) + quantity;
             if (updated > Integer.MAX_VALUE)
@@ -160,14 +194,39 @@ public class PhysicalReturnService {
         }
         stocks.forEach(ProductPhysical::setStockProduct);
         for (OrderItem item : physical) {
-            result.getItems()
-                    .add(mapper.map(received.get(item.getIdOrderItem()), PhysicalReturnLine.class));
+            var line = received.get(item.getIdOrderItem());
+            if (line == null) continue;
+            var before = previous.get(item.getIdOrderItem());
+            int priorReceived = before == null ? 0 : before.getReceivedQuantity();
+            int priorRestocked = before == null ? 0 : before.getRestockedQuantity();
+            if (before == null) result.getItems().add(mapper.map(line, PhysicalReturnLine.class));
+            else {
+                before.setReceivedQuantity(line.getReceivedQuantity());
+                before.setRestockedQuantity(line.getRestockedQuantity());
+            }
+            if (priorReceived != line.getReceivedQuantity()
+                    || priorRestocked != line.getRestockedQuantity()) {
+                OrderChangeAudit audit = new OrderChangeAudit();
+                audit.setOrderId(orderId);
+                audit.setActorUserId(actor.getId());
+                audit.setAction("PHYSICAL_RETURN_ITEM_RECEIVED");
+                audit.setPreviousValue(
+                        item.getIdOrderItem() + ":" + priorReceived + ":" + priorRestocked);
+                audit.setNewValue(
+                        item.getIdOrderItem()
+                                + ":"
+                                + line.getReceivedQuantity()
+                                + ":"
+                                + line.getRestockedQuantity());
+                audit.setReason(reason(request.getReason()));
+                audit.setCreatedAt(LocalDateTime.now());
+                workflow.saveAudit(audit);
+            }
         }
         result.setStatus(PhysicalReturnStatus.RECEIVED);
         result.setResolvedBy(actor.getId());
         result.setResolvedAt(LocalDateTime.now());
         result.setResolutionReason(reason(request.getReason()));
-        audit(result, actor, "PHYSICAL_RETURN_RECEIVED", "REQUESTED", result.getResolutionReason());
         return response(result);
     }
 
@@ -180,13 +239,12 @@ public class PhysicalReturnService {
         PhysicalReturn result =
                 returns.getByOrderId(orderId).orElseThrow(ResourceNotFoundException::new);
         if (result.getStatus() == PhysicalReturnStatus.WAIVED) return response(result);
-        if (result.getStatus() != PhysicalReturnStatus.REQUESTED)
-            throw new BusinessConflictException("La devolucion ya fue recibida");
+        String previousStatus = result.getStatus().name();
         result.setStatus(PhysicalReturnStatus.WAIVED);
         result.setResolvedBy(actor.getId());
         result.setResolvedAt(LocalDateTime.now());
         result.setResolutionReason(reason);
-        audit(result, actor, "PHYSICAL_RETURN_WAIVED", "REQUESTED", reason);
+        audit(result, actor, "PHYSICAL_RETURN_WAIVED", previousStatus, reason);
         return response(result);
     }
 
@@ -195,13 +253,47 @@ public class PhysicalReturnService {
         if ((order.getOrderStatus() != OrderStatus.SHIPPED
                         && order.getOrderStatus() != OrderStatus.DELIVERED)
                 || order.getItemsOrder().stream()
-                        .noneMatch(item -> item.getProductOrderItem() instanceof ProductPhysical))
-            return;
+                        .noneMatch(
+                                item ->
+                                        item.getProductOrderItem() instanceof ProductPhysical
+                                                && item.getFulfillmentQuantity() > 0)) return;
         PhysicalReturn result = returns.getByOrderId(order.getIdOrder()).orElse(null);
         if (result == null || result.getStatus() == PhysicalReturnStatus.REQUESTED)
             throw new BusinessConflictException(
                     "Debe recibir la devolucion fisica o registrar una excepcion antes de"
-                        + " reembolsar");
+                            + " reembolsar");
+        if (result.getStatus() == PhysicalReturnStatus.RECEIVED) {
+            for (OrderItem item : order.getItemsOrder()) {
+                if (!(item.getProductOrderItem() instanceof ProductPhysical)) continue;
+                int received =
+                        result.getItems().stream()
+                                .filter(line -> line.getOrderItemId().equals(item.getIdOrderItem()))
+                                .mapToInt(PhysicalReturnLine::getReceivedQuantity)
+                                .sum();
+                if (received < item.getFulfillmentQuantity())
+                    throw new BusinessConflictException(
+                            "Debe completar la devolucion fisica antes del reembolso total");
+            }
+        }
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void requireItemRefundReady(Order order, OrderItem item, int requestedQuantity) {
+        if (!(item.getProductOrderItem() instanceof ProductPhysical)
+                || (order.getOrderStatus() != OrderStatus.SHIPPED
+                        && order.getOrderStatus() != OrderStatus.DELIVERED)) return;
+        PhysicalReturn result = returns.getByOrderId(order.getIdOrder()).orElse(null);
+        if (result != null && result.getStatus() == PhysicalReturnStatus.WAIVED) return;
+        int received =
+                result == null
+                        ? 0
+                        : result.getItems().stream()
+                                .filter(line -> line.getOrderItemId().equals(item.getIdOrderItem()))
+                                .mapToInt(PhysicalReturnLine::getReceivedQuantity)
+                                .sum();
+        if (received < requestedQuantity - item.getCanceledQuantity())
+            throw new BusinessConflictException(
+                    "Debe recibir esas unidades o registrar una excepcion antes de reembolsarlas");
     }
 
     private PhysicalReturnResponseDTO response(PhysicalReturn result) {

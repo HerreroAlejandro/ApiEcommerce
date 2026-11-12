@@ -120,7 +120,12 @@ public class AccountStatusService {
         if (user.getStatus() != expected) {
             throw new BusinessConflictException("Estado de cuenta incompatible con esta operacion");
         }
-        change(user, actor.getId(), AccountStatus.ACTIVE, motive, source);
+        change(
+                user,
+                actor.getId(),
+                user.isEmailVerified() ? AccountStatus.ACTIVE : AccountStatus.PENDING_VERIFICATION,
+                motive,
+                source);
     }
 
     @Transactional

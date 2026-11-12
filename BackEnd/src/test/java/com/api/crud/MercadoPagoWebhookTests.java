@@ -6,10 +6,12 @@ import static org.mockito.Mockito.*;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+
 import com.api.crud.config.MercadoPagoProperties;
 import com.api.crud.exceptions.UnauthenticatedException;
 import com.api.crud.repositories.*;
 import com.api.crud.services.*;
+import com.api.crud.services.ChargebackService;
 
 import org.junit.jupiter.api.Test;
 import org.modelmapper.ModelMapper;
@@ -41,7 +43,8 @@ class MercadoPagoWebhookTests {
     }
 
     @Test
-    void automaticAndSimulatedSignaturesAreAcceptedButAlteredResourcesAreRejected() throws Exception {
+    void automaticAndSimulatedSignaturesAreAcceptedButAlteredResourcesAreRejected()
+            throws Exception {
         var verifier = new MercadoPagoWebhookVerifier(properties());
         String received = signature("ordtst123", "request-1");
         Logger logger = (Logger) LoggerFactory.getLogger(MercadoPagoWebhookVerifier.class);
@@ -52,21 +55,27 @@ class MercadoPagoWebhookTests {
             verifier.verify("ORDTST123", "request-1", received);
             verifier.verify("ORDTST123", "request-1", signature("ORDTST123", "request-1"));
             assertTrue(appender.list.isEmpty());
-            assertThrows(UnauthenticatedException.class,
+            assertThrows(
+                    UnauthenticatedException.class,
                     () -> verifier.verify("ORDTST124", "request-1", received));
             String message = appender.list.get(0).getFormattedMessage();
             assertTrue(message.contains("FIRMA_NO_COINCIDE"));
             assertFalse(message.contains("test-secret-do-not-use"));
             assertFalse(message.contains(received));
-            assertThrows(UnauthenticatedException.class,
+            assertThrows(
+                    UnauthenticatedException.class,
                     () -> verifier.verify("ORDTST123", "request-2", received));
             String alteredTimestamp = received.replace("ts=1730000000000", "ts=1730000000001");
-            assertThrows(UnauthenticatedException.class,
+            assertThrows(
+                    UnauthenticatedException.class,
                     () -> verifier.verify("ORDTST123", "request-1", alteredTimestamp));
             MercadoPagoProperties otherSecret = properties();
             otherSecret.setWebhookSecret("different-secret");
-            assertThrows(UnauthenticatedException.class,
-                    () -> new MercadoPagoWebhookVerifier(otherSecret).verify("ORDTST123", "request-1", received));
+            assertThrows(
+                    UnauthenticatedException.class,
+                    () ->
+                            new MercadoPagoWebhookVerifier(otherSecret)
+                                    .verify("ORDTST123", "request-1", received));
         } finally {
             logger.detachAppender(appender);
             appender.stop();
@@ -116,7 +125,8 @@ class MercadoPagoWebhookTests {
                         mock(PaymentDao.class),
                         mock(OrderDao.class),
                         mock(UserDao.class),
-                        new ModelMapper());
+                        new ModelMapper(),
+                        mock(ChargebackService.class));
         assertThrows(
                 UnauthenticatedException.class,
                 () -> service.webhook("ORDTST123", "request-1", "invalid"));

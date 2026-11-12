@@ -10,6 +10,7 @@ import com.api.crud.config.ModelMapperConfig;
 import com.api.crud.controllers.*;
 import com.api.crud.exceptions.BusinessConflictException;
 import com.api.crud.exceptions.GlobalExceptionHandler;
+import com.api.crud.exceptions.InputValidationHandler;
 import com.api.crud.models.entity.UserModel;
 import com.api.crud.models.enums.AccountStatus;
 import com.api.crud.models.enums.PaymentRefundStatus;
@@ -18,9 +19,15 @@ import com.api.crud.repositories.PasswordResetTokenDao;
 import com.api.crud.repositories.RoleDao;
 import com.api.crud.repositories.UserDao;
 import com.api.crud.services.AccountStatusService;
+import com.api.crud.services.AdministrativeHistoryService;
+import com.api.crud.services.CartItemService;
+import com.api.crud.services.CartService;
+import com.api.crud.services.ChargebackPersistence;
+import com.api.crud.services.ChargebackService;
 import com.api.crud.services.DigitalDeliveryService;
 import com.api.crud.services.DigitalFileGateway;
 import com.api.crud.services.EmailService;
+import com.api.crud.services.EmailVerificationService;
 import com.api.crud.services.OrderItemService;
 import com.api.crud.services.OrderService;
 import com.api.crud.services.PaymentRefundService;
@@ -32,6 +39,9 @@ import com.api.crud.services.UserService;
 import org.junit.jupiter.api.*;
 import org.modelmapper.ModelMapper;
 import org.springframework.context.annotation.*;
+import org.springframework.core.env.MapPropertySource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.web.config.EnableSpringDataWebSupport;
 import org.springframework.http.MediaType;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -43,8 +53,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
-import java.util.*;
 import java.time.Instant;
+import java.util.*;
 
 class OrderSecurityTests {
 
@@ -63,6 +73,47 @@ class OrderSecurityTests {
         }
 
         @Bean
+        InputValidationHandler inputValidationHandler() {
+            return new InputValidationHandler();
+        }
+
+        @Bean
+        AdministrativeHistoryService administrativeHistoryService() {
+            AdministrativeHistoryService service = mock(AdministrativeHistoryService.class);
+            when(service.getOrderHistory(anyString(), anyLong(), any()))
+                    .thenReturn(Page.empty(PageRequest.of(0, 20)));
+            when(service.getCartHistory(anyString(), anyLong(), any()))
+                    .thenReturn(Page.empty(PageRequest.of(0, 20)));
+            return service;
+        }
+
+        @Bean
+        AdminCartController adminCartController() {
+            return new AdminCartController(
+                    mock(CartService.class),
+                    mock(CartItemService.class),
+                    administrativeHistoryService());
+        }
+
+        @Bean
+        ChargebackPersistence chargebackPersistence() {
+            ChargebackPersistence persistence = mock(ChargebackPersistence.class);
+            when(persistence.getCases(anyString(), any(), any()))
+                    .thenReturn(Page.empty(PageRequest.of(0, 20)));
+            return persistence;
+        }
+
+        @Bean
+        ChargebackService chargebackService() {
+            return mock(ChargebackService.class);
+        }
+
+        @Bean
+        AdminChargebackController adminChargebackController() {
+            return new AdminChargebackController(chargebackPersistence(), chargebackService());
+        }
+
+        @Bean
         StoreSaleService storeSaleService() {
             return mock(StoreSaleService.class);
         }
@@ -74,7 +125,10 @@ class OrderSecurityTests {
 
         @Bean
         PhysicalReturnService physicalReturnService() {
-            return mock(PhysicalReturnService.class);
+            PhysicalReturnService service = mock(PhysicalReturnService.class);
+            when(service.getReturns(anyString(), any(), any()))
+                    .thenReturn(Page.empty(PageRequest.of(0, 20)));
+            return service;
         }
 
         @Bean
@@ -103,6 +157,11 @@ class OrderSecurityTests {
             PaymentRefundResponseDTO response = new PaymentRefundResponseDTO();
             response.setStatus(PaymentRefundStatus.REQUESTED);
             when(service.refund(anyString(), anyLong(), anyString())).thenReturn(response);
+            when(service.refundItems(anyString(), anyLong(), any())).thenReturn(response);
+            when(service.retry(anyString(), anyLong(), anyString(), anyString()))
+                    .thenReturn(response);
+            when(service.getAttempts(anyString(), anyLong(), any()))
+                    .thenReturn(Page.empty(PageRequest.of(0, 20)));
             return service;
         }
 
@@ -161,7 +220,7 @@ class OrderSecurityTests {
 
         @Bean
         AdminOrderController adminOrderController(OrderService service) {
-            return new AdminOrderController(service);
+            return new AdminOrderController(service, administrativeHistoryService());
         }
 
         @Bean
@@ -182,6 +241,16 @@ class OrderSecurityTests {
         @Bean
         AccountStatusService accountStatusService() {
             return mock(AccountStatusService.class);
+        }
+
+        @Bean
+        UserController userController() {
+            return new UserController();
+        }
+
+        @Bean
+        EmailVerificationService emailVerificationService() {
+            return mock(EmailVerificationService.class);
         }
 
         @Bean
@@ -234,9 +303,18 @@ class OrderSecurityTests {
     void setUp() {
         context = new AnnotationConfigWebApplicationContext();
         context.setServletContext(new MockServletContext());
-        context.register(Config.class, SecurityConfig.class);
+        context.getEnvironment()
+                .getPropertySources()
+                .addFirst(
+                        new MapPropertySource(
+                                "cors-test",
+                                Map.of(
+                                        "security.cors.allowed-origins",
+                                        "http://localhost:5173,http://localhost:3000")));
+        context.register(Config.class, SecurityConfig.class, CorsConfig.class);
         context.refresh();
-        clearInvocations(context.getBean(OrderService.class));
+        clearInvocations(
+                context.getBean(OrderService.class), context.getBean(DigitalDeliveryService.class));
         mvc =
                 MockMvcBuilders.webAppContextSetup(context)
                         .addFilters(context.getBean(FilterChainProxy.class))
@@ -525,6 +603,41 @@ class OrderSecurityTests {
     }
 
     @Test
+    void manualRefundRetriesAndHistoryRequireAdminAndTheRejectedAttemptId() throws Exception {
+        String base = "/admin/payments/5/refund";
+        String body =
+                "{\"previousAttemptId\":\"7126952c-0de6-4d25-a07d-717c496cd30c\",\"reason\":\"Causa"
+                        + " corregida\"}";
+        for (String role : List.of("client", "support")) {
+            mvc.perform(get(base + "/attempts").header("Authorization", "Bearer " + role))
+                    .andExpect(status().isForbidden());
+            mvc.perform(
+                            post(base + "/retry")
+                                    .header("Authorization", "Bearer " + role)
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(body))
+                    .andExpect(status().isForbidden());
+        }
+        mvc.perform(get(base + "/attempts").header("Authorization", "Bearer admin"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+        mvc.perform(get(base + "/attempts?size=101").header("Authorization", "Bearer admin"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(
+                        post(base + "/retry")
+                                .header("Authorization", "Bearer admin")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"reason\":\"Reintentar\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(
+                        post(base + "/retry")
+                                .header("Authorization", "Bearer admin")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isAccepted());
+    }
+
+    @Test
     void paymentRoutesRequireAuthenticationAndOnlyWebhookPostIsPublic() throws Exception {
         mvc.perform(post("/orders/10/checkout")).andExpect(status().isUnauthorized());
         mvc.perform(post("/orders/10/checkout").header("Authorization", "Bearer client"))
@@ -577,5 +690,200 @@ class OrderSecurityTests {
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.code").value("SERVICE_UNAVAILABLE"));
         verifyNoInteractions(context.getBean(OrderService.class));
+    }
+
+    @Test
+    void itemRefundsRequireAdminAndValidatedWholeUnits() throws Exception {
+        String path = "/admin/payments/5/refund/items";
+        String body =
+                "{\"reference\":\"7126952c-0de6-4d25-a07d-717c496cd30c\",\"reason\":\"Devolver\",\"items\":[{\"orderItemId\":21,\"quantity\":1}]}";
+        for (String role : List.of("client", "support")) {
+            mvc.perform(
+                            post(path)
+                                    .header("Authorization", "Bearer " + role)
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(body))
+                    .andExpect(status().isForbidden());
+            mvc.perform(
+                            get("/admin/payments/5/refund/history")
+                                    .header("Authorization", "Bearer " + role))
+                    .andExpect(status().isForbidden());
+        }
+        mvc.perform(
+                        post(path)
+                                .header("Authorization", "Bearer admin")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isAccepted());
+        mvc.perform(
+                        post(path)
+                                .header("Authorization", "Bearer admin")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body.replace("\"quantity\":1", "\"quantity\":0")))
+                .andExpect(status().isBadRequest());
+        mvc.perform(
+                        post(path)
+                                .header("Authorization", "Bearer admin")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body.replace("\"quantity\":1", "\"quantity\":1.5")))
+                .andExpect(status().isBadRequest());
+        mvc.perform(
+                        post(path)
+                                .header("Authorization", "Bearer admin")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        body.replace(
+                                                "7126952c-0de6-4d25-a07d-717c496cd30c", "invalid")))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void chargebackReadsAllowSupportButOnlyAdminCanSynchronizeOrRecordNotes() throws Exception {
+        mvc.perform(get("/admin/chargebacks").header("Authorization", "Bearer client"))
+                .andExpect(status().isForbidden());
+        mvc.perform(
+                        get("/admin/chargebacks?resolution=OPEN")
+                                .header("Authorization", "Bearer support"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/admin/chargebacks/1/sync").header("Authorization", "Bearer support"))
+                .andExpect(status().isForbidden());
+        mvc.perform(
+                        post("/admin/chargebacks/1/notes")
+                                .header("Authorization", "Bearer support")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"reason\":\"Documentacion enviada\"}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/admin/chargebacks/1/sync").header("Authorization", "Bearer admin"))
+                .andExpect(status().isOk());
+        mvc.perform(
+                        post("/admin/chargebacks/1/notes")
+                                .header("Authorization", "Bearer admin")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"reason\":\" \"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(
+                        post("/admin/chargebacks/1/notes")
+                                .header("Authorization", "Bearer admin")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"reason\":\"Documentacion enviada\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/admin/chargebacks?size=101").header("Authorization", "Bearer admin"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void administrativeHistoryAndReturnQueueAreStaffOnlyAndValidatePagination() throws Exception {
+        for (String path :
+                List.of(
+                        "/admin/orders/10/history",
+                        "/admin/cart/12/history",
+                        "/admin/physical-returns?status=REQUESTED")) {
+            mvc.perform(get(path)).andExpect(status().isUnauthorized());
+            mvc.perform(get(path).header("Authorization", "Bearer client"))
+                    .andExpect(status().isForbidden());
+            for (String role : List.of("admin", "support"))
+                mvc.perform(get(path).header("Authorization", "Bearer " + role))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.totalElements").value(0))
+                        .andExpect(header().string("Cache-Control", "no-store"));
+        }
+        for (String path :
+                List.of(
+                        "/admin/orders/10/history",
+                        "/admin/cart/12/history",
+                        "/admin/physical-returns")) {
+            mvc.perform(get(path + "?size=101").header("Authorization", "Bearer admin"))
+                    .andExpect(status().isBadRequest());
+            mvc.perform(get(path + "?page=-1").header("Authorization", "Bearer admin"))
+                    .andExpect(status().isBadRequest());
+        }
+        mvc.perform(
+                        get("/admin/physical-returns?status=UNKNOWN")
+                                .header("Authorization", "Bearer admin"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void allowedReactPreflightNeedsNoJwtAndDoesNotExecuteTheBusinessOperation() throws Exception {
+        mvc.perform(
+                        options("/orders/createOrder")
+                                .header("Origin", "http://localhost:5173")
+                                .header("Access-Control-Request-Method", "POST")
+                                .header(
+                                        "Access-Control-Request-Headers",
+                                        "authorization,content-type"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"))
+                .andExpect(header().doesNotExist("Access-Control-Allow-Credentials"));
+        verifyNoInteractions(context.getBean(OrderService.class), context.getBean(JWTUtil.class));
+        mvc.perform(
+                        options("/digital-deliveries/1/download")
+                                .header("Origin", "http://localhost:3000")
+                                .header("Access-Control-Request-Method", "GET")
+                                .header(
+                                        "Access-Control-Request-Headers",
+                                        "authorization,x-download-token"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"));
+        verifyNoInteractions(context.getBean(DigitalDeliveryService.class));
+    }
+
+    @Test
+    void corsRejectsOtherOriginsMethodsAndHeadersBeforeBusinessExecution() throws Exception {
+        mvc.perform(
+                        options("/orders/createOrder")
+                                .header("Origin", "https://unknown.example")
+                                .header("Access-Control-Request-Method", "POST"))
+                .andExpect(status().isForbidden())
+                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
+        mvc.perform(
+                        options("/orders/createOrder")
+                                .header("Origin", "http://localhost:5173")
+                                .header("Access-Control-Request-Method", "TRACE"))
+                .andExpect(status().isForbidden());
+        mvc.perform(
+                        options("/orders/createOrder")
+                                .header("Origin", "http://localhost:5173")
+                                .header("Access-Control-Request-Method", "POST")
+                                .header("Access-Control-Request-Headers", "x-unapproved-header"))
+                .andExpect(status().isForbidden());
+        mvc.perform(
+                        get("/orders/getMyOrders")
+                                .header("Origin", "http://localhost:5174")
+                                .header("Authorization", "Bearer client"))
+                .andExpect(status().isForbidden())
+                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
+        verifyNoInteractions(context.getBean(OrderService.class));
+    }
+
+    @Test
+    void allowedBrowserOriginDoesNotBypassAuthenticationOrAdministrativePermissions()
+            throws Exception {
+        mvc.perform(get("/orders/getMyOrders").header("Origin", "http://localhost:5173"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
+        mvc.perform(
+                        get("/admin/orders/10/history")
+                                .header("Origin", "http://localhost:5173")
+                                .header("Authorization", "Bearer client"))
+                .andExpect(status().isForbidden())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
+        mvc.perform(
+                        get("/orders/getMyOrders")
+                                .header("Origin", "http://localhost:5173")
+                                .header("Authorization", "Bearer client"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"))
+                .andExpect(header().string("Access-Control-Expose-Headers", "Content-Disposition"));
+    }
+
+    @Test
+    void emailVerificationIsPublicButOtherUserOperationsRemainProtected() throws Exception {
+        for (String path :
+                List.of("/users/email-verification/confirm", "/users/email-verification/resend")) {
+            mvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                    .andExpect(status().isBadRequest());
+        }
+        mvc.perform(get("/users/profile")).andExpect(status().isUnauthorized());
     }
 }

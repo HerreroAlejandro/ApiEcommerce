@@ -12,6 +12,21 @@ import java.math.BigDecimal;
 @Table(name = "order_items")
 public class OrderItem {
 
+    @Column(nullable = false, columnDefinition = "integer default 0")
+    @Getter
+    @Setter
+    private int refundRequestedQuantity;
+
+    @Column(nullable = false, columnDefinition = "integer default 0")
+    @Getter
+    @Setter
+    private int refundedQuantity;
+
+    @Column(nullable = false, columnDefinition = "integer default 0")
+    @Getter
+    @Setter
+    private int canceledQuantity;
+
     @Column(name = "productName", nullable = false)
     @Getter
     @Setter
@@ -61,6 +76,10 @@ public class OrderItem {
     }
 
     public OrderItem() {}
+
+    public int getFulfillmentQuantity() {
+        return amountOrderItem - canceledQuantity;
+    }
 
     public BigDecimal getSubtotal() {
         return priceOrderItem.multiply(BigDecimal.valueOf(amountOrderItem));

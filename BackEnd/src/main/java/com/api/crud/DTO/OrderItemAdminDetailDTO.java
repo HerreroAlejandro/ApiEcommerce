@@ -49,4 +49,19 @@ public class OrderItemAdminDetailDTO {
     @Getter
     @Setter
     private BigDecimal subtotal;
+    @Getter
+    @Setter
+    private int refundRequestedQuantity;
+
+    @Getter
+    @Setter
+    private int refundedQuantity;
+
+    @Getter
+    @Setter
+    private int canceledQuantity;
+
+    @Getter
+    @Setter
+    private int fulfillmentQuantity;
 }

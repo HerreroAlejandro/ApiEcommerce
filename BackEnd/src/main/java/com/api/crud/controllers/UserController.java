@@ -3,6 +3,7 @@ package com.api.crud.controllers;
 import com.api.crud.DTO.*;
 import com.api.crud.config.JWTUtil;
 import com.api.crud.exceptions.ResourceNotFoundException;
+import com.api.crud.services.EmailVerificationService;
 import com.api.crud.services.UserService;
 
 import jakarta.validation.Valid;
@@ -30,6 +31,9 @@ public class UserController {
     private UserService userService;
 
     @Autowired
+    private EmailVerificationService emailVerificationService;
+
+    @Autowired
     private JWTUtil jwtUtil;
 
     @Autowired
@@ -38,7 +42,23 @@ public class UserController {
     @PostMapping(path = "/register")
     public ResponseEntity<String> register(@Valid @RequestBody UserRegisterDTO userRegisterDTO) {
         userService.register(userRegisterDTO);
-        return ResponseEntity.status(HttpStatus.CREATED).body("User created successfully");
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body("Cuenta pendiente de verificacion. Revise su correo o solicite un reenvio.");
+    }
+
+    @PostMapping("/email-verification/resend")
+    public ResponseEntity<String> resendEmailVerification(
+            @Valid @RequestBody AccountRecoveryRequestDTO dto) {
+        emailVerificationService.resend(dto.getEmail());
+        return ResponseEntity.ok(
+                "Si la cuenta permite la verificacion, recibira instrucciones por correo.");
+    }
+
+    @PostMapping("/email-verification/confirm")
+    public ResponseEntity<String> confirmEmail(
+            @Valid @RequestBody EmailVerificationRequestDTO dto) {
+        emailVerificationService.confirm(dto.getToken());
+        return ResponseEntity.ok("Correo verificado. Ya puede iniciar sesion.");
     }
 
     @PostMapping(path = "/login")
@@ -104,7 +124,8 @@ public class UserController {
         logger.info("Received password reset request");
         userService.requestPasswordReset(dto.getEmail());
         return ResponseEntity.ok(
-                "If an account exists with this email, password reset instructions have been sent.");
+                "If an account exists with this email, password reset instructions have been"
+                    + " sent.");
     }
 
     @PatchMapping("/password-recovery/reset")

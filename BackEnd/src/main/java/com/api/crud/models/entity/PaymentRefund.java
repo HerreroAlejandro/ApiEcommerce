@@ -9,10 +9,26 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "payment_refunds")
 public class PaymentRefund {
+
+    @Column(nullable = false, columnDefinition = "boolean default false", updatable = false)
+    @Getter
+    @Setter
+    private boolean itemized;
+
+    @ElementCollection
+    @CollectionTable(
+            name = "refund_item_allocations",
+            joinColumns = @JoinColumn(name = "refund_id"),
+            uniqueConstraints = @UniqueConstraint(columnNames = {"refund_id", "orderItemId"}))
+    @Getter
+    @Setter
+    private List<RefundItemAllocation> items = new ArrayList<>();
 
     @Id
     @Column(length = 36)
@@ -23,8 +39,17 @@ public class PaymentRefund {
     @Version
     private Long version;
 
-    @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "payment_id", nullable = false, unique = true, updatable = false)
+    @Column(length = 36)
+    @Setter
+    private String currentAttemptId;
+
+    @Column(nullable = false, columnDefinition = "integer default 1")
+    @Getter
+    @Setter
+    private int attemptNumber = 1;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "payment_id", nullable = false, updatable = false)
     @Getter
     @Setter
     private Payment payment;
@@ -87,4 +112,8 @@ public class PaymentRefund {
     @Getter
     @Setter
     private String rejectionReason;
+
+    public String getCurrentAttemptId() {
+        return currentAttemptId == null ? id : currentAttemptId;
+    }
 }

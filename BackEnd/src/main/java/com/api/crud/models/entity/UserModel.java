@@ -77,6 +77,12 @@ public class UserModel {
     @Setter
     private AccountStatus status = AccountStatus.ACTIVE;
 
+    // Existing accounts remain usable; public registration explicitly sets this to false.
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    @Getter
+    @Setter
+    private boolean emailVerified = true;
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "user_roles",

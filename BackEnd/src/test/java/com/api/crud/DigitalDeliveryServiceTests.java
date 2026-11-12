@@ -19,8 +19,8 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 
-import java.math.BigDecimal;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.*;
@@ -140,7 +140,8 @@ class DigitalDeliveryServiceTests {
         assertNull(delivery.getTokenExpiresAt());
         assertEquals(firstAttempt, delivery.getAttemptedAt());
         assertEquals(1, delivery.getAttemptCount());
-        assertThrows(BusinessConflictException.class,
+        assertThrows(
+                BusinessConflictException.class,
                 () -> service.claim("buyer@example.com", 20L, first.getToken()));
         var replacement = service.issueToken("buyer@example.com", 20L);
         assertNotEquals(first.getToken(), replacement.getToken());
@@ -155,15 +156,21 @@ class DigitalDeliveryServiceTests {
         var token = service.issueToken("buyer@example.com", 20L);
         DigitalDeliveryController controller = new DigitalDeliveryController(service, files);
         var auth = new UsernamePasswordAuthenticationToken("buyer@example.com", null);
-        doThrow(new IOException("Transferencia interrumpida"))
-                .when(files).stream(any(), any());
-        assertThrows(IOException.class, () -> controller.download(
-                auth, 20L, token.getToken(),
-                new MockHttpServletRequest("GET", "/digital-deliveries/20/download"),
-                new MockHttpServletResponse()));
+        doThrow(new IOException("Transferencia interrumpida")).when(files).stream(any(), any());
+        assertThrows(
+                IOException.class,
+                () ->
+                        controller.download(
+                                auth,
+                                20L,
+                                token.getToken(),
+                                new MockHttpServletRequest(
+                                        "GET", "/digital-deliveries/20/download"),
+                                new MockHttpServletResponse()));
         assertEquals(DigitalDeliveryStatus.USED, delivery.getStatus());
         assertEquals(1, delivery.getAttemptCount());
-        assertThrows(BusinessConflictException.class,
+        assertThrows(
+                BusinessConflictException.class,
                 () -> service.issueToken("buyer@example.com", 20L));
     }
 
@@ -172,26 +179,30 @@ class DigitalDeliveryServiceTests {
         var token = service.issueToken("buyer@example.com", 20L);
         ReentrantLock lock = new ReentrantLock();
         // Models the transaction's database lock; this does not replace a MySQL integration test.
-        when(workflow.lockOrder(10L)).thenAnswer(call -> {
-            lock.lock();
-            return order;
-        });
+        when(workflow.lockOrder(10L))
+                .thenAnswer(
+                        call -> {
+                            lock.lock();
+                            return order;
+                        });
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
             List<Future<Boolean>> attempts = new ArrayList<>();
             for (int i = 0; i < 2; i++) {
-                attempts.add(executor.submit(() -> {
-                    assertTrue(start.await(5, TimeUnit.SECONDS));
-                    try {
-                        service.claim("buyer@example.com", 20L, token.getToken());
-                        return true;
-                    } catch (BusinessConflictException exception) {
-                        return false;
-                    } finally {
-                        if (lock.isHeldByCurrentThread()) lock.unlock();
-                    }
-                }));
+                attempts.add(
+                        executor.submit(
+                                () -> {
+                                    assertTrue(start.await(5, TimeUnit.SECONDS));
+                                    try {
+                                        service.claim("buyer@example.com", 20L, token.getToken());
+                                        return true;
+                                    } catch (BusinessConflictException exception) {
+                                        return false;
+                                    } finally {
+                                        if (lock.isHeldByCurrentThread()) lock.unlock();
+                                    }
+                                }));
             }
             start.countDown();
             int successful = 0;
@@ -259,11 +270,14 @@ class DigitalDeliveryServiceTests {
         var token = service.issueToken("buyer@example.com", 20L);
         for (PaymentStatus status : List.of(PaymentStatus.REVIEW, PaymentStatus.REFUNDED)) {
             order.setPaymentStatus(status);
-            assertThrows(BusinessConflictException.class,
+            assertThrows(
+                    BusinessConflictException.class,
                     () -> service.claim("buyer@example.com", 20L, token.getToken()));
-            assertThrows(BusinessConflictException.class,
+            assertThrows(
+                    BusinessConflictException.class,
                     () -> service.issueToken("buyer@example.com", 20L));
-            assertThrows(BusinessConflictException.class,
+            assertThrows(
+                    BusinessConflictException.class,
                     () -> service.reopen("admin@example.com", 20L, "Nuevo intento"));
         }
         assertEquals(0, delivery.getAttemptCount());
@@ -314,5 +328,52 @@ class DigitalDeliveryServiceTests {
                 ExternalServiceException.class, () -> service.issueToken("buyer@example.com", 20L));
         assertEquals(DigitalDeliveryStatus.AVAILABLE, delivery.getStatus());
         assertNull(delivery.getTokenHash());
+    }
+
+    @Test
+    void partialRefundRevokesOnlySelectedDigitalItemAndOtherItemRemainsDownloadable() {
+        OrderItem otherItem = new OrderItem(order, new ProductDigital(), 1, BigDecimal.TEN);
+        otherItem.setIdOrderItem(12L);
+        var other = new DigitalDelivery();
+        other.setOrderItem(otherItem);
+        other.setStatus(DigitalDeliveryStatus.AVAILABLE);
+        other.setTokenHash("existing");
+        when(deliveries.getByOrderId(10L)).thenReturn(List.of(delivery, other));
+        service.revokeItems(order, Set.of(12L));
+        assertEquals(DigitalDeliveryStatus.REVOKED, other.getStatus());
+        assertNull(other.getTokenHash());
+        assertEquals(DigitalDeliveryStatus.AVAILABLE, delivery.getStatus());
+        order.setPaymentStatus(PaymentStatus.PARTIALLY_REFUNDED);
+        assertNotNull(service.issueToken("buyer@example.com", 20L).getToken());
+    }
+
+    @Test
+    void wonChargebackRestoresOnlyUnrefundedAccessWithoutGrantingAnotherDownload() {
+        delivery.setStatus(DigitalDeliveryStatus.REVOKED);
+        delivery.setTokenHash("old-token");
+        service.restorePaidOrderAccess(order);
+        assertEquals(DigitalDeliveryStatus.AVAILABLE, delivery.getStatus());
+        assertNull(delivery.getTokenHash());
+        delivery.setStatus(DigitalDeliveryStatus.REVOKED);
+        delivery.setAttemptCount(1);
+        service.restorePaidOrderAccess(order);
+        assertEquals(DigitalDeliveryStatus.USED, delivery.getStatus());
+        delivery.setStatus(DigitalDeliveryStatus.REVOKED);
+        item.setRefundRequestedQuantity(1);
+        service.restorePaidOrderAccess(order);
+        assertEquals(DigitalDeliveryStatus.REVOKED, delivery.getStatus());
+        order.setOrderStatus(OrderStatus.CANCELED);
+        assertThrows(BusinessConflictException.class, () -> service.restorePaidOrderAccess(order));
+    }
+
+    @Test
+    void recoveryCreatesMissingEntitlementsOnlyForUnrefundedItems() {
+        when(deliveries.getByOrderId(10L)).thenReturn(List.of());
+        item.setRefundRequestedQuantity(1);
+        service.restorePaidOrderAccess(order);
+        verify(deliveries, never()).save(any());
+        item.setRefundRequestedQuantity(0);
+        service.restorePaidOrderAccess(order);
+        verify(deliveries).save(any());
     }
 }

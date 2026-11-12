@@ -173,4 +173,10 @@ class JWTAuthenticationTests {
         assertEquals(0L, user.getAuthVersion());
         assertTrue(accepted(previous));
     }
+
+    @Test
+    void unverifiedAccountsCannotUseEvenOtherwiseValidTokens() throws Exception {
+        user.setEmailVerified(false);
+        assertFalse(accepted(token()));
+    }
 }

@@ -28,6 +28,7 @@ import java.net.http.HttpResponse;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 class MercadoPagoClientTests {
 
@@ -114,6 +115,10 @@ class MercadoPagoClientTests {
         client.refundPayment(refund);
         assertEquals(firstBody, client.payload);
         assertEquals(refund.getId(), client.key);
+        refund.setCurrentAttemptId("7126952c-0de6-4d25-a07d-717c496cd30c");
+        client.refundPayment(refund);
+        assertEquals(refund.getCurrentAttemptId(), client.key);
+        assertEquals(firstBody, client.payload);
         refund.setProviderOrderId("ORDTST999");
         assertThrows(ExternalServiceException.class, () -> client.refundPayment(refund));
     }
@@ -206,6 +211,7 @@ class MercadoPagoClientTests {
     private MercadoPagoProperties properties() {
         MercadoPagoProperties properties = new MercadoPagoProperties();
         properties.setEnabled(true);
+        properties.setCollectorId("99");
         properties.setReturnUrl("https://shop.example/payment-result");
         return properties;
     }
@@ -272,6 +278,13 @@ class MercadoPagoClientTests {
         assertTrue(
                 client.payload
                         .path("config")
+                        .path("online")
+                        .path("retries")
+                        .path("allowed")
+                        .asBoolean());
+        assertTrue(
+                client.payload
+                        .path("config")
                         .path("payment_method")
                         .path("not_allowed_types")
                         .toString()
@@ -334,6 +347,9 @@ class MercadoPagoClientTests {
         assertEquals(
                 new BigDecimal("50.00"),
                 client.getOrder("ORDTST123").payments().get(0).refundedAmount());
+        assertEquals(
+                Set.of("REF1"),
+                client.getOrder("ORDTST123").payments().get(0).confirmedRefundIds());
         transactions
                 .withArray("refunds")
                 .addObject()
@@ -374,5 +390,112 @@ class MercadoPagoClientTests {
         assertTrue(result.unsettledRefundPaymentIds().contains("PAY123"));
         assertEquals(0, result.payments().get(0).refundedAmount().signum());
         assertEquals("approved", result.payments().get(0).status());
+    }
+
+    @Test
+    void canonicalOrderExposesCaseAndNumericPaymentReferencesWithoutTrustingWebhookBody()
+            throws Exception {
+        FakeClient client = new FakeClient(properties());
+        client.response = remoteOrder();
+        ObjectNode transaction =
+                (ObjectNode) client.response.path("transactions").path("payments").get(0);
+        transaction.put("reference_id", "123456");
+        transaction.put("status", "charged_back");
+        transaction.put("status_detail", "reimbursed");
+        ((ObjectNode) client.response.path("transactions"))
+                .putArray("chargebacks")
+                .addObject()
+                .put("transaction_id", "PAY123")
+                .put("case_id", "9988");
+        var snapshot = client.getOrder("ORDTST123").payments().get(0);
+        assertEquals(Set.of("9988"), snapshot.chargebackCaseIds());
+        assertEquals("123456", snapshot.numericPaymentId());
+        assertEquals("reimbursed", snapshot.statusDetail());
+        assertEquals("charged_back", snapshot.status());
+        transaction.put("status", "processed").put("status_detail", "partially_refunded");
+        ((ObjectNode) client.response.path("transactions"))
+                .putArray("refunds")
+                .addObject()
+                .put("id", "REF123")
+                .put("transaction_id", "PAY123")
+                .put("amount", "50.00")
+                .put("status", "processed");
+        var partiallyRefunded = client.getOrder("ORDTST123").payments().get(0);
+        assertEquals("approved", partiallyRefunded.status());
+        assertEquals(Set.of("9988"), partiallyRefunded.chargebackCaseIds());
+    }
+
+    @Test
+    void chargebackConsultationPreservesUnresolvedCoverageAndRejectsMixedModeOrMalformedResponses()
+            throws Exception {
+        FakeClient client = new FakeClient(properties());
+        client.response =
+                new ObjectMapper()
+                        .readTree(
+                                """
+{"id":"9988","payments":[123456],"currency":"ARS","amount":"50.00","reason":"unauthorized",
+ "coverage_applied":null,"documentation_status":"pending","live_mode":false,
+ "date_last_updated":"2026-01-01T00:00:00Z"}
+""");
+        var result = client.getChargeback("9988");
+        assertNull(result.coverageApplied());
+        assertEquals("/v1/chargebacks/9988", client.path);
+        assertEquals(Set.of("123456"), result.paymentIds());
+        ((ObjectNode) client.response).put("coverage_applied", false);
+        assertEquals(Boolean.FALSE, client.getChargeback("9988").coverageApplied());
+        ((ObjectNode) client.response).put("live_mode", true);
+        assertThrows(ExternalServiceException.class, () -> client.getChargeback("9988"));
+        assertThrows(ExternalServiceException.class, () -> client.getChargeback("../orders"));
+    }
+
+    @Test
+    void chargebackHttpRequestIncludesSellerIdentityHeader() throws Exception {
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(200);
+        when(response.body())
+                .thenReturn(
+                        """
+{"id":"9988","payments":[123456],"currency":"ARS","amount":"50.00","reason":"unauthorized",
+ "coverage_applied":true,"documentation_status":"valid","live_mode":false,
+ "date_last_updated":"2026-01-01T00:00:00Z"}
+""");
+        MercadoPagoClient client =
+                new MercadoPagoClient(properties(), new ObjectMapper()) {
+                    @Override
+                    protected HttpResponse<String> send(HttpRequest request) {
+                        assertEquals(
+                                "99", request.headers().firstValue("X-Caller-Id").orElseThrow());
+                        assertEquals("GET", request.method());
+                        return response;
+                    }
+                };
+        assertEquals(Boolean.TRUE, client.getChargeback("9988").coverageApplied());
+    }
+
+    @Test
+    void legacyCheckoutRetainsDisabledRetriesAndItsExactIdempotentRequest() throws Exception {
+        FakeClient client = new FakeClient(properties());
+        client.response =
+                new ObjectMapper()
+                        .readTree(
+                                """
+{"id":"ORDTST123","type":"online","processing_mode":"manual",
+ "checkout_url":"https://www.mercadopago.com.ar/checkout/v1/redirect?order_id=ORDTST123",
+ "external_reference":"reference-1","user_id":"99","currency":"ARS","total_amount":"250.00"}
+""");
+        PaymentCheckout legacyCheckout = checkout();
+        ObjectNode legacyBody =
+                (ObjectNode)
+                        new ObjectMapper().readTree(client.prepareOrderRequest(legacyCheckout));
+        ((ObjectNode) legacyBody.path("config").path("online").path("retries"))
+                .put("allowed", false);
+        String persistedRequest = legacyBody.toString();
+        legacyCheckout.setRequestBody(persistedRequest);
+        client.createOrder(legacyCheckout);
+        client.createOrder(legacyCheckout);
+        assertEquals(legacyBody, client.payload);
+        assertEquals(persistedRequest, legacyCheckout.getRequestBody());
+        assertEquals(legacyCheckout.getReference(), client.key);
     }
 }

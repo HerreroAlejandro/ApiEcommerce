@@ -47,7 +47,8 @@ public class ProductDaoImp implements ProductDao {
             Boolean inStock,
             Pageable pageable) {
         logger.debug(
-                "Executing product catalog query - name: {}, category: {}, type: {}, minPrice: {}, maxPrice: {}, inStock: {}",
+                "Executing product catalog query - name: {}, category: {}, type: {}, minPrice: {},"
+                    + " maxPrice: {}, inStock: {}",
                 name,
                 category,
                 type,
@@ -57,46 +58,45 @@ public class ProductDaoImp implements ProductDao {
         StringBuilder jpql =
                 new StringBuilder(
                         """
-            SELECT p
-            FROM Product p
-            WHERE p.active = true
-            """);
+                        SELECT p
+                        FROM Product p
+                        WHERE p.active = true
+                        """);
         if (name != null && !name.trim().isEmpty()) {
             jpql.append(
                     """
-                AND LOWER(p.nameProduct) LIKE LOWER(:name)
-                """);
+                    AND LOWER(p.nameProduct) LIKE LOWER(:name)
+                    """);
         }
         if (category != null && !category.trim().isEmpty()) {
             jpql.append(
                     """
-                AND LOWER(p.category) = LOWER(:category)
-                """);
+                    AND LOWER(p.category) = LOWER(:category)
+                    """);
         }
         if (type != null) {
             jpql.append(
                     """
-                AND p.type = :type
-                """);
+                    AND p.type = :type
+                    """);
         }
         if (minPrice != null) {
             jpql.append(
                     """
-                AND p.priceProduct >= :minPrice
-                """);
+                    AND p.priceProduct >= :minPrice
+                    """);
         }
         if (maxPrice != null) {
             jpql.append(
                     """
-                AND p.priceProduct <= :maxPrice
-                """);
+                    AND p.priceProduct <= :maxPrice
+                    """);
         }
         if (Boolean.TRUE.equals(inStock)) {
             jpql.append(
                     """
-                AND TYPE(p) = ProductPhysical
-                AND TREAT(p AS ProductPhysical).stockProduct > 0
-                """);
+                    AND (TYPE(p) = ProductDigital OR TREAT(p AS ProductPhysical).stockProduct > 0)
+                    """);
         }
         // Ordenamiento
         String sortProperty = "idProduct";
@@ -152,7 +152,8 @@ public class ProductDaoImp implements ProductDao {
             BigDecimal maxPrice,
             Boolean inStock) {
         logger.debug(
-                "Executing product catalog count query - name: {}, category: {}, type: {}, minPrice: {}, maxPrice: {}, inStock: {}",
+                "Executing product catalog count query - name: {}, category: {}, type: {},"
+                    + " minPrice: {}, maxPrice: {}, inStock: {}",
                 name,
                 category,
                 type,
@@ -162,46 +163,45 @@ public class ProductDaoImp implements ProductDao {
         StringBuilder jpql =
                 new StringBuilder(
                         """
-            SELECT COUNT(p)
-            FROM Product p
-            WHERE p.active = true
-            """);
+                        SELECT COUNT(p)
+                        FROM Product p
+                        WHERE p.active = true
+                        """);
         if (name != null && !name.trim().isEmpty()) {
             jpql.append(
                     """
-                AND LOWER(p.nameProduct) LIKE LOWER(:name)
-                """);
+                    AND LOWER(p.nameProduct) LIKE LOWER(:name)
+                    """);
         }
         if (category != null && !category.trim().isEmpty()) {
             jpql.append(
                     """
-                AND LOWER(p.category) = LOWER(:category)
-                """);
+                    AND LOWER(p.category) = LOWER(:category)
+                    """);
         }
         if (type != null) {
             jpql.append(
                     """
-                AND p.type = :type
-                """);
+                    AND p.type = :type
+                    """);
         }
         if (minPrice != null) {
             jpql.append(
                     """
-                AND p.priceProduct >= :minPrice
-                """);
+                    AND p.priceProduct >= :minPrice
+                    """);
         }
         if (maxPrice != null) {
             jpql.append(
                     """
-                AND p.priceProduct <= :maxPrice
-                """);
+                    AND p.priceProduct <= :maxPrice
+                    """);
         }
         if (Boolean.TRUE.equals(inStock)) {
             jpql.append(
                     """
-                AND TYPE(p) = ProductPhysical
-                AND TREAT(p AS ProductPhysical).stockProduct > 0
-                """);
+                    AND (TYPE(p) = ProductDigital OR TREAT(p AS ProductPhysical).stockProduct > 0)
+                    """);
         }
         TypedQuery<Long> query = entityManager.createQuery(jpql.toString(), Long.class);
         if (name != null && !name.trim().isEmpty()) {
@@ -233,7 +233,8 @@ public class ProductDaoImp implements ProductDao {
             Boolean inStock,
             Pageable pageable) {
         logger.debug(
-                "Executing admin product catalog query - name: {}, category: {}, type: {}, minPrice: {}, maxPrice: {}, active: {}, inStock: {}",
+                "Executing admin product catalog query - name: {}, category: {}, type: {},"
+                    + " minPrice: {}, maxPrice: {}, active: {}, inStock: {}",
                 name,
                 category,
                 type,
@@ -244,59 +245,59 @@ public class ProductDaoImp implements ProductDao {
         StringBuilder jpql =
                 new StringBuilder(
                         """
-            SELECT p
-            FROM Product p
-            WHERE 1 = 1
-            """);
+                        SELECT p
+                        FROM Product p
+                        WHERE 1 = 1
+                        """);
         if (name != null && !name.trim().isEmpty()) {
             jpql.append(
                     """
-                AND LOWER(p.nameProduct) LIKE LOWER(:name)
-                """);
+                    AND LOWER(p.nameProduct) LIKE LOWER(:name)
+                    """);
         }
         if (category != null && !category.trim().isEmpty()) {
             jpql.append(
                     """
-                AND LOWER(p.category) = LOWER(:category)
-                """);
+                    AND LOWER(p.category) = LOWER(:category)
+                    """);
         }
         if (type != null) {
             jpql.append(
                     """
-                AND p.type = :type
-                """);
+                    AND p.type = :type
+                    """);
         }
         if (minPrice != null) {
             jpql.append(
                     """
-                AND p.priceProduct >= :minPrice
-                """);
+                    AND p.priceProduct >= :minPrice
+                    """);
         }
         if (maxPrice != null) {
             jpql.append(
                     """
-                AND p.priceProduct <= :maxPrice
-                """);
+                    AND p.priceProduct <= :maxPrice
+                    """);
         }
         if (active != null) {
             jpql.append(
                     """
-                AND p.active = :active
-                """);
+                    AND p.active = :active
+                    """);
         }
         if (Boolean.TRUE.equals(inStock)) {
             jpql.append(
                     """
-                AND TYPE(p) = ProductPhysical
-                AND TREAT(p AS ProductPhysical).stockProduct > 0
-                """);
+                    AND TYPE(p) = ProductPhysical
+                    AND TREAT(p AS ProductPhysical).stockProduct > 0
+                    """);
         }
         if (Boolean.FALSE.equals(inStock)) {
             jpql.append(
                     """
-                AND TYPE(p) = ProductPhysical
-                AND TREAT(p AS ProductPhysical).stockProduct = 0
-                """);
+                    AND TYPE(p) = ProductPhysical
+                    AND TREAT(p AS ProductPhysical).stockProduct = 0
+                    """);
         }
         String sortProperty = "idProduct";
         String sortDirection = "ASC";
@@ -360,59 +361,59 @@ public class ProductDaoImp implements ProductDao {
         StringBuilder jpql =
                 new StringBuilder(
                         """
-            SELECT COUNT(p)
-            FROM Product p
-            WHERE 1 = 1
-            """);
+                        SELECT COUNT(p)
+                        FROM Product p
+                        WHERE 1 = 1
+                        """);
         if (name != null && !name.trim().isEmpty()) {
             jpql.append(
                     """
-                AND LOWER(p.nameProduct) LIKE LOWER(:name)
-                """);
+                    AND LOWER(p.nameProduct) LIKE LOWER(:name)
+                    """);
         }
         if (category != null && !category.trim().isEmpty()) {
             jpql.append(
                     """
-                AND LOWER(p.category) = LOWER(:category)
-                """);
+                    AND LOWER(p.category) = LOWER(:category)
+                    """);
         }
         if (type != null) {
             jpql.append(
                     """
-                AND p.type = :type
-                """);
+                    AND p.type = :type
+                    """);
         }
         if (minPrice != null) {
             jpql.append(
                     """
-                AND p.priceProduct >= :minPrice
-                """);
+                    AND p.priceProduct >= :minPrice
+                    """);
         }
         if (maxPrice != null) {
             jpql.append(
                     """
-                AND p.priceProduct <= :maxPrice
-                """);
+                    AND p.priceProduct <= :maxPrice
+                    """);
         }
         if (active != null) {
             jpql.append(
                     """
-                AND p.active = :active
-                """);
+                    AND p.active = :active
+                    """);
         }
         if (Boolean.TRUE.equals(inStock)) {
             jpql.append(
                     """
-                AND TYPE(p) = ProductPhysical
-                AND TREAT(p AS ProductPhysical).stockProduct > 0
-                """);
+                    AND TYPE(p) = ProductPhysical
+                    AND TREAT(p AS ProductPhysical).stockProduct > 0
+                    """);
         }
         if (Boolean.FALSE.equals(inStock)) {
             jpql.append(
                     """
-                AND TYPE(p) = ProductPhysical
-                AND TREAT(p AS ProductPhysical).stockProduct = 0
-                """);
+                    AND TYPE(p) = ProductPhysical
+                    AND TREAT(p AS ProductPhysical).stockProduct = 0
+                    """);
         }
         TypedQuery<Long> query = entityManager.createQuery(jpql.toString(), Long.class);
         if (name != null && !name.trim().isEmpty()) {
@@ -442,10 +443,10 @@ public class ProductDaoImp implements ProductDao {
         Optional<Product> response;
         String jpql =
                 """
-            SELECT p
-            FROM Product p
-            WHERE p.idProduct = :idProduct
-            """;
+                SELECT p
+                FROM Product p
+                WHERE p.idProduct = :idProduct
+                """;
         try {
             Product product =
                     entityManager
@@ -462,26 +463,32 @@ public class ProductDaoImp implements ProductDao {
 
     @Override
     public boolean hasProductReferences(Long idProduct) {
-        return !entityManager.createQuery(
-                        "SELECT i.idCartItem FROM CartItem i WHERE i.productCartItem.idProduct = :id",
-                        Long.class)
-                .setParameter("id", idProduct)
-                .setMaxResults(1)
-                .getResultList()
-                .isEmpty()
-                || !entityManager.createQuery(
-                        "SELECT i.idOrderItem FROM OrderItem i WHERE i.productOrderItem.idProduct = :id",
-                        Long.class)
-                .setParameter("id", idProduct)
-                .setMaxResults(1)
-                .getResultList()
-                .isEmpty()
-                || !entityManager.createQuery(
-                        "SELECT a.id FROM CartChangeAudit a WHERE a.productId = :id", Long.class)
-                .setParameter("id", idProduct)
-                .setMaxResults(1)
-                .getResultList()
-                .isEmpty();
+        return !entityManager
+                        .createQuery(
+                                "SELECT i.idCartItem FROM CartItem i WHERE"
+                                    + " i.productCartItem.idProduct = :id",
+                                Long.class)
+                        .setParameter("id", idProduct)
+                        .setMaxResults(1)
+                        .getResultList()
+                        .isEmpty()
+                || !entityManager
+                        .createQuery(
+                                "SELECT i.idOrderItem FROM OrderItem i WHERE"
+                                    + " i.productOrderItem.idProduct = :id",
+                                Long.class)
+                        .setParameter("id", idProduct)
+                        .setMaxResults(1)
+                        .getResultList()
+                        .isEmpty()
+                || !entityManager
+                        .createQuery(
+                                "SELECT a.id FROM CartChangeAudit a WHERE a.productId = :id",
+                                Long.class)
+                        .setParameter("id", idProduct)
+                        .setMaxResults(1)
+                        .getResultList()
+                        .isEmpty();
     }
 
     @Override

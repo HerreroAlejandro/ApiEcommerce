@@ -61,6 +61,7 @@ public class JWTFilter extends OncePerRequestFilter {
         Long version = jwtUtil.extractAuthVersion(token);
         if (user.isEmpty()
                 || user.get().getStatus() != AccountStatus.ACTIVE
+                || !user.get().isEmailVerified()
                 || version == null
                 || version != user.get().getAuthVersion()) return;
         var authorities =

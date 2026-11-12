@@ -69,7 +69,8 @@ public class DigitalDeliveryService {
     }
 
     private void requirePaid(Order order) {
-        if (order.getPaymentStatus() != PaymentStatus.PAID
+        if ((order.getPaymentStatus() != PaymentStatus.PAID
+                        && order.getPaymentStatus() != PaymentStatus.PARTIALLY_REFUNDED)
                 || order.getOrderStatus() == OrderStatus.CANCELED
                 || order.getOrderStatus() == OrderStatus.EXPIRED) {
             throw new BusinessConflictException("La compra no habilita la descarga");
@@ -113,6 +114,8 @@ public class DigitalDeliveryService {
                 .forEach(delivery -> existing.add(delivery.getOrderItem().getIdOrderItem()));
         for (OrderItem item : order.getItemsOrder()) {
             if (!(item.getProductOrderItem() instanceof ProductDigital)
+                    || item.getRefundRequestedQuantity() > 0
+                    || item.getFulfillmentQuantity() <= 0
                     || existing.contains(item.getIdOrderItem())) continue;
             if (item.getDigitalDownloadLink() == null || item.getDigitalDownloadLink().isBlank()) {
                 throw new BusinessConflictException(
@@ -132,6 +135,33 @@ public class DigitalDeliveryService {
         for (DigitalDelivery delivery : deliveries.getByOrderId(order.getIdOrder())) {
             delivery.setStatus(DigitalDeliveryStatus.REVOKED);
             delivery.setRevokedAt(LocalDateTime.now());
+            invalidateToken(delivery);
+        }
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void revokeItems(Order order, Set<Long> itemIds) {
+        for (DigitalDelivery delivery : deliveries.getByOrderId(order.getIdOrder())) {
+            if (!itemIds.contains(delivery.getOrderItem().getIdOrderItem())) continue;
+            delivery.setStatus(DigitalDeliveryStatus.REVOKED);
+            delivery.setRevokedAt(LocalDateTime.now());
+            invalidateToken(delivery);
+        }
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void restorePaidOrderAccess(Order order) {
+        requirePaid(order);
+        enablePaidOrder(order);
+        for (DigitalDelivery delivery : deliveries.getByOrderId(order.getIdOrder())) {
+            if (delivery.getStatus() != DigitalDeliveryStatus.REVOKED
+                    || delivery.getOrderItem().getRefundRequestedQuantity() > 0
+                    || delivery.getOrderItem().getFulfillmentQuantity() <= 0) continue;
+            delivery.setStatus(
+                    delivery.getAttemptCount() == 0
+                            ? DigitalDeliveryStatus.AVAILABLE
+                            : DigitalDeliveryStatus.USED);
+            delivery.setRevokedAt(null);
             invalidateToken(delivery);
         }
     }

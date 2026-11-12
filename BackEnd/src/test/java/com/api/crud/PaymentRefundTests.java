@@ -3,6 +3,8 @@ package com.api.crud;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import com.api.crud.DTO.ItemRefundLineRequestDTO;
+import com.api.crud.DTO.ItemRefundRequestDTO;
 import com.api.crud.DTO.PaymentRefundResponseDTO;
 import com.api.crud.config.*;
 import com.api.crud.exceptions.*;
@@ -14,15 +16,21 @@ import com.api.crud.services.*;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.locks.ReentrantLock;
 
 class PaymentRefundTests {
 
     private PaymentDao payments;
     private PaymentRefundDao refunds;
+    private PaymentRefundAttemptDao attempts;
+    private Map<String, PaymentRefundAttempt> attemptRecords;
     private OrderWorkflowDao workflow;
     private DigitalDeliveryService deliveries;
     private PhysicalReturnService physicalReturns;
@@ -64,6 +72,36 @@ class PaymentRefundTests {
     void setUp() {
         payments = mock(PaymentDao.class);
         refunds = mock(PaymentRefundDao.class);
+        attempts = mock(PaymentRefundAttemptDao.class);
+        attemptRecords = new HashMap<>();
+        when(attempts.getById(anyString()))
+                .thenAnswer(call -> Optional.ofNullable(attemptRecords.get(call.getArgument(0))));
+        doAnswer(
+                        call -> {
+                            PaymentRefundAttempt attempt = call.getArgument(0);
+                            attemptRecords.put(attempt.getId(), attempt);
+                            return null;
+                        })
+                .when(attempts)
+                .save(any());
+        when(attempts.getByRefundId(anyString(), any()))
+                .thenAnswer(
+                        call ->
+                                new PageImpl<>(
+                                        attemptRecords.values().stream()
+                                                .filter(
+                                                        attempt ->
+                                                                attempt.getRefund()
+                                                                        .getId()
+                                                                        .equals(
+                                                                                call.getArgument(
+                                                                                        0)))
+                                                .sorted(
+                                                        Comparator.comparingInt(
+                                                                        PaymentRefundAttempt
+                                                                                ::getAttemptNumber)
+                                                                .reversed())
+                                                .toList()));
         workflow = mock(OrderWorkflowDao.class);
         deliveries = mock(DigitalDeliveryService.class);
         client = mock(MercadoPagoClient.class);
@@ -101,7 +139,11 @@ class PaymentRefundTests {
         when(payments.getById(5L)).thenReturn(Optional.of(payment));
         when(workflow.lockOrder(10L)).thenReturn(order);
         saved = new HashMap<>();
-        when(refunds.getByPaymentId(5L)).thenAnswer(call -> saved.values().stream().findFirst());
+        when(refunds.getByPaymentId(5L))
+                .thenAnswer(
+                        call ->
+                                saved.values().stream()
+                                        .max(Comparator.comparing(PaymentRefund::getRequestedAt)));
         when(refunds.getById(anyString()))
                 .thenAnswer(call -> Optional.ofNullable(saved.get(call.getArgument(0))));
         doAnswer(
@@ -124,7 +166,8 @@ class PaymentRefundTests {
                         client,
                         deliveries,
                         new ModelMapperConfig().modelMapper(),
-                        physicalReturns);
+                        physicalReturns,
+                        attempts);
     }
 
     @Test
@@ -176,6 +219,140 @@ class PaymentRefundTests {
                                         "REFUND_REJECTED".equals(audit.getAction())
                                                 && audit.getReason()
                                                         .contains("cannot_refund_order")));
+    }
+
+    @Test
+    void manualRetryCreatesOneSuccessorAndKeepsRejectedAttemptHistoryAndOriginalIntent() {
+        String id = persistence.prepare("admin@example.com", 5L, "Cancelar compra");
+        when(client.refundPayment(any()))
+                .thenThrow(new RefundRejectedException("cannot_refund_order"));
+        when(client.getOrder("ORDTST123")).thenReturn(unchangedProviderOrder(Set.of()));
+        persistence.dispatch("admin@example.com", id);
+        PaymentRefundAttempt first = attemptRecords.get(id);
+        assertEquals(PaymentRefundStatus.REJECTED, first.getStatus());
+        admin.setId(8L);
+        persistence.prepareRetry("admin@example.com", 5L, id, "Causa corregida, reintento manual");
+        String successor = saved.get(id).getCurrentAttemptId();
+        assertNotEquals(id, successor);
+        assertEquals(2, saved.get(id).getAttemptNumber());
+        assertEquals(id, attemptRecords.get(successor).getPreviousAttemptId());
+        assertEquals(
+                "Causa corregida, reintento manual", attemptRecords.get(successor).getReason());
+        assertEquals("Cancelar compra", saved.get(id).getReason());
+        assertEquals(7L, saved.get(id).getActorUserId());
+        assertEquals(7L, first.getActorUserId());
+        assertEquals(8L, attemptRecords.get(successor).getActorUserId());
+        assertEquals(PaymentRefundStatus.REJECTED, first.getStatus());
+        assertNotNull(first.getRejectedAt());
+        assertNull(saved.get(id).getRejectedAt());
+        assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
+        assertEquals(id, persistence.prepareRetry("admin@example.com", 5L, id, "Reenvio HTTP"));
+        assertEquals(2, attemptRecords.size());
+        doReturn(new MercadoPagoClient.RefundReceipt("REF456")).when(client).refundPayment(any());
+        persistence.dispatch("admin@example.com", id);
+        persistence.dispatch("admin@example.com", id);
+        assertEquals(PaymentRefundStatus.PROCESSING, attemptRecords.get(successor).getStatus());
+        assertEquals("REF456", attemptRecords.get(successor).getProviderRefundId());
+        assertEquals(PaymentRefundStatus.REJECTED, first.getStatus());
+        var history = persistence.getAttempts("admin@example.com", 5L, PageRequest.of(0, 20));
+        assertEquals(2, history.getTotalElements());
+        assertEquals(successor, history.getContent().get(0).getId());
+        assertEquals("cannot_refund_order", history.getContent().get(1).getRejectionCode());
+        verify(client, times(2)).refundPayment(any());
+        verify(workflow)
+                .saveAudit(argThat(audit -> "REFUND_RETRY_REQUESTED".equals(audit.getAction())));
+    }
+
+    @Test
+    void uncertainProcessingAndConfirmedRequestsCannotCreateANewKey() {
+        String id = persistence.prepare("admin@example.com", 5L, "Cancelar");
+        for (PaymentRefundStatus state :
+                List.of(
+                        PaymentRefundStatus.REQUESTED,
+                        PaymentRefundStatus.PROCESSING,
+                        PaymentRefundStatus.CONFIRMED)) {
+            saved.get(id).setStatus(state);
+            attemptRecords.get(id).setStatus(state);
+            assertThrows(
+                    BusinessConflictException.class,
+                    () -> persistence.prepareRetry("admin@example.com", 5L, id, "Nuevo intento"));
+        }
+        assertEquals(id, saved.get(id).getCurrentAttemptId());
+        assertEquals(1, attemptRecords.size());
+        verifyNoInteractions(client);
+    }
+
+    @Test
+    void retryRevalidatesFinancialStateAndReplayingItsSourceNeverCreatesAThirdAttempt() {
+        String id = persistence.prepare("admin@example.com", 5L, "Cancelar");
+        when(client.refundPayment(any()))
+                .thenThrow(new RefundRejectedException("cannot_refund_order"));
+        when(client.getOrder("ORDTST123")).thenReturn(unchangedProviderOrder(Set.of()));
+        persistence.dispatch("admin@example.com", id);
+        when(client.getOrder("ORDTST123")).thenReturn(unchangedProviderOrder(Set.of("PAY123")));
+        assertThrows(
+                ExternalServiceException.class,
+                () -> persistence.prepareRetry("admin@example.com", 5L, id, "Corregido"));
+        assertEquals(1, attemptRecords.size());
+        when(client.getOrder("ORDTST123")).thenReturn(unchangedProviderOrder(Set.of()));
+        persistence.prepareRetry("admin@example.com", 5L, id, "Corregido");
+        persistence.dispatch("admin@example.com", id);
+        assertEquals(PaymentRefundStatus.REJECTED, saved.get(id).getStatus());
+        String second = saved.get(id).getCurrentAttemptId();
+        persistence.prepareRetry("admin@example.com", 5L, id, "Reenvio anterior");
+        assertEquals(second, saved.get(id).getCurrentAttemptId());
+        assertEquals(2, attemptRecords.size());
+        persistence.prepareRetry("admin@example.com", 5L, second, "Tercer intento expreso");
+        assertEquals(3, attemptRecords.size());
+        assertEquals(3, saved.get(id).getAttemptNumber());
+        assertThrows(
+                BusinessConflictException.class,
+                () -> persistence.prepareRetry("admin@example.com", 5L, id, "Peticion obsoleta"));
+    }
+
+    @Test
+    void simultaneousRetryPreparationsProduceOnlyOneSuccessorUnderTheOrderLock() throws Exception {
+        String id = persistence.prepare("admin@example.com", 5L, "Cancelar");
+        when(client.refundPayment(any()))
+                .thenThrow(new RefundRejectedException("cannot_refund_order"));
+        when(client.getOrder("ORDTST123")).thenReturn(unchangedProviderOrder(Set.of()));
+        persistence.dispatch("admin@example.com", id);
+        ReentrantLock lock = new ReentrantLock();
+        // Simulates the transaction-scoped write lock; MySQL integration remains pending.
+        when(workflow.lockOrder(10L))
+                .thenAnswer(
+                        call -> {
+                            lock.lock();
+                            return order;
+                        });
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            List<Future<String>> requests = new ArrayList<>();
+            for (int i = 0; i < 2; i++) {
+                requests.add(
+                        executor.submit(
+                                () -> {
+                                    assertTrue(start.await(5, TimeUnit.SECONDS));
+                                    try {
+                                        return persistence.prepareRetry(
+                                                "admin@example.com", 5L, id, "Causa corregida");
+                                    } finally {
+                                        if (lock.isHeldByCurrentThread()) lock.unlock();
+                                    }
+                                }));
+            }
+            start.countDown();
+            for (var request : requests) assertEquals(id, request.get(10, TimeUnit.SECONDS));
+            assertEquals(2, attemptRecords.size());
+            assertEquals(2, saved.get(id).getAttemptNumber());
+            assertEquals(
+                    id,
+                    attemptRecords.get(saved.get(id).getCurrentAttemptId()).getPreviousAttemptId());
+            verify(client).refundPayment(any());
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test
@@ -420,7 +597,7 @@ class PaymentRefundTests {
         when(confirmations.applyOrder(remote)).thenReturn(List.of());
         PaymentRefundResponseDTO response = new PaymentRefundResponseDTO();
         response.setStatus(PaymentRefundStatus.PROCESSING);
-        when(storage.getRefund("admin@example.com", 5L)).thenReturn(response);
+        when(storage.getRefundById("admin@example.com", 5L, "request")).thenReturn(response);
         var service = new PaymentRefundService(storage, client, confirmations);
         assertEquals(
                 PaymentRefundStatus.PROCESSING,
@@ -432,7 +609,7 @@ class PaymentRefundTests {
         sequence.verify(storage).prepare("admin@example.com", 5L, "Devolver");
         sequence.verify(storage).dispatch("admin@example.com", "request");
         sequence.verify(client).getOrder("ORDTST123");
-        sequence.verify(storage).getRefund("admin@example.com", 5L);
+        sequence.verify(storage).getRefundById("admin@example.com", 5L, "request");
     }
 
     @Test
@@ -456,5 +633,137 @@ class PaymentRefundTests {
         payment.setRefundedAmount(payment.getAmount());
         persistence.dispatch("admin@example.com", id);
         verifyNoInteractions(client);
+    }
+
+    private ItemRefundRequestDTO partial(UUID reference, int quantity) {
+        var line = new ItemRefundLineRequestDTO();
+        line.setOrderItemId(20L);
+        line.setQuantity(quantity);
+        var request = new ItemRefundRequestDTO();
+        request.setReference(reference);
+        request.setReason("Devolver unidades");
+        request.setItems(List.of(line));
+        return request;
+    }
+
+    private ProductPhysical physicalLine() {
+        var product = new ProductPhysical();
+        product.setIdProduct(4L);
+        product.setStockProduct(3);
+        var item = new OrderItem(order, product, 3, new BigDecimal("25.00"));
+        item.setIdOrderItem(20L);
+        order.setItemsOrder(List.of(item));
+        when(workflow.lockProduct(4L)).thenReturn(product);
+        return product;
+    }
+
+    @Test
+    void itemRefundUsesHistoricalPriceAndRestoresOnlySelectedUnitsOnce() {
+        var product = physicalLine();
+        product.setPriceProduct(new BigDecimal("999.00"));
+        UUID reference = UUID.randomUUID();
+        String id = persistence.prepareItems("admin@example.com", 5L, partial(reference, 2));
+        assertEquals(new BigDecimal("50.00"), saved.get(id).getAmount());
+        assertEquals(5, product.getStockProduct());
+        var item = order.getItemsOrder().get(0);
+        assertEquals(3, item.getAmountOrderItem());
+        assertEquals(2, item.getCanceledQuantity());
+        assertEquals(1, item.getFulfillmentQuantity());
+        assertEquals(0, item.getRefundedQuantity());
+        assertEquals(2, item.getRefundRequestedQuantity());
+        assertEquals(id, persistence.prepareItems("admin@example.com", 5L, partial(reference, 2)));
+        assertEquals(5, product.getStockProduct());
+        assertEquals(1, attemptRecords.size());
+        verify(deliveries).revokeItems(order, Set.of(20L));
+        verify(deliveries, never()).revokeOrder(any());
+        var dto = persistence.getRefundById("admin@example.com", 5L, id);
+        assertTrue(dto.isItemized());
+        assertEquals(2, dto.getItems().get(0).getQuantity());
+    }
+
+    @Test
+    void itemRefundRejectsOversizedForeignDuplicateAndChangedReplay() {
+        var product = physicalLine();
+        assertThrows(
+                BusinessConflictException.class,
+                () ->
+                        persistence.prepareItems(
+                                "admin@example.com", 5L, partial(UUID.randomUUID(), 4)));
+        var foreign = partial(UUID.randomUUID(), 1);
+        foreign.getItems().get(0).setOrderItemId(99L);
+        assertThrows(
+                InvalidRequestException.class,
+                () -> persistence.prepareItems("admin@example.com", 5L, foreign));
+        var duplicate = partial(UUID.randomUUID(), 1);
+        duplicate.setItems(List.of(duplicate.getItems().get(0), duplicate.getItems().get(0)));
+        assertThrows(
+                InvalidRequestException.class,
+                () -> persistence.prepareItems("admin@example.com", 5L, duplicate));
+        assertEquals(3, product.getStockProduct());
+        UUID reference = UUID.randomUUID();
+        persistence.prepareItems("admin@example.com", 5L, partial(reference, 1));
+        assertThrows(
+                BusinessConflictException.class,
+                () -> persistence.prepareItems("admin@example.com", 5L, partial(reference, 2)));
+        assertThrows(
+                BusinessConflictException.class,
+                () ->
+                        persistence.prepareItems(
+                                "admin@example.com", 5L, partial(UUID.randomUUID(), 1)));
+    }
+
+    @Test
+    void itemRefundAfterShipmentDoesNotRestoreStockAndRequiresReceipt() {
+        var product = physicalLine();
+        order.setOrderStatus(OrderStatus.SHIPPED);
+        persistence.prepareItems("admin@example.com", 5L, partial(UUID.randomUUID(), 1));
+        verify(physicalReturns).requireItemRefundReady(order, order.getItemsOrder().get(0), 1);
+        assertEquals(3, product.getStockProduct());
+        assertEquals(0, order.getItemsOrder().get(0).getCanceledQuantity());
+        assertEquals(OrderStatus.SHIPPED, order.getOrderStatus());
+    }
+
+    @Test
+    void subsequentPartialsCannotRefundTheSameUnitsAndFullRefundUsesRemainingMoney() {
+        var product = physicalLine();
+        String first =
+                persistence.prepareItems("admin@example.com", 5L, partial(UUID.randomUUID(), 2));
+        saved.get(first).setStatus(PaymentRefundStatus.CONFIRMED);
+        payment.setRefundedAmount(new BigDecimal("50.00"));
+        order.setPaymentStatus(PaymentStatus.PARTIALLY_REFUNDED);
+        assertThrows(
+                BusinessConflictException.class,
+                () ->
+                        persistence.prepareItems(
+                                "admin@example.com", 5L, partial(UUID.randomUUID(), 2)));
+        String second =
+                persistence.prepareItems("admin@example.com", 5L, partial(UUID.randomUUID(), 1));
+        assertEquals(new BigDecimal("25.00"), saved.get(second).getAmount());
+        assertEquals(6, product.getStockProduct());
+        saved.get(second).setStatus(PaymentRefundStatus.CONFIRMED);
+        payment.setRefundedAmount(new BigDecimal("75.00"));
+        order.setPaymentStatus(PaymentStatus.PARTIALLY_REFUNDED);
+        String full =
+                persistence.prepare("admin@example.com", 5L, "Devolver el saldo incluido envio");
+        assertFalse(saved.get(full).isItemized());
+        assertEquals(new BigDecimal("25.00"), saved.get(full).getAmount());
+        assertEquals(3, saved.size());
+    }
+
+    @Test
+    void canceledOrderWithVerifiedChargebackRecoveryCanRequestRefundWithoutResumingPurchase() {
+        payment.setProviderStatus("charged_back");
+        payment.setProviderStatusDetail("reimbursed");
+        payment.setReviewReason(PaymentReviewReason.LATE_APPROVAL);
+        order.setOrderStatus(OrderStatus.CANCELED);
+        order.setPaymentStatus(PaymentStatus.REVIEW);
+        String id =
+                persistence.prepare(
+                        "admin@example.com", 5L, "Devolver dinero recuperado del contracargo");
+        persistence.dispatch("admin@example.com", id);
+        assertEquals(PaymentRefundStatus.PROCESSING, saved.get(id).getStatus());
+        assertEquals(OrderStatus.CANCELED, order.getOrderStatus());
+        assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
+        verify(client).refundPayment(saved.get(id));
     }
 }

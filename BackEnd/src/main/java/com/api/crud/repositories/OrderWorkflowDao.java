@@ -12,6 +12,8 @@ public interface OrderWorkflowDao {
 
     void lockUser(Long id);
 
+    long getActivePendingOrderCount(Long userId, LocalDateTime now, LocalDateTime legacyCutoff);
+
     Optional<Cart> lockCart(Long userId);
 
     Product lockProduct(Long id);
@@ -19,6 +21,8 @@ public interface OrderWorkflowDao {
     Order lockOrder(Long id);
 
     void saveAudit(OrderChangeAudit audit);
+
+    Page<OrderChangeAudit> getOrderHistory(Long orderId, Pageable pageable);
 
     void flush();
 

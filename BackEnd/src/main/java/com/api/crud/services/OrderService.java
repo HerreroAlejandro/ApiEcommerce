@@ -12,6 +12,7 @@ import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +41,9 @@ public class OrderService {
     @Value("${orders.expiration.reservation-minutes:30}")
     private long reservationMinutes = 30;
 
+    @Value("${orders.reservation.max-pending-per-customer:3}")
+    private int maxPendingOrders = 3;
+
     public OrderService(
             OrderDao orderDao,
             UserDao userDao,
@@ -58,10 +62,12 @@ public class OrderService {
     }
 
     @PostConstruct
-    void validateReservationMinutes() {
+    void validateOrderConfiguration() {
         if (reservationMinutes < 1) {
             throw new IllegalStateException("La reserva debe durar al menos un minuto");
         }
+        if (maxPendingOrders < 1)
+            throw new IllegalStateException("El limite de ordenes pendientes debe ser al menos 1");
     }
 
     public List<Long> getExpiredOrderIds(LocalDateTime now, long afterId) {
@@ -146,11 +152,15 @@ public class OrderService {
         }
         Order order = workflow.lockOrder(id);
         if (order.getDeliveryMethod() != DeliveryMethod.SHIPPING
-                || order.getPaymentStatus() != PaymentStatus.PAID
+                || (order.getPaymentStatus() != PaymentStatus.PAID
+                        && order.getPaymentStatus() != PaymentStatus.PARTIALLY_REFUNDED)
                 || (order.getOrderStatus() != OrderStatus.CONFIRMED
                         && order.getOrderStatus() != OrderStatus.SHIPPED)
                 || order.getItemsOrder().stream()
-                        .noneMatch(item -> item.getProductOrderItem() instanceof ProductPhysical)) {
+                        .noneMatch(
+                                item ->
+                                        item.getProductOrderItem() instanceof ProductPhysical
+                                                && item.getFulfillmentQuantity() > 0)) {
             throw conflict("El seguimiento requiere una orden fisica pagada, confirmada o enviada");
         }
         String motive = reason(request.getReason());
@@ -218,10 +228,20 @@ public class OrderService {
         workflow.saveAudit(audit);
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public OrderDetailDTO createMyOrder(String email, OrderCreateRequestDTO request) {
         UserModel buyer = user(email);
         workflow.lockUser(buyer.getId());
+        // Read after acquiring the customer lock: concurrent purchases must see the last commit.
+        LocalDateTime now = LocalDateTime.now();
+        if (workflow.getActivePendingOrderCount(
+                        buyer.getId(), now, now.minusMinutes(reservationMinutes))
+                >= maxPendingOrders)
+            throw conflict(
+                    "Alcanzo el limite de "
+                            + maxPendingOrders
+                            + " ordenes pendientes de pago. Pague o cancele una orden, o espere su"
+                            + " vencimiento.");
         Cart cart = workflow.lockCart(buyer.getId()).orElseThrow(() -> conflict("Carrito vacio"));
         if (!cart.isActive()) throw conflict("Carrito deshabilitado");
         if (cart.getItemsCart().isEmpty()) throw conflict("Carrito vacio");
@@ -318,10 +338,11 @@ public class OrderService {
         }
         if ((order.getOrderStatus() != OrderStatus.PENDING
                         && order.getOrderStatus() != OrderStatus.CONFIRMED)
-                || order.getPaymentStatus() == PaymentStatus.PAID) {
+                || order.getPaymentStatus() == PaymentStatus.PAID
+                || order.getPaymentStatus() == PaymentStatus.PARTIALLY_REFUNDED) {
             throw conflict(
                     "La cancelacion requiere una orden sin enviar y sin pago pendiente de"
-                        + " reembolso");
+                            + " reembolso");
         }
         restoreStock(order);
         String before = order.getOrderStatus().name();
@@ -335,10 +356,30 @@ public class OrderService {
         if (order.getPaymentStatus() == PaymentStatus.REFUNDED
                 && (order.getOrderStatus() == OrderStatus.PENDING
                         || order.getOrderStatus() == OrderStatus.CONFIRMED)) {
-            cancel(order, null, order.getSalesChannel() == SalesChannel.IN_STORE
-                    ? "Cancelacion por reembolso total presencial registrado"
-                    : "Cancelacion por reembolso total verificado del proveedor");
+            cancel(
+                    order,
+                    null,
+                    order.getSalesChannel() == SalesChannel.IN_STORE
+                            ? "Cancelacion por reembolso total presencial registrado"
+                            : "Cancelacion por reembolso total verificado del proveedor");
         }
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void cancelChargebackOrder(Order order) {
+        if (order.getOrderStatus() != OrderStatus.PENDING
+                && order.getOrderStatus() != OrderStatus.CONFIRMED) return;
+        restoreStock(order);
+        String before = order.getOrderStatus().name();
+        order.setOrderStatus(OrderStatus.CANCELED);
+        order.getItemsOrder().forEach(item -> item.setCanceledQuantity(item.getAmountOrderItem()));
+        audit(
+                order,
+                null,
+                "CHARGEBACK_FULFILLMENT_CANCELED",
+                before,
+                "CANCELED",
+                "Entrega cancelada por contracargo verificado; el caso financiero sigue separado");
     }
 
     private void restoreStock(Order order) {
@@ -351,7 +392,7 @@ public class OrderService {
                                 .toList()) {
             Product product = workflow.lockProduct(item.getProductOrderItem().getIdProduct());
             if (product instanceof ProductPhysical physical) {
-                long stock = (long) physical.getStockProduct() + item.getAmountOrderItem();
+                long stock = (long) physical.getStockProduct() + item.getFulfillmentQuantity();
                 if (stock > Integer.MAX_VALUE) throw conflict("Stock fuera del limite admitido");
                 physical.setStockProduct((int) stock);
             }
@@ -377,6 +418,7 @@ public class OrderService {
         if (previous == status) return;
         boolean digitalOnly =
                 order.getItemsOrder().stream()
+                        .filter(item -> item.getFulfillmentQuantity() > 0)
                         .allMatch(item -> item.getProductOrderItem() instanceof ProductDigital);
         boolean allowed =
                 (previous == OrderStatus.PENDING && status == OrderStatus.CONFIRMED)
@@ -390,7 +432,9 @@ public class OrderService {
                                 && (digitalOnly
                                         || order.getDeliveryMethod()
                                                 == DeliveryMethod.STORE_PICKUP));
-        if (!allowed || order.getPaymentStatus() != PaymentStatus.PAID)
+        if (!allowed
+                || (order.getPaymentStatus() != PaymentStatus.PAID
+                        && order.getPaymentStatus() != PaymentStatus.PARTIALLY_REFUNDED))
             throw conflict("Transicion de orden no permitida");
         if (!digitalOnly
                 && order.getDeliveryMethod() == DeliveryMethod.SHIPPING
@@ -419,7 +463,7 @@ public class OrderService {
         workflow.lockOrder(id);
         throw conflict(
                 "Los pagos online se verifican con Mercado Pago; las ventas presenciales se"
-                    + " registran en /admin/store-sales y sus devoluciones en"
-                    + " /admin/store-sales/{orderId}/refund");
+                        + " registran en /admin/store-sales y sus devoluciones en"
+                        + " /admin/store-sales/{orderId}/refund");
     }
 }

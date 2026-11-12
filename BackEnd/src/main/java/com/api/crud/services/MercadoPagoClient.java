@@ -109,7 +109,7 @@ public class MercadoPagoClient {
                         "POST",
                         "/v1/orders/" + refund.getProviderOrderId() + "/refund",
                         body,
-                        refund.getId());
+                        refund.getCurrentAttemptId());
         if (!refund.getProviderOrderId().equals(requiredText(response, "id"))) throw unavailable();
         for (JsonNode result : response.path("transactions").path("refunds")) {
             if (paymentId.equals(text(result, "transaction_id"))
@@ -121,6 +121,48 @@ public class MercadoPagoClient {
             }
         }
         throw unavailable();
+    }
+
+    public VerifiedChargeback getChargeback(String caseId) {
+        properties.requireEnabled();
+        if (caseId == null || !caseId.matches("[0-9]{1,30}")) throw unavailable();
+        JsonNode result = request("GET", "/v1/chargebacks/" + caseId, null, null);
+        try {
+            if (!caseId.equals(requiredText(result, "id"))
+                    || !result.path("live_mode").isBoolean()
+                    || result.path("live_mode").asBoolean() != properties.isLiveMode()
+                    || !result.path("payments").isArray()
+                    || result.path("payments").isEmpty()) throw unavailable();
+            Set<String> ids = new HashSet<>();
+            for (JsonNode id : result.path("payments")) {
+                if (!id.isValueNode()
+                        || !id.asText().matches("[0-9]{1,30}")
+                        || !ids.add(id.asText())) throw unavailable();
+            }
+            JsonNode coverage = result.path("coverage_applied");
+            if (!coverage.isMissingNode() && !coverage.isNull() && !coverage.isBoolean())
+                throw unavailable();
+            String documentation = requiredText(result, "documentation_status");
+            String reason = requiredText(result, "reason");
+            Instant updated = instant(result, "date_last_updated");
+            if (documentation.length() > 40
+                    || reason.length() > 100
+                    || updated == null
+                    || updated.isAfter(Instant.now().plusSeconds(60))) throw unavailable();
+            return new VerifiedChargeback(
+                    caseId,
+                    Set.copyOf(ids),
+                    requiredText(result, "currency"),
+                    decimal(result, "amount"),
+                    result.path("live_mode").asBoolean(),
+                    coverage.isBoolean() ? coverage.asBoolean() : null,
+                    documentation,
+                    reason,
+                    updated,
+                    instant(result, "date_documentation_deadline"));
+        } catch (IllegalArgumentException | DateTimeException exception) {
+            throw unavailable();
+        }
     }
 
     ObjectNode orderBody(PaymentCheckout checkout) {
@@ -160,7 +202,7 @@ public class MercadoPagoClient {
         ArrayNode excluded = config.putObject("payment_method").putArray("not_allowed_types");
         for (String type : excludedPaymentTypes()) excluded.add(type);
         ObjectNode online = config.putObject("online");
-        online.putObject("retries").put("allowed", false);
+        online.putObject("retries").put("allowed", true);
         if (!properties.getReturnUrl().isBlank()) {
             online.put("success_url", properties.getReturnUrl() + "?result=success");
             online.put("pending_url", properties.getReturnUrl() + "?result=pending");
@@ -222,6 +264,7 @@ public class MercadoPagoClient {
                 if (!paymentId.matches("PAY[A-Z0-9]{1,61}") || !seen.add(paymentId))
                     throw unavailable();
                 BigDecimal refunded = BigDecimal.ZERO.setScale(2);
+                Set<String> confirmedRefundIds = new HashSet<>();
                 Set<String> refundIds = new HashSet<>();
                 for (JsonNode refund : transactions.path("refunds")) {
                     if (!refundIds.add(requiredText(refund, "id"))) throw unavailable();
@@ -232,6 +275,7 @@ public class MercadoPagoClient {
                     if (paymentId.equals(text(refund, "transaction_id"))
                             && "processed".equals(text(refund, "status"))) {
                         refunded = refunded.add(decimal(refund, "amount"));
+                        confirmedRefundIds.add(requiredText(refund, "id"));
                     }
                 }
                 if (("partially_refunded".equals(text(attempt, "status_detail"))
@@ -241,14 +285,32 @@ public class MercadoPagoClient {
                 BigDecimal paymentAmount = decimal(attempt, "amount");
                 if (refunded.signum() > 0 && refunded.compareTo(paymentAmount) == 0)
                     status = "refunded";
+                Set<String> caseIds = new HashSet<>();
+                boolean unidentifiedChargeback = false;
                 for (JsonNode chargeback : transactions.path("chargebacks")) {
-                    if (paymentId.equals(text(chargeback, "transaction_id")))
-                        status = "charged_back";
+                    if (!paymentId.equals(text(chargeback, "transaction_id"))) continue;
+                    String caseId = text(chargeback, "case_id");
+                    if (caseId != null) {
+                        if (!caseId.matches("[0-9]{1,30}")) throw unavailable();
+                        caseIds.add(caseId);
+                    } else unidentifiedChargeback = true;
                 }
+                // Identified historical cases are evaluated by the chargeback lifecycle.
+                // Their continued presence must not hide a later credit/refund of the payment.
+                if (unidentifiedChargeback
+                        || (!caseIds.isEmpty() && !Set.of("approved", "refunded").contains(status)))
+                    status = "charged_back";
+                String numericReference = text(attempt, "reference_id");
+                if (numericReference == null)
+                    numericReference = text(attempt.path("reference"), "id");
+                if (numericReference != null && !numericReference.matches("[0-9]{1,30}"))
+                    numericReference = null;
                 // No precise approval time is guaranteed in Orders. Use its canonical update
                 // time conservatively; a first confirmation after expiry requires review.
                 Instant approved = instant(attempt, "date_approved");
                 if (approved == null && "approved".equals(status)) approved = updated;
+                String statusDetail = text(attempt, "status_detail");
+                if (statusDetail != null && statusDetail.length() > 40) throw unavailable();
                 payments.add(
                         new VerifiedPayment(
                                 paymentId,
@@ -262,7 +324,11 @@ public class MercadoPagoClient {
                                 text(attempt.path("payment_method"), "id"),
                                 approved,
                                 updated,
-                                live));
+                                live,
+                                Set.copyOf(confirmedRefundIds),
+                                statusDetail,
+                                numericReference,
+                                Set.copyOf(caseIds)));
             }
             return new VerifiedOrder(
                     id,
@@ -331,6 +397,8 @@ public class MercadoPagoClient {
                     HttpRequest.newBuilder(URI.create("https://api.mercadopago.com" + path))
                             .timeout(Duration.ofSeconds(15))
                             .header("Authorization", "Bearer " + properties.getAccessToken());
+            if (path.startsWith("/v1/chargebacks/"))
+                builder.header("X-Caller-Id", properties.getCollectorId());
             if (body == null) builder.GET();
             else {
                 builder.header("Content-Type", "application/json");
@@ -426,7 +494,7 @@ public class MercadoPagoClient {
                         .orElse("no_disponible");
         log.warn(
                 "Mercado Pago rechazo la solicitud: metodo={}, ruta={}, HTTP={}, codigos={},"
-                    + " campos={}, requestId={}",
+                        + " campos={}, requestId={}",
                 method,
                 path,
                 response.statusCode(),
@@ -475,6 +543,18 @@ public class MercadoPagoClient {
 
     public record RefundReceipt(String id) {}
 
+    public record VerifiedChargeback(
+            String id,
+            Set<String> paymentIds,
+            String currency,
+            BigDecimal amount,
+            boolean liveMode,
+            Boolean coverageApplied,
+            String documentationStatus,
+            String reason,
+            Instant updatedAt,
+            Instant documentationDeadline) {}
+
     public record VerifiedOrder(
             String id,
             String reference,
@@ -509,5 +589,72 @@ public class MercadoPagoClient {
             String paymentMethod,
             Instant approvedAt,
             Instant updatedAt,
-            boolean liveMode) {}
+            boolean liveMode,
+            Set<String> confirmedRefundIds,
+            String statusDetail,
+            String numericPaymentId,
+            Set<String> chargebackCaseIds) {
+
+        public VerifiedPayment(
+                String id,
+                String reference,
+                String collectorId,
+                String currency,
+                BigDecimal amount,
+                BigDecimal refundedAmount,
+                String status,
+                String paymentType,
+                String paymentMethod,
+                Instant approvedAt,
+                Instant updatedAt,
+                boolean liveMode,
+                Set<String> confirmedRefundIds) {
+            this(
+                    id,
+                    reference,
+                    collectorId,
+                    currency,
+                    amount,
+                    refundedAmount,
+                    status,
+                    paymentType,
+                    paymentMethod,
+                    approvedAt,
+                    updatedAt,
+                    liveMode,
+                    confirmedRefundIds,
+                    null,
+                    null,
+                    Set.of());
+        }
+
+        public VerifiedPayment(
+                String id,
+                String reference,
+                String collectorId,
+                String currency,
+                BigDecimal amount,
+                BigDecimal refundedAmount,
+                String status,
+                String paymentType,
+                String paymentMethod,
+                Instant approvedAt,
+                Instant updatedAt,
+                boolean liveMode) {
+            this(
+                    id,
+                    reference,
+                    collectorId,
+                    currency,
+                    amount,
+                    refundedAmount,
+                    status,
+                    paymentType,
+                    paymentMethod,
+                    approvedAt,
+                    updatedAt,
+                    liveMode,
+                    Set.of());
+        }
+    }
 }

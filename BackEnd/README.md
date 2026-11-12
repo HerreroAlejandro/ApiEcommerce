@@ -95,6 +95,19 @@ column is no longer mapped, and `CartItemDTO` exposes `subtotal` instead.
 Existing databases may retain the unused column with `ddl-auto=update`; its
 removal must be handled separately when updating the database schema.
 
+### Customer cart product data
+
+Customer cart items include the current product `active`, `type` and
+`stockProduct` values, mapped through ModelMapper. `stockProduct` is the actual
+stock for physical products and null for digital products; null does not mean
+zero stock. Digital products retain their existing one-unit purchase rule.
+
+The frontend can show an inactive product warning or compare `amountCartItem`
+with physical stock. There is no additional availability flag, enum or database
+column. Items remain visible and their quantities are not adjusted automatically.
+Checkout still validates current product state and stock because the values may
+change after the cart was fetched. Private download links are not exposed.
+
 ## Administrative cart changes
 
 ADMIN and SUPPORT can use the following routes under `/admin/cart-items`:
@@ -464,6 +477,38 @@ when checkout deducted it. Existing orders default to false because the previous
 implementation did not deduct stock; review this value if stock was changed manually.
 Verify schema, rollback and concurrent checkout against MySQL before deployment.
 
+### Pending online reservation limit
+
+A customer can keep at most **3 active unpaid online orders** by default.
+Configure `orders.reservation.max-pending-per-customer` through the optional
+`ORDER_MAX_PENDING_ORDERS` environment variable. The value must be at least 1;
+no environment variable is required to use the default.
+
+Only orders belonging to that customer count: sales channel `ONLINE`, order
+status `PENDING`, payment `PENDING` or `FAILED`, inventory still deducted, and an
+unexpired reservation. Digital-only online orders count too. Historical orders
+without `expiresAt` use their purchase date plus the configured reservation
+minutes, consistently with the expiration workflow.
+
+Paid orders, payments under review, canceled/expired orders, and in-store sales
+do not count. An elapsed reservation no longer counts even if the expiration
+scheduler has not processed it yet; stock still follows the existing release
+workflow and availability checks.
+
+Reaching the limit returns HTTP **409** with an explanation to pay, cancel, or
+wait for an existing reservation to expire. The check runs before touching the
+cart or reserving products: a rejected purchase keeps the cart and stock intact.
+Once a previous order stops counting, the customer can create another one.
+
+Creation holds the customer row lock before counting and uses `READ_COMMITTED`
+isolation, so a concurrent request sees the order committed by the previous
+request instead of an earlier MySQL snapshot. No new endpoint, DTO, table, or
+migration is required.
+
+Local tests cover the limit, configuration, cart/stock preservation and two
+simultaneous requests competing for the last slot. Their locks are simulated;
+real MySQL concurrency remains an integration check.
+
 ## Error responses
 
 Exception classes and HTTP handlers live in `com.api.crud.exceptions`.
@@ -490,3 +535,73 @@ traces are not returned to clients.
 Collection searches with no matches return 200 and an empty collection/page.
 Password reset and account recovery requests retain their generic success message
 when the email does not identify an eligible account.
+
+## Administrative histories and physical return queue
+
+Read-only queries available to active ADMIN/SUPPORT accounts:
+
+| Endpoint | Response |
+| --- | --- |
+| GET /admin/orders/{orderId}/history?page=0&size=20 | Page of OrderHistoryResponseDTO |
+| GET /admin/cart/{cartId}/history?page=0&size=20 | Page of CartHistoryResponseDTO |
+| GET /admin/physical-returns?status=REQUESTED&page=0&size=20 | Page of PhysicalReturnListDTO |
+
+The cart route uses the existing singular `/admin/cart` controller base. No
+previous route was renamed. Physical return creation, detail, receipt and waiver
+remain at `/admin/orders/{orderId}/physical-return` and its existing subpaths.
+
+Pages start at zero, default to 20 rows, and accept at most 100. Audits use
+createdAt descending, then id descending; return summaries use requestedAt
+and id descending. Sorting is fixed. Responses carry `Cache-Control: no-store`.
+Invalid page limits or status values return 400; clients cannot read these
+administrative routes. Service-level checks also require an active staff account.
+
+Histories expose event ID, timestamp, action, responsible user ID, reason and
+before/after values. A null order actor denotes an automated/system event; a
+null cart product ID denotes a cart-level action. Target IDs already appear in
+the URL and user/product entities are not embedded. Queries read stored audit
+identifiers directly, so deleted carts retain accessible histories. No events
+produce an empty page, including an identifier with no recorded history.
+
+The return list is a summary: ID, order ID, status, request date and resolution
+date. It excludes item collections, addresses and full reasons; use the existing
+per-order detail for those data. Omit status to list all states, or filter by
+REQUESTED, RECEIVED or WAIVED. REQUESTED means no receipt/waiver has been recorded;
+RECEIVED may represent a partial receipt. A customer keeping the rest of a
+purchase does not automatically make a partial return pending.
+
+Pagination and counts run in the DAO, rather than loading the entire history
+into memory. DTO conversion stays in ModelMapperConfig. These queries create no
+audit entries, change no return state and require no new database columns.
+## React frontend and CORS
+
+The API accepts browser requests from `http://localhost:5173` and
+`http://localhost:3000` by default. No environment variable is needed for those
+local development origins. React with JavaScript can use either configured
+origin; CORS does not depend on the frontend framework.
+
+To replace the list, set `CORS_ALLOWED_ORIGINS` to exact origins separated by
+commas, for example `http://localhost:5173,http://127.0.0.1:5173`. Include the
+scheme and port, without paths or wildcards. An empty value disables cross-origin
+browser access. Different hosts, schemes and ports are different origins.
+
+The property is:
+
+```properties
+security.cors.allowed-origins=${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
+```
+
+Send the application's JWT in `Authorization: Bearer <token>` and JSON requests
+with `Content-Type: application/json`. Cookie credentials are not enabled; the
+frontend does not need `credentials: "include"`. Browser preflight requests are
+handled before authentication, while actual requests still require their usual
+JWT and permissions. CORS is a browser policy, not a replacement for authorization.
+
+`X-Download-Token` is allowed for digital downloads, and `Content-Disposition`
+is exposed so JavaScript can read the download filename. Postman requests and
+Mercado Pago webhooks without an Origin header keep their existing behavior.
+No frontend project, endpoint or database migration is introduced by this setup.
+
+## Registro con correo verificado
+
+El registro publico queda pendiente hasta confirmar el correo. Consultar [EMAIL_VERIFICATION.md](EMAIL_VERIFICATION.md) para los endpoints, reenvios, configuracion del enlace y cambios del esquema.

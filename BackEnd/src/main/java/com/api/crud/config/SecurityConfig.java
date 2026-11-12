@@ -12,6 +12,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 @EnableWebSecurity
@@ -27,9 +28,12 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http, UrlBasedCorsConfigurationSource corsConfigurationSource)
+            throws Exception {
         SecurityProblemHandler problems = new SecurityProblemHandler();
         http.csrf(AbstractHttpConfigurer::disable)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .exceptionHandling(
                         errors ->
                                 errors.authenticationEntryPoint(problems)
@@ -38,6 +42,11 @@ public class SecurityConfig {
                         authorizeRequests ->
                                 authorizeRequests
                                         .requestMatchers("/users/register")
+                                        .permitAll()
+                                        .requestMatchers(
+                                                HttpMethod.POST,
+                                                "/users/email-verification/resend",
+                                                "/users/email-verification/confirm")
                                         .permitAll()
                                         .requestMatchers(
                                                 HttpMethod.POST, "/payments/mercadopago/webhook")
@@ -57,7 +66,9 @@ public class SecurityConfig {
                                         .requestMatchers(
                                                 "/admin/store-sales", "/admin/store-sales/**")
                                         .hasAnyAuthority("ADMIN", "SUPPORT")
-                                        .requestMatchers("/admin/payments/*/refund")
+                                        .requestMatchers(
+                                                "/admin/payments/*/refund",
+                                                "/admin/payments/*/refund/**")
                                         .hasAuthority("ADMIN")
                                         .requestMatchers(HttpMethod.GET, "/admin/payments/**")
                                         .hasAnyAuthority("ADMIN", "SUPPORT")
@@ -92,6 +103,13 @@ public class SecurityConfig {
                                         .authenticated()
                                         .requestMatchers(
                                                 HttpMethod.GET, "/admin/users/*/status-history")
+                                        .hasAnyAuthority("ADMIN", "SUPPORT")
+                                        .requestMatchers(
+                                                HttpMethod.GET,
+                                                "/admin/chargebacks",
+                                                "/admin/chargebacks/**")
+                                        .hasAnyAuthority("ADMIN", "SUPPORT")
+                                        .requestMatchers(HttpMethod.GET, "/admin/physical-returns")
                                         .hasAnyAuthority("ADMIN", "SUPPORT")
                                         .requestMatchers("/admin/**")
                                         .hasAuthority("ADMIN")

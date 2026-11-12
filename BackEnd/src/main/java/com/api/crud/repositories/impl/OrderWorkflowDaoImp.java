@@ -27,11 +27,32 @@ public class OrderWorkflowDaoImp implements OrderWorkflowDao {
     }
 
     @Override
+    public long getActivePendingOrderCount(
+            Long userId, LocalDateTime now, LocalDateTime legacyCutoff) {
+        return entityManager
+                .createQuery(
+                        "SELECT COUNT(o) FROM Order o WHERE o.userOrder.id = :userId"
+                                + " AND o.salesChannel = :channel AND o.orderStatus = :status"
+                                + " AND o.paymentStatus IN :payments AND o.stockDeducted = true"
+                                + " AND (o.expiresAt > :now OR (o.expiresAt IS NULL"
+                                + " AND o.purchaseDateOrder > :legacyCutoff))",
+                        Long.class)
+                .setParameter("userId", userId)
+                .setParameter("channel", SalesChannel.ONLINE)
+                .setParameter("status", OrderStatus.PENDING)
+                .setParameter("payments", List.of(PaymentStatus.PENDING, PaymentStatus.FAILED))
+                .setParameter("now", now)
+                .setParameter("legacyCutoff", legacyCutoff)
+                .getSingleResult();
+    }
+
+    @Override
     public Optional<Cart> lockCart(Long userId) {
         List<Cart> carts =
                 entityManager
                         .createQuery(
-                                "SELECT DISTINCT c FROM Cart c LEFT JOIN FETCH c.itemsCart WHERE c.userCart.id = :userId",
+                                "SELECT DISTINCT c FROM Cart c LEFT JOIN FETCH c.itemsCart WHERE"
+                                        + " c.userCart.id = :userId",
                                 Cart.class)
                         .setParameter("userId", userId)
                         .setLockMode(LockModeType.PESSIMISTIC_WRITE)
@@ -58,6 +79,28 @@ public class OrderWorkflowDaoImp implements OrderWorkflowDao {
     @Override
     public void saveAudit(OrderChangeAudit audit) {
         entityManager.persist(audit);
+    }
+
+    @Override
+    public Page<OrderChangeAudit> getOrderHistory(Long orderId, Pageable pageable) {
+        List<OrderChangeAudit> rows =
+                entityManager
+                        .createQuery(
+                                "SELECT a FROM OrderChangeAudit a WHERE a.orderId = :id ORDER BY"
+                                    + " a.createdAt DESC, a.id DESC",
+                                OrderChangeAudit.class)
+                        .setParameter("id", orderId)
+                        .setFirstResult(Math.toIntExact(pageable.getOffset()))
+                        .setMaxResults(pageable.getPageSize())
+                        .getResultList();
+        long count =
+                entityManager
+                        .createQuery(
+                                "SELECT COUNT(a) FROM OrderChangeAudit a WHERE a.orderId = :id",
+                                Long.class)
+                        .setParameter("id", orderId)
+                        .getSingleResult();
+        return new PageImpl<>(rows, pageable, count);
     }
 
     @Override

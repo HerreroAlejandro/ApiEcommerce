@@ -1,8 +1,11 @@
 package com.api.crud.controllers;
 
 import com.api.crud.DTO.ChangeReasonRequestDTO;
+import com.api.crud.DTO.ItemRefundRequestDTO;
 import com.api.crud.DTO.PaymentAdminResponseDTO;
+import com.api.crud.DTO.PaymentRefundAttemptResponseDTO;
 import com.api.crud.DTO.PaymentRefundResponseDTO;
+import com.api.crud.DTO.PaymentRefundRetryRequestDTO;
 import com.api.crud.DTO.PaymentResponseDTO;
 import com.api.crud.models.enums.PaymentRefundStatus;
 import com.api.crud.services.PaymentRefundService;
@@ -22,6 +25,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/admin")
@@ -36,6 +40,22 @@ public class AdminPaymentController {
         this.refunds = refunds;
     }
 
+    @PostMapping("/payments/{paymentId}/refund/items")
+    public ResponseEntity<PaymentRefundResponseDTO> refundItems(
+            Authentication authentication,
+            @PathVariable @Positive Long paymentId,
+            @Valid @RequestBody ItemRefundRequestDTO request) {
+        return refundResponse(refunds.refundItems(authentication.getName(), paymentId, request));
+    }
+
+    @GetMapping("/payments/{paymentId}/refund/history")
+    public ResponseEntity<List<PaymentRefundResponseDTO>> getRefundHistory(
+            Authentication authentication, @PathVariable @Positive Long paymentId) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(refunds.getRefundHistory(authentication.getName(), paymentId));
+    }
+
     @PostMapping("/payments/{paymentId}/refund")
     public ResponseEntity<PaymentRefundResponseDTO> refundPayment(
             Authentication authentication,
@@ -43,6 +63,54 @@ public class AdminPaymentController {
             @Valid @RequestBody ChangeReasonRequestDTO request) {
         PaymentRefundResponseDTO refund =
                 refunds.refund(authentication.getName(), paymentId, request.getReason());
+        return refundResponse(refund);
+    }
+
+    @PostMapping("/payments/{paymentId}/refund/retry")
+    public ResponseEntity<PaymentRefundResponseDTO> retryRefund(
+            Authentication authentication,
+            @PathVariable @Positive Long paymentId,
+            @Valid @RequestBody PaymentRefundRetryRequestDTO request) {
+        return refundResponse(
+                refunds.retry(
+                        authentication.getName(),
+                        paymentId,
+                        request.getPreviousAttemptId().toString(),
+                        request.getReason()));
+    }
+
+    @GetMapping("/payments/{paymentId}/refund/attempts")
+    public ResponseEntity<Page<PaymentRefundAttemptResponseDTO>> getRefundAttempts(
+            Authentication authentication,
+            @PathVariable @Positive Long paymentId,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(
+                        refunds.getAttempts(
+                                authentication.getName(), paymentId, PageRequest.of(page, size)));
+    }
+
+    @GetMapping("/payments/{paymentId}/refund/{refundId}/attempts")
+    public ResponseEntity<Page<PaymentRefundAttemptResponseDTO>> getAttemptsForRefund(
+            Authentication authentication,
+            @PathVariable @Positive Long paymentId,
+            @PathVariable UUID refundId,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(
+                        refunds.getAttemptsForRefund(
+                                authentication.getName(),
+                                paymentId,
+                                refundId.toString(),
+                                PageRequest.of(page, size)));
+    }
+
+    private ResponseEntity<PaymentRefundResponseDTO> refundResponse(
+            PaymentRefundResponseDTO refund) {
         return ResponseEntity.status(
                         refund.getStatus() == PaymentRefundStatus.CONFIRMED
                                         || refund.getStatus() == PaymentRefundStatus.REJECTED

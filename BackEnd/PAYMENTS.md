@@ -180,11 +180,13 @@ La petición no acepta un importe: el servidor calcula lo pagado menos lo ya
 reembolsado y apunta exclusivamente a esa transacción. Por ello, devolver un
 pago duplicado no devuelve también el pago principal ni detiene su compra.
 
-Se guarda una sola solicitud por pago, con UUID estable como clave de
-idempotencia, administrador, fecha, motivo, importe y operación remota. La
-solicitud se confirma en la base antes de enviar la petición a Mercado Pago.
-Los reintentos conservan la solicitud y el motivo originales. Se auditan la
-solicitud, la aceptación del proveedor y la confirmación verificada.
+Se guardan solicitudes comerciales secuenciales por pago, con administrador, fecha,
+motivo e importe originales. Cada intento de ejecución tiene su propio UUID
+estable como clave de idempotencia, responsable y motivo. La solicitud y el
+intento se confirman en la base antes de llamar a Mercado Pago. Reenviar una
+operación incierta conserva su clave. Crear un intento distinto requiere un
+rechazo verificado, autorización explícita de ADMIN y una nueva comprobación
+financiera. El primer intento conserva el UUID histórico de la solicitud.
 
 | Estado de solicitud | Significado |
 | --- | --- |
@@ -198,7 +200,9 @@ HTTP 202 devuelve una solicitud aún pendiente.
 Un timeout puede devolver 503 aunque MP haya recibido la petición. Consultá
 GET /admin/payments/{paymentId}/refund y sincronizá la order si es necesario;
 no crees otra solicitud con una clave distinta. Repetir el mismo POST reutiliza
-la clave. Cuando ya está PROCESSING, CONFIRMED o REJECTED no se vuelve a enviar el reembolso.
+la clave del intento actual. Cuando ya está PROCESSING, CONFIRMED o REJECTED no
+se vuelve a enviar ese intento. Para un REJECTED puede solicitarse uno nuevo
+mediante el endpoint específico descrito abajo.
 
 Si se devuelve el pago principal, la orden queda en REVIEW mientras se tramita,
 se bloquea el despacho y se revocan permisos digitales. Esto no afirma que el
@@ -209,8 +213,7 @@ requiere gestionar por separado la devolución física.
 
 No se aceptan contracargos, pagos pendientes/rechazados ni discrepancias de
 vendedor, moneda o entorno. Las devoluciones parciales previas se contemplan
-para devolver todo el resto; no se incorpora un formulario de devoluciones
-parciales. Si durante una solicitud pendiente se devuelve parte del dinero
+para devolver todo el resto; los parciales por articulo se describen al final. Si durante una solicitud pendiente se devuelve parte del dinero
 desde otro canal, la API no cambia el importe ni genera otra clave: bloquea el
 reintento por discrepancia y requiere conciliar la operación en Mercado Pago.
 El listado /admin/payments/review también incluye solicitudes sin confirmar.
@@ -247,12 +250,77 @@ estados asíncronos de fallo que no estén documentados para este flujo.
 REJECTED cierra el envío de esta solicitud, pero no la situación comercial:
 la compra afectada permanece bloqueada, no se restaura PAID, no se repone stock
 ni se rehabilitan descargas. Un pago duplicado rechazado no afecta la compra
-principal. El listado de revisión conserva el caso. Todavía no existe una operación
-para cancelar la solicitud, crear otro intento ni continuar la compra.
+principal. El listado de revisión conserva el caso. No existe una operación para
+cancelar la intención de devolver dinero ni continuar la compra.
 
 Si después se verifica que el dinero efectivamente fue devuelto, la solicitud
 puede pasar a CONFIRMED: se conservan los datos del rechazo anterior y su auditoría.
 La verdad financiera prevalece sobre el registro previo; no se envía otro reembolso.
+
+### Intentos manuales después de un rechazo
+
+ADMIN consulta primero `GET /admin/payments/{paymentId}/refund`. La respuesta
+incluye `currentAttemptId` y `attemptNumber`. Para retomar un rechazo verificado:
+
+```http
+POST /admin/payments/{paymentId}/refund/retry
+Content-Type: application/json
+
+{
+  "previousAttemptId": "7126952c-0de6-4d25-a07d-717c496cd30c",
+  "reason": "Se revisó y corrigió la causa del rechazo"
+}
+```
+
+`previousAttemptId` debe ser el UUID real devuelto por la API, no uno inventado
+para la petición. El servidor bloquea la orden, sincroniza y verifica de nuevo
+el importe disponible, vendedor, moneda, entorno y ausencia de un reembolso
+pendiente para ese pago. Mantiene el mismo importe y el mismo pago: no permite
+cambiar el destino del dinero ni pasar por alto una devolución física pendiente.
+
+Si la verificación falla, no genera una clave nueva. Si el dinero ya se devolvió,
+se conserva la confirmación financiera y no se vuelve a enviarlo. REQUESTED o
+PROCESSING no autorizan otro intento: se consulta y, cuando corresponde, se
+reenvía la operación existente con su clave.
+
+Repetir la petición sobre el mismo intento anterior devuelve su sucesor sin
+crear otro. Esto también se aplica si el sucesor fue rechazado: para intentar
+otra vez hay que indicar expresamente el nuevo `currentAttemptId`. Una petición
+obsoleta no puede saltar intentos posteriores. Se conservan los motivos y
+responsables originales; un reenvío HTTP no los sustituye. Restricciones únicas
+en la base impiden dos sucesores de un mismo intento y dos números iguales
+dentro de la solicitud.
+
+El historial paginado se consulta con:
+
+```http
+GET /admin/payments/{paymentId}/refund/attempts?page=0&size=20
+```
+
+Requiere ADMIN, al igual que crear o reintentar el reembolso; `size` admite
+entre 1 y 100. Cada entrada tiene UUID, número, intento anterior, responsable,
+motivo, fechas, estado y referencia del proveedor cuando existe. No se mezclan
+los resultados de intentos rechazados con los nuevos. Si el dinero se devuelve
+por otro canal después de un rechazo, la solicitud puede quedar CONFIRMED y el
+intento históricamente rechazado conserva REJECTED. La confirmación financiera
+no borra lo ocurrido antes.
+
+Para confirmar un intento en particular se exige su referencia de reembolso
+aceptada y que esa referencia figure procesada en la consulta de Mercado Pago.
+Que el total ya haya sido devuelto por otra operación confirma la solicitud
+financiera, pero no inventa un resultado exitoso para un intento distinto. En
+ese caso el historial puede conservar un intento no confirmado y la solicitud
+estar CONFIRMED; no se permite enviar otro reembolso por esa diferencia.
+
+Migración adicional: `src/main/resources/db/manual/2026-11-11-refund-attempts.sql`.
+Agrega la tabla de intentos, copia los reembolsos históricos conservando sus UUID
+y enlaza el intento actual. Requiere las migraciones anteriores. Si Hibernate ya
+creó columnas o la tabla, ejecutar solo el DDL faltante, pero no omitir la copia
+de datos. La API bloquea el despacho de un reembolso antiguo sin historial
+migrado en lugar de generar otra clave. El script no se ejecutó desde Codex.
+
+Esta etapa cubre los intentos del reembolso online por el importe restante.
+Los reembolsos parciales por articulo se describen a continuacion. El seguimiento y la resolucion verificada de contracargos se describen en CHARGEBACKS.md.
 
 Migración: `src/main/resources/db/manual/2026-11-11-refund-rejections.sql`.
 Agrega el estado y los tres campos; inspeccionar primero la tabla si Hibernate ya
@@ -272,6 +340,8 @@ No hay saldo a favor, transferencia de pagos entre órdenes ni cambios a UserMod
 | POST /admin/payment-checkouts/{providerOrderId}/sync | ADMIN |
 | POST /admin/payments/{paymentId}/refund | ADMIN |
 | GET /admin/payments/{paymentId}/refund | ADMIN |
+| POST /admin/payments/{paymentId}/refund/retry | ADMIN |
+| GET /admin/payments/{paymentId}/refund/attempts?page=0&size=20 | ADMIN |
 
 El antiguo POST /admin/payments/{paymentId}/sync se reemplazó por la
 sincronización de la order remota completa.
@@ -296,3 +366,155 @@ fallaron las credenciales, el contenido de la solicitud o la conexión.
 
 Seguimos en pruebas. Faltan pruebas de reembolsos con MP, devoluciones parciales
 externas, contracargos y concurrencia real en MySQL entre pago y vencimiento.
+
+## Reembolsos online por artículo
+
+ADMIN puede solicitar `POST /admin/payments/{paymentId}/refund/items`:
+
+```json
+{
+  "reference": "1e57e7cc-b4e7-4376-b9bd-b66613f43b90",
+  "reason": "Devolver una unidad acordada con el comprador",
+  "items": [{ "orderItemId": 21, "quantity": 1 }]
+}
+```
+
+`orderItemId` identifica la línea histórica de la orden, no el producto. Se aceptan
+cantidades enteras positivas, hasta las unidades que no tengan una devolución
+solicitada. El servidor usa el precio unitario histórico y excluye el envío.
+No se aceptan importes calculados por el cliente. El endpoint total existente
+continúa devolviendo el dinero restante, incluido el envío pendiente de devolver.
+
+Conservar `reference` al reenviar la misma solicitud, incluso después de un timeout.
+Cambiar los artículos, cantidades o motivo conservando la referencia produce 409.
+Una referencia nueva representa otra solicitud: solo se acepta cuando la anterior
+está CONFIRMED. Un rechazo definitivo conserva la intención y sus unidades;
+se resuelve con `/refund/retry` y `previousAttemptId`, sin reservar stock otra vez.
+
+Antes del envío, al registrar la intención se excluyen esas unidades de la entrega
+y se reintegran al stock una vez. No se reanudará la entrega de esas unidades si
+el proveedor rechaza el intento: la solicitud sigue pendiente de resolución.
+Después del envío no se repone stock desde el reembolso. Primero deben recibirse
+las unidades físicas correspondientes o registrarse una excepción administrativa.
+La recepción física controla por separado qué cantidades son vendibles.
+
+Mientras se resuelve, el pago principal queda REVIEW y se bloquea el despacho.
+Solo se revocan las descargas de los artículos seleccionados. Al verificar el
+dinero devuelto, el pago pasa a PARTIALLY_REFUNDED y el resto de la compra puede
+continuar; si se devolvió todo el dinero, se aplica REFUNDED. Las líneas originales,
+sus cantidades compradas, nombres y precios se conservan. En la respuesta de
+artículos se agregan refundRequestedQuantity, refundedQuantity, canceledQuantity
+y fulfillmentQuantity (unidades que no fueron excluidas de la entrega).
+
+`GET /admin/payments/{paymentId}/refund` devuelve la solicitud más reciente.
+`GET /admin/payments/{paymentId}/refund/history` devuelve todas las solicitudes.
+Para consultar los intentos de una solicitud anterior:
+`GET /admin/payments/{paymentId}/refund/{refundId}/attempts?page=0&size=20`.
+Los tres endpoints requieren ADMIN. El retry identifica la solicitud por el
+intento anterior, aunque ya existan otros reembolsos históricos del mismo pago.
+
+La confirmación financiera de la solicitud y la del intento individual siguen
+siendo distintas: el dinero devuelto puede resolver la solicitud, pero solo una
+referencia REF verificada confirma que ese intento concreto lo devolvió.
+
+Migración pendiente de ejecutar: `src/main/resources/db/manual/2026-11-11-item-refunds.sql`.
+Permite varias solicitudes por pago, crea sus líneas y los contadores históricos.
+Inspeccionar antes el esquema si Hibernate ya creó columnas. El script no mueve dinero.
+
+Este endpoint corresponde a pagos online de Mercado Pago. La venta presencial
+con efectivo/terminal mantiene por ahora su registro de reembolso total.
+Los parciales inesperados desde otros canales siguen sujetos
+a revisión; no se fuerzan a un estado utilizable por coincidir solo con un importe.
+
+## Contracargos
+
+Ver [CHARGEBACKS.md](CHARGEBACKS.md): cancelacion de entregas no despachadas,
+casos OPEN/WON/LOST, recuperacion verificada de dinero, notas y endpoints.
+CHARGED_BACK es un resultado financiero; no equivale a REFUNDED ni borra una entrega.
+No se devuelve dinero otra vez cuando el contracargo se perdio. Los comprobantes
+se presentan desde la gestion de Mercado Pago; la API no sube archivos.
+
+## Cierre de revisiones generales de compras previamente pagadas
+
+Una correccion de importe, moneda, vendedor, entorno o estado inesperado ya puede
+cerrar REVIEW cuando la compra habia sido aceptada previamente por esta API.
+Se usa el mismo webhook firmado o la sincronizacion administrativa existente;
+no hay un endpoint que permita forzar PAID ni se agrego un scheduler.
+
+`payments.acceptedAt` registra la aceptacion local original. No equivale a la
+fecha de aprobacion de Mercado Pago ni a la fecha de la ultima consulta. Se
+conserva al entrar en revision, para no confundir una recuperacion con un pago
+nuevo, tardio o vinculado a una orden que nunca se acepto como pagada.
+El dato se incluye en la respuesta administrativa del pago.
+
+Para continuar se exige:
+
+- Datos canonicos compatibles con el checkout y el total historico de la orden.
+- Pago principal aprobado con un medio admitido y una fecha de aprobacion valida.
+- Evidencia de aceptacion local, inventario descontado y orden PENDING,
+  CONFIRMED, SHIPPED o DELIVERED.
+- Ningun reembolso pendiente, rechazado sin resolver o intencion de devolucion
+  total. Los parciales confirmados deben explicar todo el dinero devuelto.
+- Ningun contracargo sin resolver: ese recorrido conserva su propio cierre
+  verificado descrito en CHARGEBACKS.md y tiene prioridad sobre este mecanismo.
+
+La compra vuelve a PAID o PARTIALLY_REFUNDED, segun corresponda. No se cambia su
+estado de entrega, no se descuenta stock otra vez ni se compra inventario nuevo.
+Que haya vencido el checkout no convierte en tardia una compra ya aceptada y
+pagada que conserva su inventario; ese plazo controla la aprobacion inicial.
+Las ordenes CANCELED/EXPIRED siguen iguales y quedan orientadas al reembolso.
+Si falta evidencia de aceptacion o inventario, se mantiene REVIEW.
+
+La restauracion digital se comparte con el cierre favorable de contracargos:
+las descargas revocadas no utilizadas pueden volver a AVAILABLE; las utilizadas
+vuelven a USED conservando sus intentos y fechas. No se reactivan articulos
+reembolsados, con devolucion solicitada o excluidos de la entrega. Los permisos
+anteriores permanecen invalidados: el cliente solicita un token nuevo.
+Se pueden crear permisos faltantes solo para articulos historicos elegibles.
+Si falta su contenido historico, la transaccion no fuerza una recuperacion.
+
+El cambio de REVIEW a un estado utilizable genera PAYMENT_REVIEW_RESOLVED en
+order_change_audit. Repetir una notificacion ya resuelta no agrega otro cierre
+ni vuelve a habilitar intentos de descarga.
+
+Migracion: `src/main/resources/db/manual/2026-11-12-payment-review-recovery.sql`.
+No se ejecuto contra la base del usuario. Si Hibernate ya creo acceptedAt,
+omitir el ALTER y ejecutar solo el backfill conservador. Este backfill reconoce
+compras actualmente pagadas con datos compatibles; no inventa una aceptacion
+para registros viejos que ya estan en REVIEW sin evidencia suficiente.
+Esos registros permanecen bloqueados para revision de su historial.
+Verificacion de esta pasada: 278 pruebas locales aprobadas, sin fallos ni errores.
+Se excluyo CrudApplicationTests para no iniciar la aplicacion con base/correo
+reales. Mercado Pago se simulo; no se movio dinero ni se ejecuto la migracion.
+En el backfill, acceptedAt toma la observacion verificada de una compra pagada;
+no reconstruye una fecha original que no haya quedado registrada.
+
+## Reintentar un pago rechazado
+
+Los checkouts nuevos envian `config.online.retries.allowed=true`. Si el primer
+pago es rechazado, el comprador puede volver al mismo checkout mientras la
+orden siga PENDING, su pago sea PENDING/FAILED y conserve su reserva vigente.
+Se reutilizan la referencia, la order de Mercado Pago y la URL originales.
+El reintento no crea otra reserva, no descuenta stock nuevamente y no extiende
+el vencimiento. Las compras pagadas, canceladas, vencidas o en revision no
+pueden abrir el checkout mediante la API.
+
+Cada transaccion verificada conserva su propio registro. Un rechazo anterior,
+incluso si su aviso se repite despues, no reemplaza un pago exitoso de otro
+intento de la misma compra. Se mantiene la proteccion de pagos duplicados.
+
+Esto es distinto de reenviar la creacion por un timeout: ese reenvio conserva
+el UUID de idempotencia y el body exacto que ya se guardo. Los checkouts viejos
+no se reescriben; si fueron creados con retries.allowed=false, conservan esa
+configuracion. El cambio no modifica una order ya creada en Mercado Pago.
+Para comprobar la nueva configuracion se necesita una compra y checkout nuevos.
+
+No se agregaron endpoints ni cambios de esquema. Seguimos en pruebas. Queda
+pendiente comprobar rechazo y pago posterior exitoso dentro del checkout del
+proveedor, con el comprador de prueba; las pruebas locales simulan esas respuestas.
+No se configuraron cobros recurrentes ni un proceso de reintentos automaticos
+del backend. La experiencia y los limites efectivos del checkout deben
+confirmarse en el entorno de prueba de Mercado Pago.
+Verificacion de reintentos: 55 pruebas relacionadas aprobadas sin fallos ni errores
+(MercadoPagoClientTests, PaymentCheckoutTests y PaymentConfirmationTests). Las
+respuestas del proveedor fueron simuladas; no se realizaron cobros reales.

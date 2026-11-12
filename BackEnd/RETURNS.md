@@ -5,7 +5,7 @@ En ese caso, la devolución de dinero se realiza fuera de la API y ADMIN la regi
 `POST /admin/store-sales/{orderId}/refund`, según [STORE_SALES.md](STORE_SALES.md).
 Los reembolsos online siguen el endpoint de pagos de Mercado Pago descrito abajo.
 
-Esta primera versión admite la devolución de **todos los artículos físicos del pedido**, con una sola recepción definitiva. No admite devoluciones ni reembolsos parciales elegidos por artículo. En pedidos mixtos se reciben todos los artículos físicos y el reembolso total también revoca el acceso digital.
+Se admiten recepciones parciales acumuladas por articulo. El reembolso total exige recibir todos los articulos fisicos que debian entregarse (o registrar una excepcion). El reembolso online parcial solo exige las unidades elegidas. En pedidos mixtos, el parcial revoca solo los digitales seleccionados; el total revoca todo el acceso digital.
 
 ## Antes del envío
 
@@ -23,7 +23,7 @@ El pedido conserva `SHIPPED` o `DELIVERED`. Una devolución física se registra 
    { "reason": "Devolución total acordada con el cliente" }
    ```
 
-2. Cuando llegan **todos** los artículos físicos, ADMIN registra la recepción y la inspección:
+2. Cuando llegan artículos físicos, ADMIN registra la recepción y la inspección:
 
    `POST /admin/orders/{orderId}/physical-return/receive`
 
@@ -36,7 +36,7 @@ El pedido conserva `SHIPPED` o `DELIVERED`. Una devolución física se registra 
    }
    ```
 
-   Debe incluir cada línea física del pedido, sin duplicados, con la cantidad total comprada. `orderItemId` es el identificador del artículo **de la orden**, no el del producto. La cantidad que vuelve a stock puede ser cero y nunca superar la recibida. Las cantidades quedan registradas. Repetir la misma recepción no repone stock otra vez; intentar cambiarla devuelve conflicto.
+   Incluí las líneas recibidas, sin duplicados. Las cantidades son acumuladas: recibir una unidad y luego otra se registra primero como 1 y después como 2. Podés omitir líneas que todavía no llegaron. No se puede superar la cantidad que debía entregarse, descontando las unidades excluidas antes del envío. `orderItemId` es el identificador del artículo **de la orden**, no el del producto. La cantidad que vuelve a stock puede ser cero y nunca superar la recibida. Las cantidades quedan registradas. Repetir la misma recepción no repone stock otra vez. Una recepción posterior agrega solo el incremento al stock; las cantidades acumuladas no pueden disminuir y no se puede reclasificar como vendible una unidad ya registrada como no vendible.
 
 3. ADMIN solicita el reembolso por el endpoint de pagos existente. La recepción no mueve dinero por sí sola. Se devuelve todo el importe restante de ese pago, incluido el envío cobrado si lo hubiera. Actualmente el envío está configurado en cero. La confirmación se verifica con Mercado Pago.
 
@@ -68,3 +68,36 @@ Esta excepción queda como `WAIVED`, con fecha, responsable y motivo. No repone 
 El script manual `src/main/resources/db/manual/2026-11-10-physical-returns.sql` crea `physical_returns` y `physical_return_lines` en el esquema existente. No ejecuta reembolsos ni modifica el stock histórico. No fue ejecutado desde Codex.
 
 Las pruebas usan repositorios y Mercado Pago simulados. Falta probar la migración, los bloqueos reales y el recorrido de reembolso en sandbox con una base aislada.
+
+Para devolver dinero por unidades seleccionadas, usar
+`POST /admin/payments/{paymentId}/refund/items`, según [PAYMENTS.md](PAYMENTS.md).
+La recepción acumulada debe cubrir esas unidades más las ya solicitadas de esa
+misma línea; una unidad recibida no permite reembolsar dos veces. Las unidades
+excluidas antes del envío no requieren recepción física. Recibir artículos nunca
+cambia automáticamente el estado del cobro ni llama a Mercado Pago.
+La excepcion administrativa tambien puede cerrar el retorno pendiente despues
+de una recepcion parcial. Conserva las lineas ya recibidas y el stock repuesto;
+no repone las unidades que no regresaron. Al autorizarla se cierra la recepcion
+de ese pedido, con motivo y auditoria.
+
+
+Un pedido SHIPPED/DELIVERED con pago CHARGED_BACK tambien permite registrar
+una devolucion fisica. Solo se repone lo recibido y vendible; no se ejecuta otro
+reembolso ni se modifica el resultado financiero. Ver [CHARGEBACKS.md](CHARGEBACKS.md).
+
+## Listado administrativo
+
+ADMIN y SUPPORT pueden consultar `GET /admin/physical-returns?status=REQUESTED&page=0&size=20`.
+El filtro status es opcional (REQUESTED, RECEIVED o WAIVED); sin el se listan todos.
+La pagina empieza en cero, tiene 20 registros por defecto y un maximo de 100.
+El orden es requestedAt descendente y luego id descendente.
+
+Se devuelve PhysicalReturnListDTO, con identificadores, estado y fechas. Para ver
+motivos, responsables y articulos se conserva `GET /admin/orders/{orderId}/physical-return`.
+REQUESTED significa que todavia no hubo recepcion ni excepcion. RECEIVED puede
+ser parcial: no se interpreta automaticamente que deban devolverse los demas
+articulos que el comprador decidio conservar.
+
+El historial de recepciones, excepciones y cambios financieros se consulta en
+`GET /admin/orders/{orderId}/history?page=0&size=20`. Estas lecturas no producen
+nuevas auditorias ni modifican stock, reembolsos o estados.

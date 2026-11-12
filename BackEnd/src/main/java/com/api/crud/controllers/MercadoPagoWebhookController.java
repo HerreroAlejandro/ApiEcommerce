@@ -23,7 +23,10 @@ public class MercadoPagoWebhookController {
             @RequestParam(required = false) String type,
             @RequestHeader(name = "x-request-id", required = false) String requestId,
             @RequestHeader(name = "x-signature", required = false) String signature) {
-        if (type == null || type.equals("order") || type.equals("orders_v2")) {
+        if (type == null
+                || type.equals("order")
+                || type.equals("orders_v2")
+                || type.equals("chargebacks")) {
             payments.webhook(dataId, requestId, signature);
         }
         return ResponseEntity.ok().build();

@@ -16,6 +16,8 @@ import jakarta.validation.Validation;
 import jakarta.validation.ValidatorFactory;
 
 import org.junit.jupiter.api.*;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -118,11 +120,11 @@ class PhysicalReturnTests {
     }
 
     @Test
-    void partialForeignDuplicateOrExcessQuantitiesAreRejectedBeforeStockChanges() {
+    void foreignDuplicateOrExcessQuantitiesAreRejectedBeforeStockChanges() {
         service.request("admin@example.com", 10L, "Devolucion");
         assertThrows(
                 InvalidRequestException.class,
-                () -> service.receive("admin@example.com", 10L, receipt(1, 1)));
+                () -> service.receive("admin@example.com", 10L, receipt(3, 1)));
         assertThrows(
                 InvalidRequestException.class,
                 () -> service.receive("admin@example.com", 10L, receipt(2, 3)));
@@ -152,7 +154,7 @@ class PhysicalReturnTests {
         product.setStockProduct(3);
         service.receive("admin@example.com", 10L, receipt(2, 1));
         assertThrows(
-                BusinessConflictException.class,
+                InvalidRequestException.class,
                 () -> service.receive("admin@example.com", 10L, receipt(2, 2)));
         assertEquals(4, product.getStockProduct());
     }
@@ -205,5 +207,72 @@ class PhysicalReturnTests {
         actor.setRoles(Set.of(new Role("CLIENT")));
         assertThrows(
                 ForbiddenOperationException.class, () -> service.get("admin@example.com", 10L));
+    }
+
+    @Test
+    void cumulativePartialReceiptsRestockOnlyNewUnitsAndGateEachRefund() {
+        service.request("admin@example.com", 10L, "Devolucion por etapas");
+        service.receive("admin@example.com", 10L, receipt(1, 1));
+        assertEquals(4, product.getStockProduct());
+        service.receive("admin@example.com", 10L, receipt(1, 1));
+        assertEquals(4, product.getStockProduct());
+        var item = order.getItemsOrder().get(0);
+        assertDoesNotThrow(() -> service.requireItemRefundReady(order, item, 1));
+        assertThrows(
+                BusinessConflictException.class,
+                () -> service.requireItemRefundReady(order, item, 2));
+        assertThrows(BusinessConflictException.class, () -> service.requireRefundReady(order));
+        service.receive("admin@example.com", 10L, receipt(2, 1));
+        assertEquals(4, product.getStockProduct());
+        assertEquals(1, saved.getItems().size());
+        assertDoesNotThrow(() -> service.requireItemRefundReady(order, item, 2));
+        assertDoesNotThrow(() -> service.requireRefundReady(order));
+        assertThrows(
+                InvalidRequestException.class,
+                () -> service.receive("admin@example.com", 10L, receipt(1, 1)));
+    }
+
+    @Test
+    void waiverAfterPartialReceiptPreservesRestockingAndAllowsRemainingRefund() {
+        service.request("admin@example.com", 10L, "Devolver");
+        service.receive("admin@example.com", 10L, receipt(1, 1));
+        service.waive("admin@example.com", 10L, "No exigir el retorno de la unidad restante");
+        assertEquals(1, saved.getItems().size());
+        assertEquals(4, product.getStockProduct());
+        assertDoesNotThrow(
+                () -> service.requireItemRefundReady(order, order.getItemsOrder().get(0), 2));
+        assertThrows(
+                BusinessConflictException.class,
+                () -> service.receive("admin@example.com", 10L, receipt(2, 2)));
+    }
+
+    @Test
+    void lostChargebackStillAllowsRecordingActualMerchandiseReturnWithoutASecondRefund() {
+        order.setPaymentStatus(PaymentStatus.CHARGED_BACK);
+        service.request("admin@example.com", 10L, "Retorno posterior al contracargo");
+        service.receive("admin@example.com", 10L, receipt(2, 1));
+        assertEquals(4, product.getStockProduct());
+        assertEquals(PaymentStatus.CHARGED_BACK, order.getPaymentStatus());
+        assertEquals(OrderStatus.DELIVERED, order.getOrderStatus());
+    }
+
+    @Test
+    void listFiltersExistingReturnStatesAndKeepsTheResponseSummarized() {
+        service.request("admin@example.com", 10L, "Devolver una parte");
+        var page = PageRequest.of(0, 20);
+        when(returns.getReturns(PhysicalReturnStatus.REQUESTED, page))
+                .thenReturn(new PageImpl<>(List.of(saved), page, 1));
+        actor.setRoles(Set.of(new Role("SUPPORT")));
+        var result = service.getReturns("admin@example.com", PhysicalReturnStatus.REQUESTED, page);
+        assertEquals(1, result.getTotalElements());
+        assertEquals(10L, result.getContent().get(0).getOrderId());
+        assertEquals(PhysicalReturnStatus.REQUESTED, result.getContent().get(0).getStatus());
+        assertThrows(
+                InvalidRequestException.class,
+                () -> service.getReturns("admin@example.com", null, PageRequest.of(0, 101)));
+        actor.setRoles(Set.of(new Role("CLIENT")));
+        assertThrows(
+                ForbiddenOperationException.class,
+                () -> service.getReturns("admin@example.com", null, page));
     }
 }

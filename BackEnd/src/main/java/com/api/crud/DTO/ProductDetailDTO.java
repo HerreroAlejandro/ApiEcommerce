@@ -37,5 +37,9 @@ public class ProductDetailDTO {
     @Setter
     private ProductType type;
 
+    @Getter
+    @Setter
+    private Integer stockProduct;
+
     public ProductDetailDTO() {}
 }

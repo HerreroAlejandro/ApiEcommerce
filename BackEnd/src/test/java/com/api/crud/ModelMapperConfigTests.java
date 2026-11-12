@@ -76,4 +76,12 @@ class ModelMapperConfigTests {
         assertEquals(7L, admin.getUserId());
         assertEquals(user.getEmail(), admin.getUserEmail());
     }
+
+    @Test
+    void publicProductDetailIncludesOnlyPhysicalStock() {
+        ProductPhysical physical = new ProductPhysical();
+        physical.setStockProduct(4);
+        assertEquals(4, mapper.map(physical, ProductDetailDTO.class).getStockProduct());
+        assertNull(mapper.map(new ProductDigital(), ProductDetailDTO.class).getStockProduct());
+    }
 }

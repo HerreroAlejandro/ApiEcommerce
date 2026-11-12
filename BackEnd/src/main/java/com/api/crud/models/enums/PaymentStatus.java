@@ -6,6 +6,8 @@ public enum PaymentStatus {
     PENDING,
     // El pago está realizado
     PAID,
+    PARTIALLY_REFUNDED,
+    CHARGED_BACK,
     // El pago falló
     FAILED,
     // El pago fue devuelto

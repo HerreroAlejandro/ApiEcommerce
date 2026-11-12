@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.api.crud.AccountStatusServiceTests
+-------------------------------------------------------------------------------
+Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 9.180 s -- in com.api.crud.AccountStatusServiceTests

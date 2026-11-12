@@ -18,6 +18,23 @@ public class ModelMapperConfig {
     @Bean
     public ModelMapper modelMapper() {
         ModelMapper modelMapper = new ModelMapper();
+        Converter<Product, Integer> productStock =
+                context ->
+                        context.getSource() instanceof ProductPhysical physical
+                                ? physical.getStockProduct()
+                                : null;
+        modelMapper
+                .createTypeMap(Product.class, ProductDetailDTO.class)
+                .addMappings(
+                        mapping ->
+                                mapping.using(productStock)
+                                        .map(source -> source, ProductDetailDTO::setStockProduct));
+        modelMapper
+                .createTypeMap(ProductPhysical.class, ProductDetailDTO.class)
+                .includeBase(Product.class, ProductDetailDTO.class);
+        modelMapper
+                .createTypeMap(ProductDigital.class, ProductDetailDTO.class)
+                .includeBase(Product.class, ProductDetailDTO.class);
         modelMapper
                 .typeMap(UserModel.class, UserDetailAdminResponseDTO.class)
                 .addMappings(
@@ -47,6 +64,80 @@ public class ModelMapperConfig {
         configureShipping(modelMapper);
         configureOrders(modelMapper);
         configureDigitalDeliveries(modelMapper);
+        modelMapper.createTypeMap(
+                OrderChangeAudit.class,
+                OrderHistoryResponseDTO.class,
+                modelMapper
+                        .getConfiguration()
+                        .copy()
+                        .setMatchingStrategy(MatchingStrategies.STRICT));
+        modelMapper.createTypeMap(
+                CartChangeAudit.class,
+                CartHistoryResponseDTO.class,
+                modelMapper
+                        .getConfiguration()
+                        .copy()
+                        .setMatchingStrategy(MatchingStrategies.STRICT));
+        modelMapper
+                .createTypeMap(
+                        PhysicalReturn.class,
+                        PhysicalReturnListDTO.class,
+                        modelMapper
+                                .getConfiguration()
+                                .copy()
+                                .setMatchingStrategy(MatchingStrategies.STRICT))
+                .addMapping(
+                        source -> source.getOrder().getIdOrder(),
+                        PhysicalReturnListDTO::setOrderId);
+        modelMapper
+                .createTypeMap(
+                        ChargebackCase.class,
+                        ChargebackListDTO.class,
+                        modelMapper
+                                .getConfiguration()
+                                .copy()
+                                .setMatchingStrategy(MatchingStrategies.STRICT))
+                .addMappings(
+                        mapping -> {
+                            mapping.map(
+                                    source -> source.getPayment().getId(),
+                                    ChargebackListDTO::setPaymentId);
+                            mapping.map(
+                                    source ->
+                                            source.getPayment()
+                                                    .getCheckout()
+                                                    .getOrder()
+                                                    .getIdOrder(),
+                                    ChargebackListDTO::setOrderId);
+                        });
+        modelMapper
+                .createTypeMap(
+                        ChargebackCase.class,
+                        ChargebackResponseDTO.class,
+                        modelMapper
+                                .getConfiguration()
+                                .copy()
+                                .setMatchingStrategy(MatchingStrategies.STRICT))
+                .addMappings(
+                        mapping -> {
+                            mapping.map(
+                                    source -> source.getPayment().getId(),
+                                    ChargebackResponseDTO::setPaymentId);
+                            mapping.map(
+                                    source ->
+                                            source.getPayment()
+                                                    .getCheckout()
+                                                    .getOrder()
+                                                    .getIdOrder(),
+                                    ChargebackResponseDTO::setOrderId);
+                        });
+        modelMapper.createTypeMap(
+                PaymentRefundAttempt.class,
+                PaymentRefundAttemptResponseDTO.class,
+                modelMapper
+                        .getConfiguration()
+                        .copy()
+                        .setMatchingStrategy(MatchingStrategies.STRICT));
         modelMapper
                 .createTypeMap(
                         StoreSaleCreateRequestDTO.class,
@@ -91,6 +182,13 @@ public class ModelMapperConfig {
                 .addMapping(
                         source -> source.getOrder().getIdOrder(),
                         PhysicalReturnResponseDTO::setOrderId);
+        modelMapper.createTypeMap(
+                RefundItemAllocation.class,
+                RefundItemResponseDTO.class,
+                modelMapper
+                        .getConfiguration()
+                        .copy()
+                        .setMatchingStrategy(MatchingStrategies.STRICT));
         modelMapper
                 .createTypeMap(
                         PaymentRefund.class,
@@ -204,6 +302,11 @@ public class ModelMapperConfig {
     }
 
     private void configureCartItems(ModelMapper mapper) {
+        Converter<Product, Integer> stock =
+                context ->
+                        context.getSource() instanceof ProductPhysical physical
+                                ? physical.getStockProduct()
+                                : null;
         mapper.createTypeMap(
                         CartItem.class,
                         MyCartItemResponseDTO.class,
@@ -224,6 +327,16 @@ public class ModelMapperConfig {
                             mapping.map(
                                     source -> source.getProductCartItem().getImageUrl(),
                                     MyCartItemResponseDTO::setImageUrl);
+                            mapping.map(
+                                    source -> source.getProductCartItem().isActive(),
+                                    MyCartItemResponseDTO::setActive);
+                            mapping.map(
+                                    source -> source.getProductCartItem().getType(),
+                                    MyCartItemResponseDTO::setType);
+                            mapping.using(stock)
+                                    .map(
+                                            CartItem::getProductCartItem,
+                                            MyCartItemResponseDTO::setStockProduct);
                         });
         mapper.createTypeMap(
                         CartItem.class,
@@ -272,11 +385,6 @@ public class ModelMapperConfig {
                             mapping.map(
                                     source -> source.getCart().getIdCart(),
                                     CartItemAdminDetailDTO::setCartId);
-                            Converter<Product, Integer> stock =
-                                    context ->
-                                            context.getSource() instanceof ProductPhysical physical
-                                                    ? physical.getStockProduct()
-                                                    : null;
                             mapping.using(stock)
                                     .map(
                                             CartItem::getProductCartItem,

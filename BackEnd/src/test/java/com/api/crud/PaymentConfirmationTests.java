@@ -10,10 +10,13 @@ import com.api.crud.models.entity.Order;
 import com.api.crud.models.enums.*;
 import com.api.crud.repositories.*;
 import com.api.crud.services.*;
+import com.api.crud.services.ChargebackService;
 import com.api.crud.services.MercadoPagoClient.VerifiedPayment;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -25,6 +28,9 @@ class PaymentConfirmationTests {
 
     private PaymentDao payments;
     private PaymentRefundDao refunds;
+    private ChargebackDao chargebackRecords;
+    private List<ChargebackCase> chargebackHistory;
+    private PaymentRefundAttemptDao attempts;
     private OrderWorkflowDao workflow;
     private OrderService orders;
     private DigitalDeliveryService deliveries;
@@ -38,6 +44,20 @@ class PaymentConfirmationTests {
     void setUp() {
         payments = mock(PaymentDao.class);
         refunds = mock(PaymentRefundDao.class);
+        attempts = mock(PaymentRefundAttemptDao.class);
+        chargebackRecords = mock(ChargebackDao.class);
+        chargebackHistory = new ArrayList<>();
+        when(chargebackRecords.getByPaymentId(anyLong()))
+                .thenAnswer(call -> List.copyOf(chargebackHistory));
+        doAnswer(
+                        call -> {
+                            ChargebackCase record = call.getArgument(0);
+                            record.setId((long) chargebackHistory.size() + 1);
+                            chargebackHistory.add(record);
+                            return null;
+                        })
+                .when(chargebackRecords)
+                .save(any());
         workflow = mock(OrderWorkflowDao.class);
         orders = mock(OrderService.class);
         deliveries = mock(DigitalDeliveryService.class);
@@ -48,10 +68,14 @@ class PaymentConfirmationTests {
                         deliveries,
                         orders,
                         new ModelMapperConfig().modelMapper(),
-                        refunds);
+                        refunds,
+                        attempts,
+                        new ChargebackLifecycle(
+                                chargebackRecords, refunds, workflow, orders, deliveries));
         version = Instant.now().truncatedTo(ChronoUnit.MICROS);
         order = new Order();
         order.setIdOrder(10L);
+        order.setItemsOrder(List.of());
         order.setOrderStatus(OrderStatus.PENDING);
         order.setPaymentStatus(PaymentStatus.PENDING);
         order.setStockDeducted(true);
@@ -227,11 +251,34 @@ class PaymentConfirmationTests {
         refund.setPreviouslyRefundedAmount(new BigDecimal("0.00"));
         refund.setStatus(PaymentRefundStatus.PROCESSING);
         when(refunds.getByPaymentId(extra.getId())).thenReturn(Optional.of(refund));
-        var refunded = snapshot("PAY2", "refunded", "100.00", "100.00", version.plusSeconds(1));
+        PaymentRefundAttempt attempt = new PaymentRefundAttempt();
+        attempt.setId(refund.getId());
+        attempt.setRefund(refund);
+        attempt.setStatus(PaymentRefundStatus.PROCESSING);
+        attempt.setProviderRefundId("REF123");
+        when(attempts.getById(refund.getId())).thenReturn(Optional.of(attempt));
+        var base = snapshot("PAY2", "refunded", "100.00", "100.00", version.plusSeconds(1));
+        var refunded =
+                new VerifiedPayment(
+                        base.id(),
+                        base.reference(),
+                        base.collectorId(),
+                        base.currency(),
+                        base.amount(),
+                        base.refundedAmount(),
+                        base.status(),
+                        base.paymentType(),
+                        base.paymentMethod(),
+                        base.approvedAt(),
+                        base.updatedAt(),
+                        base.liveMode(),
+                        Set.of("REF123"));
         service.apply(refunded);
         service.apply(refunded);
         assertEquals(PaymentRefundStatus.CONFIRMED, refund.getStatus());
         assertNotNull(refund.getConfirmedAt());
+        assertEquals(PaymentRefundStatus.CONFIRMED, attempt.getStatus());
+        assertNotNull(attempt.getConfirmedAt());
         assertEquals(PaymentStatus.PAID, order.getPaymentStatus());
         assertEquals("PAY1", order.getProviderPaymentId());
         assertTrue(order.isStockDeducted());
@@ -253,6 +300,92 @@ class PaymentConfirmationTests {
     }
 
     @Test
+    void moneyReturnedByAnotherRefundDoesNotConfirmAnUnrelatedAttempt() {
+        service.apply(snapshot("PAY1", "approved", "100.00", "0.00", version));
+        Payment payment = records.get("PAY1");
+        PaymentRefund refund = new PaymentRefund();
+        refund.setId("request");
+        refund.setAmount(new BigDecimal("100.00"));
+        refund.setPreviouslyRefundedAmount(BigDecimal.ZERO);
+        refund.setStatus(PaymentRefundStatus.PROCESSING);
+        PaymentRefundAttempt attempt = new PaymentRefundAttempt();
+        attempt.setId("request");
+        attempt.setRefund(refund);
+        attempt.setStatus(PaymentRefundStatus.PROCESSING);
+        attempt.setProviderRefundId("REFCURRENT");
+        when(refunds.getByPaymentId(payment.getId())).thenReturn(Optional.of(refund));
+        when(attempts.getById("request")).thenReturn(Optional.of(attempt));
+        var base = snapshot("PAY1", "refunded", "100.00", "100.00", version.plusSeconds(1));
+        var external =
+                new VerifiedPayment(
+                        base.id(),
+                        base.reference(),
+                        base.collectorId(),
+                        base.currency(),
+                        base.amount(),
+                        base.refundedAmount(),
+                        base.status(),
+                        base.paymentType(),
+                        base.paymentMethod(),
+                        base.approvedAt(),
+                        base.updatedAt(),
+                        base.liveMode(),
+                        Set.of("REFOTHER"));
+        service.apply(external);
+        service.apply(external);
+        assertEquals(PaymentRefundStatus.CONFIRMED, refund.getStatus());
+        assertEquals(PaymentStatus.REFUNDED, order.getPaymentStatus());
+        assertEquals(PaymentRefundStatus.PROCESSING, attempt.getStatus());
+        assertNull(attempt.getConfirmedAt());
+        verify(orders).cancelRefundedOrder(order);
+    }
+
+    @Test
+    void matchingProviderReferenceCanConfirmAttemptAfterTheFinancialRequestWasClosed() {
+        service.apply(snapshot("PAY1", "approved", "100.00", "0.00", version));
+        Payment payment = records.get("PAY1");
+        PaymentRefund refund = new PaymentRefund();
+        refund.setId("request");
+        refund.setAmount(new BigDecimal("100.00"));
+        refund.setPreviouslyRefundedAmount(BigDecimal.ZERO);
+        refund.setStatus(PaymentRefundStatus.PROCESSING);
+        PaymentRefundAttempt attempt = new PaymentRefundAttempt();
+        attempt.setId("request");
+        attempt.setRefund(refund);
+        attempt.setStatus(PaymentRefundStatus.PROCESSING);
+        attempt.setProviderRefundId("REFCURRENT");
+        when(refunds.getByPaymentId(payment.getId())).thenReturn(Optional.of(refund));
+        when(attempts.getById("request")).thenReturn(Optional.of(attempt));
+        var base = snapshot("PAY1", "refunded", "100.00", "100.00", version.plusSeconds(1));
+        service.apply(base);
+        Instant financiallyConfirmedAt = refund.getConfirmedAt();
+        assertEquals(PaymentRefundStatus.PROCESSING, attempt.getStatus());
+        var identified =
+                new VerifiedPayment(
+                        base.id(),
+                        base.reference(),
+                        base.collectorId(),
+                        base.currency(),
+                        base.amount(),
+                        base.refundedAmount(),
+                        base.status(),
+                        base.paymentType(),
+                        base.paymentMethod(),
+                        base.approvedAt(),
+                        base.updatedAt(),
+                        base.liveMode(),
+                        Set.of("REFCURRENT"));
+        service.apply(identified);
+        service.apply(identified);
+        assertEquals(PaymentRefundStatus.CONFIRMED, attempt.getStatus());
+        assertNotNull(attempt.getConfirmedAt());
+        assertEquals(financiallyConfirmedAt, refund.getConfirmedAt());
+        verify(orders).cancelRefundedOrder(order);
+        verify(workflow)
+                .saveAudit(argThat(audit -> "REFUND_ATTEMPT_CONFIRMED".equals(audit.getAction())));
+    }
+
+    @Test
     void rejectedRefundStillBlocksDeliveryButVerifiedMoneyReturnedCanConfirmItLater() {
         service.apply(snapshot("PAY1", "approved", "100.00", "0.00", version));
         order.setPaymentStatus(PaymentStatus.REVIEW);
@@ -264,6 +397,12 @@ class PaymentConfirmationTests {
         refund.setPreviouslyRefundedAmount(BigDecimal.ZERO);
         refund.setRejectedAt(version);
         refund.setRejectionCode("cannot_refund_order");
+        PaymentRefundAttempt rejected = new PaymentRefundAttempt();
+        rejected.setId(refund.getId());
+        rejected.setRefund(refund);
+        rejected.setStatus(PaymentRefundStatus.REJECTED);
+        rejected.setRejectedAt(version);
+        when(attempts.getById(refund.getId())).thenReturn(Optional.of(rejected));
         when(refunds.getByPaymentId(records.get("PAY1").getId())).thenReturn(Optional.of(refund));
         service.apply(snapshot("PAY1", "approved", "100.00", "0.00", version.plusSeconds(1)));
         assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
@@ -273,6 +412,8 @@ class PaymentConfirmationTests {
         assertNotNull(refund.getConfirmedAt());
         assertEquals(version, refund.getRejectedAt());
         assertEquals("cannot_refund_order", refund.getRejectionCode());
+        assertEquals(PaymentRefundStatus.REJECTED, rejected.getStatus());
+        assertNull(rejected.getConfirmedAt());
         verify(deliveries).enablePaidOrder(order);
         verify(orders).cancelRefundedOrder(order);
     }
@@ -305,7 +446,8 @@ class PaymentConfirmationTests {
                         payments,
                         mock(OrderDao.class),
                         users,
-                        new ModelMapperConfig().modelMapper());
+                        new ModelMapperConfig().modelMapper(),
+                        mock(ChargebackService.class));
 
         assertThrows(
                 ExternalServiceException.class,
@@ -334,6 +476,12 @@ class PaymentConfirmationTests {
         service.apply(rejected);
         assertEquals(PaymentStatus.PAID, order.getPaymentStatus());
         assertEquals(2, records.size());
+        assertEquals("123", order.getProviderPaymentId());
+        assertEquals("rejected", records.get("122").getProviderStatus());
+        assertNotNull(records.get("123").getAcceptedAt());
+        assertTrue(order.isStockDeducted());
+        verify(workflow, never()).lockProduct(anyLong());
+        verify(orders, never()).expireReservedOrder(any());
         verify(deliveries).enablePaidOrder(order);
     }
 
@@ -461,5 +609,331 @@ class PaymentConfirmationTests {
                         false);
         assertNull(service.apply(unknown));
         verifyNoInteractions(workflow);
+    }
+
+    @Test
+    void verifiedItemRefundKeepsRemainingPurchaseUsableAndRepeatedEventDoesNotRefundUnitsTwice() {
+        service.apply(snapshot("PAY123", "approved", "100.00", "0.00", version));
+        Payment payment = records.get("PAY123");
+        var item = new OrderItem(order, new ProductPhysical(), 2, new BigDecimal("50.00"));
+        item.setIdOrderItem(20L);
+        item.setRefundRequestedQuantity(1);
+        item.setCanceledQuantity(1);
+        order.setItemsOrder(List.of(item));
+        var allocation = new RefundItemAllocation();
+        allocation.setOrderItemId(20L);
+        allocation.setQuantity(1);
+        allocation.setUnitPrice(new BigDecimal("50.00"));
+        var refund = new PaymentRefund();
+        refund.setId(UUID.randomUUID().toString());
+        refund.setPayment(payment);
+        refund.setItemized(true);
+        refund.setAmount(new BigDecimal("50.00"));
+        refund.setPreviouslyRefundedAmount(BigDecimal.ZERO);
+        refund.setStatus(PaymentRefundStatus.PROCESSING);
+        refund.setProviderRefundId("REF123");
+        refund.setItems(List.of(allocation));
+        when(refunds.getByPaymentId(payment.getId())).thenReturn(Optional.of(refund));
+        when(refunds.getAllByPaymentId(payment.getId())).thenReturn(List.of(refund));
+        order.setPaymentStatus(PaymentStatus.REVIEW);
+        var remote =
+                new VerifiedPayment(
+                        "PAY123",
+                        checkout.getReference(),
+                        "99",
+                        "ARS",
+                        new BigDecimal("100.00"),
+                        new BigDecimal("50.00"),
+                        "approved",
+                        "credit_card",
+                        "visa",
+                        version.minusSeconds(10),
+                        version.plusSeconds(1),
+                        false,
+                        Set.of("REF123"));
+        service.apply(remote);
+        assertEquals(PaymentRefundStatus.CONFIRMED, refund.getStatus());
+        assertEquals(PaymentStatus.PARTIALLY_REFUNDED, order.getPaymentStatus());
+        assertEquals(PaymentReviewReason.NONE, payment.getReviewReason());
+        assertEquals(1, item.getRefundedQuantity());
+        service.apply(remote);
+        assertEquals(1, item.getRefundedQuantity());
+        assertEquals(1, item.getFulfillmentQuantity());
+        verify(orders, never()).cancelRefundedOrder(any());
+        verify(deliveries, never()).revokeOrder(any());
+        service.apply(
+                snapshot("PAY123", "charged_back", "100.00", "50.00", version.plusSeconds(2)));
+        assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
+        service.apply(remote);
+        assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
+        assertEquals(PaymentReviewReason.CHARGEBACK, payment.getReviewReason());
+        service.apply(snapshot("PAY123", "approved", "100.00", "50.00", version.plusSeconds(3)));
+        assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
+        assertEquals(PaymentReviewReason.CHARGEBACK, payment.getReviewReason());
+    }
+
+    @Test
+    void
+            caseResolutionCanSettleAnUnchangedPaymentSnapshotAndRecoveryNeverReopensCanceledFulfillment() {
+        service.apply(snapshot("PAY123", "approved", "100.00", "0.00", version));
+        doAnswer(
+                        call -> {
+                            order.setOrderStatus(OrderStatus.CANCELED);
+                            order.setStockDeducted(false);
+                            return null;
+                        })
+                .when(orders)
+                .cancelChargebackOrder(order);
+        var disputed =
+                new VerifiedPayment(
+                        "PAY123",
+                        checkout.getReference(),
+                        "99",
+                        "ARS",
+                        new BigDecimal("100.00"),
+                        BigDecimal.ZERO,
+                        "charged_back",
+                        "credit_card",
+                        "visa",
+                        version,
+                        version.plusSeconds(1),
+                        false,
+                        Set.of(),
+                        "in_process",
+                        "123456",
+                        Set.of("9988"));
+        service.apply(disputed);
+        service.apply(disputed);
+        assertEquals(1, chargebackHistory.size());
+        assertEquals("123456", records.get("PAY123").getProviderReferenceId());
+        chargebackHistory.get(0).setResolution(ChargebackResolution.LOST);
+        service.apply(disputed);
+        assertEquals(PaymentStatus.CHARGED_BACK, order.getPaymentStatus());
+        chargebackHistory.get(0).setResolution(ChargebackResolution.WON);
+        var recovered =
+                new VerifiedPayment(
+                        "PAY123",
+                        checkout.getReference(),
+                        "99",
+                        "ARS",
+                        new BigDecimal("100.00"),
+                        BigDecimal.ZERO,
+                        "charged_back",
+                        "credit_card",
+                        "visa",
+                        version,
+                        version.plusSeconds(2),
+                        false,
+                        Set.of(),
+                        "reimbursed",
+                        "123456",
+                        Set.of("9988"));
+        service.apply(recovered);
+        assertEquals(OrderStatus.CANCELED, order.getOrderStatus());
+        assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
+        assertEquals(PaymentReviewReason.LATE_APPROVAL, records.get("PAY123").getReviewReason());
+        var refunded =
+                new VerifiedPayment(
+                        "PAY123",
+                        checkout.getReference(),
+                        "99",
+                        "ARS",
+                        new BigDecimal("100.00"),
+                        new BigDecimal("100.00"),
+                        "charged_back",
+                        "credit_card",
+                        "visa",
+                        version,
+                        version.plusSeconds(3),
+                        false,
+                        Set.of("REF1"),
+                        "reimbursed",
+                        "123456",
+                        Set.of("9988"));
+        service.apply(refunded);
+        assertEquals(PaymentStatus.REFUNDED, order.getPaymentStatus());
+        assertEquals(OrderStatus.CANCELED, order.getOrderStatus());
+        assertFalse(order.isStockDeducted());
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = OrderStatus.class,
+            names = {"PENDING", "CONFIRMED", "SHIPPED", "DELIVERED"})
+    void correctedVerifiedPaymentRestoresAnAcceptedPurchaseWithoutChangingFulfillment(
+            OrderStatus status) {
+        service.apply(snapshot("PAY1", "approved", "100.00", "0.00", version));
+        Payment payment = records.get("PAY1");
+        Instant accepted = payment.getAcceptedAt();
+        assertNotNull(accepted);
+        order.setOrderStatus(status);
+        service.apply(snapshot("PAY1", "approved", "90.00", "0.00", version.plusSeconds(1)));
+        assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
+        assertEquals(PaymentReviewReason.AMOUNT_MISMATCH, payment.getReviewReason());
+        var corrected = snapshot("PAY1", "approved", "100.00", "0.00", version.plusSeconds(2));
+        service.apply(corrected);
+        assertEquals(PaymentStatus.PAID, order.getPaymentStatus());
+        assertEquals(PaymentReviewReason.NONE, payment.getReviewReason());
+        assertEquals(status, order.getOrderStatus());
+        assertEquals(accepted, payment.getAcceptedAt());
+        assertTrue(order.isStockDeducted());
+        service.apply(corrected);
+        verify(deliveries).restorePaidOrderAccess(order);
+        verify(deliveries).enablePaidOrder(order);
+        verify(workflow, never()).lockProduct(anyLong());
+        var audits = org.mockito.ArgumentCaptor.forClass(OrderChangeAudit.class);
+        verify(workflow, atLeastOnce()).saveAudit(audits.capture());
+        assertEquals(
+                1,
+                audits.getAllValues().stream()
+                        .filter(audit -> "PAYMENT_REVIEW_RESOLVED".equals(audit.getAction()))
+                        .count());
+    }
+
+    @Test
+    void recoveryUsesOriginalAcceptanceNotTheNewProviderTimestampOrCheckoutDeadline() {
+        service.apply(snapshot("PAY1", "approved", "100.00", "0.00", version));
+        service.apply(snapshot("PAY1", "in_process", "100.00", "0.00", version.plusSeconds(1)));
+        checkout.setExpiresAt(version.minusSeconds(1));
+        var corrected =
+                new VerifiedPayment(
+                        "PAY1",
+                        checkout.getReference(),
+                        "99",
+                        "ARS",
+                        new BigDecimal("100.00"),
+                        BigDecimal.ZERO,
+                        "approved",
+                        "credit_card",
+                        "visa",
+                        version.plusSeconds(2),
+                        version.plusSeconds(2),
+                        false);
+        service.apply(corrected);
+        assertEquals(PaymentStatus.PAID, order.getPaymentStatus());
+        verify(deliveries).restorePaidOrderAccess(order);
+        verify(orders, never()).expireReservedOrder(any());
+    }
+
+    @Test
+    void providerBindingWithoutPriorAcceptanceCannotForcePaid() {
+        service.apply(snapshot("PAY1", "pending", "100.00", "0.00", version));
+        order.setProviderPaymentId("PAY1");
+        order.setPaymentStatus(PaymentStatus.REVIEW);
+        service.apply(snapshot("PAY1", "approved", "100.00", "0.00", version.plusSeconds(1)));
+        assertNull(records.get("PAY1").getAcceptedAt());
+        assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
+        assertEquals(
+                PaymentReviewReason.INVALID_PROVIDER_STATE, records.get("PAY1").getReviewReason());
+        verifyNoInteractions(deliveries);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = OrderStatus.class,
+            names = {"CANCELED", "EXPIRED"})
+    void correctedMoneyNeverReopensACanceledOrExpiredPurchase(OrderStatus status) {
+        service.apply(snapshot("PAY1", "approved", "100.00", "0.00", version));
+        order.setOrderStatus(status);
+        order.setStockDeducted(false);
+        order.setPaymentStatus(PaymentStatus.REVIEW);
+        service.apply(snapshot("PAY1", "approved", "100.00", "0.00", version.plusSeconds(1)));
+        assertEquals(status, order.getOrderStatus());
+        assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
+        assertEquals(PaymentReviewReason.LATE_APPROVAL, records.get("PAY1").getReviewReason());
+        assertFalse(order.isStockDeducted());
+        verify(deliveries, never()).restorePaidOrderAccess(any());
+    }
+
+    @Test
+    void releasedInventoryStillBlocksRecoveryOfAnAcceptedPurchase() {
+        service.apply(snapshot("PAY1", "approved", "100.00", "0.00", version));
+        order.setPaymentStatus(PaymentStatus.REVIEW);
+        order.setStockDeducted(false);
+        service.apply(snapshot("PAY1", "approved", "100.00", "0.00", version.plusSeconds(1)));
+        assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
+        verify(deliveries, never()).restorePaidOrderAccess(any());
+    }
+
+    @Test
+    void sameSnapshotCanCloseExplainedPartialReviewButNeverAnExternalUnknownPartial() {
+        service.apply(snapshot("PAY1", "approved", "100.00", "0.00", version));
+        var partial = snapshot("PAY1", "approved", "100.00", "20.00", version.plusSeconds(1));
+        service.apply(partial);
+        service.apply(partial);
+        assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
+        verify(deliveries, never()).restorePaidOrderAccess(any());
+        PaymentRefund refund = new PaymentRefund();
+        refund.setId("partial");
+        refund.setItemized(true);
+        refund.setAmount(new BigDecimal("20.00"));
+        refund.setPreviouslyRefundedAmount(BigDecimal.ZERO);
+        refund.setStatus(PaymentRefundStatus.CONFIRMED);
+        when(refunds.getAllByPaymentId(1L)).thenReturn(List.of(refund));
+        when(refunds.getByPaymentId(1L)).thenReturn(Optional.of(refund));
+        service.apply(partial);
+        assertEquals(PaymentStatus.PARTIALLY_REFUNDED, order.getPaymentStatus());
+        service.apply(partial);
+        verify(deliveries).restorePaidOrderAccess(order);
+    }
+
+    @Test
+    void unchangedPaymentCannotBypassAPendingOrFullRefundOrAMismatchedOrderTotal() {
+        var approved = snapshot("PAY1", "approved", "100.00", "0.00", version);
+        service.apply(approved);
+        order.setPaymentStatus(PaymentStatus.REVIEW);
+        PaymentRefund refund = new PaymentRefund();
+        refund.setItemized(true);
+        refund.setStatus(PaymentRefundStatus.REJECTED);
+        when(refunds.getAllByPaymentId(1L)).thenReturn(List.of(refund));
+        service.apply(approved);
+        assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
+        refund.setItemized(false);
+        refund.setStatus(PaymentRefundStatus.CONFIRMED);
+        service.apply(approved);
+        assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
+        when(refunds.getAllByPaymentId(1L)).thenReturn(List.of());
+        order.setTotalOrder(new BigDecimal("99.00"));
+        service.apply(approved);
+        assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
+        verify(deliveries, never()).restorePaidOrderAccess(any());
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = PaymentReviewReason.class,
+            names = {
+                "CURRENCY_MISMATCH",
+                "COLLECTOR_MISMATCH",
+                "MODE_MISMATCH",
+                "UNSUPPORTED_METHOD",
+                "INVALID_PROVIDER_STATE"
+            })
+    void otherReviewCausesRequireCorrectedCanonicalDataBeforeRecovery(PaymentReviewReason issue) {
+        service.apply(snapshot("PAY1", "approved", "100.00", "0.00", version));
+        var invalid =
+                new VerifiedPayment(
+                        "PAY1",
+                        checkout.getReference(),
+                        issue == PaymentReviewReason.COLLECTOR_MISMATCH ? "other" : "99",
+                        issue == PaymentReviewReason.CURRENCY_MISMATCH ? "USD" : "ARS",
+                        new BigDecimal("100.00"),
+                        BigDecimal.ZERO,
+                        "approved",
+                        issue == PaymentReviewReason.UNSUPPORTED_METHOD ? "ticket" : "credit_card",
+                        "visa",
+                        issue == PaymentReviewReason.INVALID_PROVIDER_STATE
+                                ? version.plusSeconds(120)
+                                : version.minusSeconds(10),
+                        version.plusSeconds(1),
+                        issue == PaymentReviewReason.MODE_MISMATCH);
+        service.apply(invalid);
+        assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
+        assertEquals(issue, records.get("PAY1").getReviewReason());
+        service.apply(invalid);
+        verify(deliveries, never()).restorePaidOrderAccess(any());
+        service.apply(snapshot("PAY1", "approved", "100.00", "0.00", version.plusSeconds(2)));
+        assertEquals(PaymentStatus.PAID, order.getPaymentStatus());
+        verify(deliveries).restorePaidOrderAccess(order);
     }
 }

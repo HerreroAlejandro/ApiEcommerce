@@ -75,7 +75,8 @@ public class PaymentDaoImp implements PaymentDao {
     public List<Payment> getByOrderId(Long orderId) {
         return entityManager
                 .createQuery(
-                        "SELECT p FROM Payment p WHERE p.checkout.order.idOrder = :id ORDER BY p.id DESC",
+                        "SELECT p FROM Payment p WHERE p.checkout.order.idOrder = :id ORDER BY p.id"
+                                + " DESC",
                         Payment.class)
                 .setParameter("id", orderId)
                 .getResultList();
@@ -91,9 +92,13 @@ public class PaymentDaoImp implements PaymentDao {
         List<Payment> rows =
                 entityManager
                         .createQuery(
-                                "SELECT p FROM Payment p WHERE p.reviewReason <> :none OR EXISTS (SELECT r.id FROM PaymentRefund r WHERE r.payment = p AND r.status <> :confirmed) ORDER BY p.verifiedAt DESC, p.id DESC",
+                                "SELECT p FROM Payment p WHERE (p.reviewReason <> :none AND"
+                                        + " p.reviewReason <> :closed) OR EXISTS (SELECT r.id FROM"
+                                        + " PaymentRefund r WHERE r.payment = p AND r.status <>"
+                                        + " :confirmed) ORDER BY p.verifiedAt DESC, p.id DESC",
                                 Payment.class)
                         .setParameter("none", PaymentReviewReason.NONE)
+                        .setParameter("closed", PaymentReviewReason.CHARGEBACK_LOST)
                         .setParameter("confirmed", PaymentRefundStatus.CONFIRMED)
                         .setFirstResult(Math.toIntExact(pageable.getOffset()))
                         .setMaxResults(pageable.getPageSize())
@@ -101,9 +106,13 @@ public class PaymentDaoImp implements PaymentDao {
         long count =
                 entityManager
                         .createQuery(
-                                "SELECT COUNT(p) FROM Payment p WHERE p.reviewReason <> :none OR EXISTS (SELECT r.id FROM PaymentRefund r WHERE r.payment = p AND r.status <> :confirmed)",
+                                "SELECT COUNT(p) FROM Payment p WHERE (p.reviewReason <> :none AND"
+                                        + " p.reviewReason <> :closed) OR EXISTS (SELECT r.id FROM"
+                                        + " PaymentRefund r WHERE r.payment = p AND r.status <>"
+                                        + " :confirmed)",
                                 Long.class)
                         .setParameter("none", PaymentReviewReason.NONE)
+                        .setParameter("closed", PaymentReviewReason.CHARGEBACK_LOST)
                         .setParameter("confirmed", PaymentRefundStatus.CONFIRMED)
                         .getSingleResult();
         return new PageImpl<>(rows, pageable, count);

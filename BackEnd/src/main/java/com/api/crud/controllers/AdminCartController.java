@@ -3,8 +3,10 @@ package com.api.crud.controllers;
 import com.api.crud.DTO.CartAdminDetailDTO;
 import com.api.crud.DTO.CartAdminFilterDTO;
 import com.api.crud.DTO.CartAdminListDTO;
+import com.api.crud.DTO.CartHistoryResponseDTO;
 import com.api.crud.DTO.ChangeReasonRequestDTO;
 import com.api.crud.exceptions.ResourceNotFoundException;
+import com.api.crud.services.AdministrativeHistoryService;
 import com.api.crud.services.CartItemService;
 import com.api.crud.services.CartService;
 
@@ -13,11 +15,12 @@ import jakarta.validation.constraints.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -32,11 +35,33 @@ public class AdminCartController {
 
     private static final Logger logger = LoggerFactory.getLogger(AdminCartController.class);
 
-    @Autowired
-    private CartService cartService;
+    private final CartService cartService;
 
-    @Autowired
-    private CartItemService cartItemService;
+    private final CartItemService cartItemService;
+
+    private final AdministrativeHistoryService historyService;
+
+    public AdminCartController(
+            CartService cartService,
+            CartItemService cartItemService,
+            AdministrativeHistoryService historyService) {
+        this.cartService = cartService;
+        this.cartItemService = cartItemService;
+        this.historyService = historyService;
+    }
+
+    @GetMapping("/{cartId}/history")
+    public ResponseEntity<Page<CartHistoryResponseDTO>> getCartHistory(
+            Authentication authentication,
+            @PathVariable @Positive Long cartId,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(
+                        historyService.getCartHistory(
+                                authentication.getName(), cartId, PageRequest.of(page, size)));
+    }
 
     @PatchMapping("/{id}/disable")
     public ResponseEntity<Void> disableCart(

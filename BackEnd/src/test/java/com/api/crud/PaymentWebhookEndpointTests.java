@@ -6,8 +6,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.api.crud.config.MercadoPagoProperties;
 import com.api.crud.controllers.MercadoPagoWebhookController;
-import com.api.crud.exceptions.GlobalExceptionHandler;
 import com.api.crud.exceptions.ExternalServiceException;
+import com.api.crud.exceptions.GlobalExceptionHandler;
 import com.api.crud.repositories.*;
 import com.api.crud.services.*;
 
@@ -29,8 +29,8 @@ class PaymentWebhookEndpointTests {
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
-    void unsignedNotificationsAreRejectedAndSignedBodiesCannotOverrideTheFetchedResource(boolean lowercaseSignature)
-            throws Exception {
+    void unsignedNotificationsAreRejectedAndSignedBodiesCannotOverrideTheFetchedResource(
+            boolean lowercaseSignature) throws Exception {
         MercadoPagoProperties properties = new MercadoPagoProperties();
         properties.setEnabled(true);
         properties.setWebhookSecret("test-secret");
@@ -49,7 +49,8 @@ class PaymentWebhookEndpointTests {
                         mock(PaymentDao.class),
                         mock(OrderDao.class),
                         mock(UserDao.class),
-                        new ModelMapper());
+                        new ModelMapper(),
+                        mock(ChargebackService.class));
         var mvc =
                 MockMvcBuilders.standaloneSetup(new MercadoPagoWebhookController(service))
                         .setControllerAdvice(new GlobalExceptionHandler())
@@ -64,8 +65,10 @@ class PaymentWebhookEndpointTests {
                         + HexFormat.of()
                                 .formatHex(
                                         mac.doFinal(
-                                                ((lowercaseSignature ? "id:ordtst123;" : "id:ORDTST123;")
-                                                        + "request-id:request-1;ts:1730000000000;")
+                                                ((lowercaseSignature
+                                                                        ? "id:ordtst123;"
+                                                                        : "id:ORDTST123;")
+                                                                + "request-id:request-1;ts:1730000000000;")
                                                         .getBytes(StandardCharsets.UTF_8)));
         when(client.getOrder("ORDTST123"))
                 .thenThrow(new ExternalServiceException("Proveedor temporalmente no disponible"))
@@ -88,8 +91,18 @@ class PaymentWebhookEndpointTests {
                                 .content(
                                         "{\"data\":{\"id\":\"999\"},\"status\":\"approved\",\"amount\":1}"))
                 .andExpect(status().isOk());
-        verify(client, times(2)).getOrder("ORDTST123");
+        mvc.perform(
+                        post("/payments/mercadopago/webhook")
+                                .param("data.id", "ORDTST123")
+                                .param("type", "chargebacks")
+                                .header("x-request-id", "request-1")
+                                .header("x-signature", signature)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"data\":{\"id\":\"forged-case\"},\"coverage_applied\":true}"))
+                .andExpect(status().isOk());
+        verify(client, times(3)).getOrder("ORDTST123");
         verify(client, never()).getOrder("999");
-        verify(confirmations).applyOrder(canonical);
+        verify(confirmations, times(2)).applyOrder(canonical);
     }
 }

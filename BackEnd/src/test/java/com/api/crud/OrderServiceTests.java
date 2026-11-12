@@ -19,12 +19,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.*;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 class OrderServiceTests {
@@ -441,5 +444,165 @@ class OrderServiceTests {
         assertEquals(7, product.getStockProduct());
         service.cancelRefundedOrder(order);
         assertEquals(7, product.getStockProduct());
+    }
+
+    @Test
+    void fullRefundAfterPartialCancellationRestoresOnlyRemainingReservation() {
+        order.getItemsOrder().get(0).setCanceledQuantity(1);
+        order.getItemsOrder().get(0).setRefundRequestedQuantity(1);
+        order.getItemsOrder().get(0).setRefundedQuantity(1);
+        order.setPaymentStatus(PaymentStatus.REFUNDED);
+        service.cancelRefundedOrder(order);
+        assertEquals(6, product.getStockProduct());
+        service.cancelRefundedOrder(order);
+        assertEquals(6, product.getStockProduct());
+    }
+
+    @Test
+    void chargebackCancelsUnshippedFulfillmentWithoutMarkingMoneyRefundedAndRestocksOnce() {
+        order.setPaymentStatus(PaymentStatus.REVIEW);
+        order.getItemsOrder().get(0).setCanceledQuantity(1);
+        service.cancelChargebackOrder(order);
+        assertEquals(OrderStatus.CANCELED, order.getOrderStatus());
+        assertEquals(PaymentStatus.REVIEW, order.getPaymentStatus());
+        assertEquals(6, product.getStockProduct());
+        assertFalse(order.isStockDeducted());
+        assertEquals(2, order.getItemsOrder().get(0).getAmountOrderItem());
+        assertEquals(0, order.getItemsOrder().get(0).getFulfillmentQuantity());
+        service.cancelChargebackOrder(order);
+        assertEquals(6, product.getStockProduct());
+        verify(workflow).saveAudit(any());
+    }
+
+    @Test
+    void chargebackCannotUndoAShipmentOrDelivery() {
+        for (var status : List.of(OrderStatus.SHIPPED, OrderStatus.DELIVERED)) {
+            order.setOrderStatus(status);
+            service.cancelChargebackOrder(order);
+            assertEquals(status, order.getOrderStatus());
+        }
+        assertEquals(5, product.getStockProduct());
+        verify(workflow, never()).lockProduct(anyLong());
+    }
+
+    @Test
+    void pendingOrderLimitRejectsBeforeTouchingCartOrStock() {
+        when(workflow.getActivePendingOrderCount(eq(7L), any(), any())).thenReturn(3L);
+        var error =
+                assertThrows(
+                        BusinessConflictException.class,
+                        () -> service.createMyOrder(user.getEmail(), checkoutRequest()));
+        assertTrue(error.getMessage().contains("3 ordenes"));
+        assertEquals(5, product.getStockProduct());
+        assertEquals(1, cart.getItemsCart().size());
+        verify(workflow, never()).lockCart(anyLong());
+        verify(workflow, never()).lockProduct(anyLong());
+        verify(orders, never()).saveOrder(any());
+        verify(workflow, never()).flush();
+        var sequence = inOrder(workflow);
+        sequence.verify(workflow).lockUser(7L);
+        sequence.verify(workflow).getActivePendingOrderCount(eq(7L), any(), any());
+    }
+
+    @Test
+    void customerBelowLimitCanReserveTheNextOrder() {
+        when(workflow.getActivePendingOrderCount(eq(7L), any(), any())).thenReturn(2L);
+        var result = service.createMyOrder(user.getEmail(), checkoutRequest());
+        assertEquals(11L, result.getIdOrder());
+        assertEquals(3, product.getStockProduct());
+        assertTrue(cart.getItemsCart().isEmpty());
+        var now = ArgumentCaptor.forClass(LocalDateTime.class);
+        var cutoff = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(workflow).getActivePendingOrderCount(eq(7L), now.capture(), cutoff.capture());
+        assertEquals(now.getValue().minusMinutes(30), cutoff.getValue());
+    }
+
+    @Test
+    void configuredLimitAllowsANewOrderWhenAPreviousReservationStopsCounting() {
+        ReflectionTestUtils.setField(service, "maxPendingOrders", 1);
+        when(workflow.getActivePendingOrderCount(eq(7L), any(), any())).thenReturn(1L, 0L);
+        assertThrows(
+                BusinessConflictException.class,
+                () -> service.createMyOrder(user.getEmail(), checkoutRequest()));
+        assertEquals(5, product.getStockProduct());
+        assertEquals(1, cart.getItemsCart().size());
+        assertDoesNotThrow(() -> service.createMyOrder(user.getEmail(), checkoutRequest()));
+        assertEquals(3, product.getStockProduct());
+        verify(orders).saveOrder(any());
+    }
+
+    @Test
+    void pendingReservationConfigurationMustRemainPositive() {
+        for (int invalid : List.of(0, -1)) {
+            ReflectionTestUtils.setField(service, "maxPendingOrders", invalid);
+            assertThrows(
+                    IllegalStateException.class,
+                    () -> ReflectionTestUtils.invokeMethod(service, "validateOrderConfiguration"));
+        }
+        ReflectionTestUtils.setField(service, "maxPendingOrders", 3);
+        assertDoesNotThrow(
+                () -> ReflectionTestUtils.invokeMethod(service, "validateOrderConfiguration"));
+        ReflectionTestUtils.setField(service, "reservationMinutes", 0L);
+        assertThrows(
+                IllegalStateException.class,
+                () -> ReflectionTestUtils.invokeMethod(service, "validateOrderConfiguration"));
+    }
+
+    @Test
+    void simultaneousPurchasesByOneCustomerCannotTakeTheLastReservationSlotTwice()
+            throws Exception {
+        // Simulates the per-customer database lock until transaction completion.
+        // The real MySQL isolation/locking still requires an isolated integration test.
+        ReentrantLock customerLock = new ReentrantLock();
+        var pending = new AtomicInteger(2);
+        doAnswer(
+                        call -> {
+                            customerLock.lock();
+                            return null;
+                        })
+                .when(workflow)
+                .lockUser(7L);
+        when(workflow.getActivePendingOrderCount(eq(7L), any(), any()))
+                .thenAnswer(call -> (long) pending.get());
+        doAnswer(
+                        call -> {
+                            ((Order) call.getArgument(0)).setIdOrder(11L);
+                            pending.incrementAndGet();
+                            return null;
+                        })
+                .when(orders)
+                .saveOrder(any());
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            List<Future<Boolean>> results = new ArrayList<>();
+            for (int request = 0; request < 2; request++) {
+                results.add(
+                        executor.submit(
+                                () -> {
+                                    assertTrue(start.await(5, TimeUnit.SECONDS));
+                                    try {
+                                        service.createMyOrder(user.getEmail(), checkoutRequest());
+                                        return true;
+                                    } catch (BusinessConflictException conflict) {
+                                        assertTrue(conflict.getMessage().contains("limite"));
+                                        return false;
+                                    } finally {
+                                        if (customerLock.isHeldByCurrentThread())
+                                            customerLock.unlock();
+                                    }
+                                }));
+            }
+            start.countDown();
+            int successes = 0;
+            for (var result : results) if (result.get(10, TimeUnit.SECONDS)) successes++;
+            assertEquals(1, successes);
+            assertEquals(3, pending.get());
+            assertEquals(3, product.getStockProduct());
+            verify(orders).saveOrder(any());
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+        }
     }
 }

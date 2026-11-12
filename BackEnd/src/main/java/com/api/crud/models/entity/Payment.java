@@ -15,6 +15,20 @@ import java.time.Instant;
 @Table(name = "payments")
 public class Payment {
 
+    @Getter
+    @Setter
+    private Instant acceptedAt;
+
+    @Column(length = 30, unique = true)
+    @Getter
+    @Setter
+    private String providerReferenceId;
+
+    @Column(length = 40)
+    @Getter
+    @Setter
+    private String providerStatusDetail;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Getter

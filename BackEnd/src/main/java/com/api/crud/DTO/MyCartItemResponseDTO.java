@@ -1,5 +1,7 @@
 package com.api.crud.DTO;
 
+import com.api.crud.models.enums.ProductType;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -30,6 +32,18 @@ public class MyCartItemResponseDTO {
     @Getter
     @Setter
     private int amountCartItem;
+
+    @Getter
+    @Setter
+    private boolean active;
+
+    @Getter
+    @Setter
+    private ProductType type;
+
+    @Getter
+    @Setter
+    private Integer stockProduct;
 
     @Getter
     @Setter

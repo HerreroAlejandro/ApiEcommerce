@@ -34,6 +34,7 @@ public class PaymentService {
     private final UserDao users;
 
     private final ModelMapper mapper;
+    private final ChargebackService chargebacks;
 
     public PaymentService(
             PaymentCheckoutPersistence checkout,
@@ -43,7 +44,8 @@ public class PaymentService {
             PaymentDao payments,
             OrderDao orders,
             UserDao users,
-            ModelMapper mapper) {
+            ModelMapper mapper,
+            ChargebackService chargebacks) {
         this.checkout = checkout;
         this.confirmations = confirmations;
         this.client = client;
@@ -52,6 +54,7 @@ public class PaymentService {
         this.orders = orders;
         this.users = users;
         this.mapper = mapper;
+        this.chargebacks = chargebacks;
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -63,6 +66,7 @@ public class PaymentService {
     public void webhook(String dataId, String requestId, String signature) {
         verifier.verify(dataId, requestId, signature);
         confirmations.applyOrder(client.getOrder(dataId));
+        chargebacks.synchronizeOrderCases(dataId);
     }
 
     private UserModel user(String email) {
@@ -104,7 +108,8 @@ public class PaymentService {
                 confirmations.applyOrder(client.getOrder(providerOrderId));
         if (result == null)
             throw new ResourceNotFoundException("El pago no pertenece a una orden de esta API");
-        return result;
+        List<PaymentResponseDTO> reconciled = chargebacks.synchronizeOrderCases(providerOrderId);
+        return reconciled == null ? result : reconciled;
     }
 
     @Transactional(readOnly = true)

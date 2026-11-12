@@ -61,6 +61,9 @@ public class UserService {
     @Autowired
     private AccountStatusService accountStatusService;
 
+    @Autowired
+    private EmailVerificationService emailVerificationService;
+
     public String login(LoginRequestDTO loginRequestDTO) {
         UserModel user =
                 userDao.getUserByEmail(loginRequestDTO.getEmail())
@@ -71,7 +74,11 @@ public class UserService {
         if (!passwordEncoder.matches(loginRequestDTO.getPassword(), user.getPassword())) {
             throw new UnauthenticatedException("Email o contraseña incorrectos");
         }
-        if (user.getStatus() != AccountStatus.ACTIVE) {
+        if (user.getStatus() == AccountStatus.PENDING_VERIFICATION) {
+            throw new ForbiddenOperationException(
+                    "Debe verificar su correo antes de iniciar sesion");
+        }
+        if (user.getStatus() != AccountStatus.ACTIVE || !user.isEmailVerified()) {
             throw new ForbiddenOperationException("La cuenta no esta activa");
         }
         return jwtUtil.generateToken(
@@ -98,20 +105,14 @@ public class UserService {
                                             "El rol CLIENT no existe en la base de datos");
                                 });
         userModel.getRoles().add(role);
-        userModel.setStatus(AccountStatus.ACTIVE);
+        userModel.setStatus(AccountStatus.PENDING_VERIFICATION);
+        userModel.setEmailVerified(false);
         if (userModel.getOrders() == null) {
             userModel.setOrders(new ArrayList<>());
         }
         userDao.register(userModel);
         logger.info("User {} registered successfully", userRegisterDTO.getEmail());
-        if (!emailService.sendEmail(
-                userModel.getEmail(),
-                "Registration Confirmation",
-                "Hello "
-                        + userModel.getFirstName()
-                        + ",\n\nYour account has been created successfully.\n\nGreetings!")) {
-            throw new ExternalServiceException("No se pudo enviar el correo de confirmacion");
-        }
+        emailVerificationService.prepareRegistration(userModel);
     }
 
     public List<UserListAdminResponseDTO> getUserByName(String firstName, String lastName) {

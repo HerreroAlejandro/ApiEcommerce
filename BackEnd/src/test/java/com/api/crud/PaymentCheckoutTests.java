@@ -138,4 +138,60 @@ class PaymentCheckoutTests {
                 ResourceNotFoundException.class, () -> service.prepare("buyer@example.com", 10L));
         assertTrue(saved.isEmpty());
     }
+
+    @Test
+    void rejectedPaymentReusesCheckoutWithoutExtendingReservationOrReservingMoreStock() {
+        String reference = service.prepare("buyer@example.com", 10L);
+        var first = service.ensureOrder("buyer@example.com", reference);
+        PaymentCheckout checkout = saved.get(10L);
+        Instant expiresAt = checkout.getExpiresAt();
+        LocalDateTime orderDeadline = order.getExpiresAt();
+        String body = checkout.getRequestBody();
+        order.setPaymentStatus(PaymentStatus.FAILED);
+        assertEquals(reference, service.prepare("buyer@example.com", 10L));
+        var retry = service.ensureOrder("buyer@example.com", reference);
+        assertEquals(first.getProviderOrderId(), retry.getProviderOrderId());
+        assertEquals(first.getCheckoutUrl(), retry.getCheckoutUrl());
+        assertEquals(expiresAt, checkout.getExpiresAt());
+        assertEquals(orderDeadline, order.getExpiresAt());
+        assertEquals(body, checkout.getRequestBody());
+        assertTrue(order.isStockDeducted());
+        assertEquals(1, saved.size());
+        verify(client).createOrder(any());
+        verify(client).prepareOrderRequest(any());
+        verify(workflow, never()).lockProduct(anyLong());
+    }
+
+    @Test
+    void reopeningCheckoutAfterFailureStillRejectsExpiredCanceledPaidAndReviewStates() {
+        String reference = service.prepare("buyer@example.com", 10L);
+        service.ensureOrder("buyer@example.com", reference);
+        order.setPaymentStatus(PaymentStatus.FAILED);
+        LocalDateTime deadline = order.getExpiresAt();
+        order.setExpiresAt(LocalDateTime.now().minusSeconds(1));
+        assertThrows(
+                BusinessConflictException.class,
+                () -> service.ensureOrder("buyer@example.com", reference));
+        order.setExpiresAt(deadline);
+        for (OrderStatus status : List.of(OrderStatus.CANCELED, OrderStatus.EXPIRED)) {
+            order.setOrderStatus(status);
+            assertThrows(
+                    BusinessConflictException.class,
+                    () -> service.ensureOrder("buyer@example.com", reference));
+        }
+        order.setOrderStatus(OrderStatus.PENDING);
+        for (PaymentStatus status :
+                List.of(
+                        PaymentStatus.PAID,
+                        PaymentStatus.PARTIALLY_REFUNDED,
+                        PaymentStatus.REFUNDED,
+                        PaymentStatus.REVIEW,
+                        PaymentStatus.CHARGED_BACK)) {
+            order.setPaymentStatus(status);
+            assertThrows(
+                    BusinessConflictException.class,
+                    () -> service.ensureOrder("buyer@example.com", reference));
+        }
+        verify(client).createOrder(any());
+    }
 }

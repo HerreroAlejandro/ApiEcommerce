@@ -2,6 +2,7 @@ package com.api.crud.controllers;
 
 import com.api.crud.DTO.*;
 import com.api.crud.models.enums.*;
+import com.api.crud.services.AdministrativeHistoryService;
 import com.api.crud.services.OrderService;
 
 import jakarta.validation.Valid;
@@ -10,6 +11,7 @@ import jakarta.validation.constraints.*;
 import org.springframework.data.domain.*;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -21,9 +23,25 @@ import java.time.LocalDateTime;
 public class AdminOrderController {
 
     private final OrderService orderService;
+    private final AdministrativeHistoryService historyService;
 
-    public AdminOrderController(OrderService orderService) {
+    public AdminOrderController(
+            OrderService orderService, AdministrativeHistoryService historyService) {
         this.orderService = orderService;
+        this.historyService = historyService;
+    }
+
+    @GetMapping("/{orderId}/history")
+    public ResponseEntity<Page<OrderHistoryResponseDTO>> getOrderHistory(
+            Authentication authentication,
+            @PathVariable @Positive Long orderId,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(
+                        historyService.getOrderHistory(
+                                authentication.getName(), orderId, PageRequest.of(page, size)));
     }
 
     @PatchMapping("/{orderId}/shipment")

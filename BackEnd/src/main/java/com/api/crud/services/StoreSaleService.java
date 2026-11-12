@@ -168,7 +168,7 @@ public class StoreSaleService {
         if (request.getAmountPaid().compareTo(total) != 0)
             throw new BusinessConflictException(
                     "El importe cobrado no coincide con los precios actuales y el envio; revise el"
-                        + " cobro antes de registrar la venta");
+                            + " cobro antes de registrar la venta");
         StoreSaleDetails details = mapper.map(request, StoreSaleDetails.class);
         LocalDateTime now = LocalDateTime.now();
         details.setReference(request.getReference().toString());
@@ -213,6 +213,12 @@ public class StoreSaleService {
         details.setRefundReason(reason.trim());
         order.setPaymentStatus(PaymentStatus.REFUNDED);
         lifecycle.cancelRefundedOrder(order);
+        for (OrderItem item : order.getItemsOrder()) {
+            item.setRefundRequestedQuantity(item.getAmountOrderItem());
+            item.setRefundedQuantity(item.getAmountOrderItem());
+            if (order.getOrderStatus() == OrderStatus.CANCELED)
+                item.setCanceledQuantity(item.getAmountOrderItem());
+        }
         audit(order, actor, "STORE_SALE_REFUNDED", reason.trim());
         return mapper.map(order, OrderAdminDetailDTO.class);
     }

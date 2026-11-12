@@ -7,8 +7,25 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 public class PaymentRefundResponseDTO {
+
+    @Getter
+    @Setter
+    private boolean itemized;
+
+    @Getter
+    @Setter
+    private List<RefundItemResponseDTO> items;
+
+    @Getter
+    @Setter
+    private String currentAttemptId;
+
+    @Getter
+    @Setter
+    private int attemptNumber;
 
     @Getter
     @Setter

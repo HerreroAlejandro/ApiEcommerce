@@ -413,8 +413,15 @@ class StoreSaleTests {
         service.refund("operator@example.com", 10L, "Reintento");
         assertEquals(5, product.getStockProduct());
         assertEquals("Dinero devuelto en caja", saved.getStoreSale().getRefundReason());
-        verify(workflow).saveAudit(argThat(audit -> "CANCEL".equals(audit.getAction())
-                && audit.getReason().equals("Cancelacion por reembolso total presencial registrado")));
+        verify(workflow)
+                .saveAudit(
+                        argThat(
+                                audit ->
+                                        "CANCEL".equals(audit.getAction())
+                                                && audit.getReason()
+                                                        .equals(
+                                                                "Cancelacion por reembolso total"
+                                                                    + " presencial registrado")));
     }
 
     @Test
@@ -465,7 +472,8 @@ class StoreSaleTests {
                         payments,
                         orders,
                         users,
-                        mapper);
+                        mapper,
+                        mock(ChargebackService.class));
         assertThrows(
                 ResourceNotFoundException.class,
                 () -> paymentService.getMyPayments("customer@example.com", 10L));
